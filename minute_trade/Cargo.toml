@@ -1,0 +1,39 @@
+[package]
+name = "minute_trade"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust library for implementing intraday trading strategies with minute-by-minute OHLCV data"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/example/minute_trade"
+readme = "README.md"
+keywords = ["trading", "finance", "algorithmic", "strategies", "intraday"]
+categories = ["finance", "algorithms"]
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+rand = "0.8"
+csv = "1.1"
+
+[dev-dependencies]
+criterion = "0.4"
+approx = "0.5"
+
+# We'll add benchmarks later
+# [[bench]]
+# name = "strategy_benchmarks"
+# harness = false
+
+[[example]]
+name = "scalping_strategy"
+path = "examples/scalping_strategy.rs"
+
+[[example]]
+name = "volatility_breakout"
+path = "examples/volatility_breakout.rs"
+
+[[example]]
+name = "strategy_comparison"
+path = "examples/strategy_comparison.rs"

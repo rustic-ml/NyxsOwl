@@ -1,0 +1,40 @@
+[package]
+name = "nyxs_owl"
+version = "0.2.0"
+edition = "2021"
+description = "A Rust library for the NyxsOwl project integrating day trading and minute trading capabilities"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rustic-ml/NyxsOwl"
+readme = "README.md"
+keywords = ["nyxs", "strategies", "trading", "finance", "algorithms"]
+categories = ["finance", "algorithms"]
+exclude = [
+    "*.jpg",
+    ".gitignore",
+    "examples/*",
+    "test/*",
+    "Cargo.lock"
+]
+
+# Core dependencies that will be included in the published crate
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+# Dependencies only needed for development or testing
+[dev-dependencies]
+day_trade = { path = "../day_trade" }
+trade_math = { path = "../trade_math" }
+minute_trade = { path = "../minute_trade" }
+
+# Optional features that can be enabled by users
+[features]
+default = []
+# Include day trading functionality (included from day_trade crate)
+day-trading = []
+# Include minute-level trading functionality (included from minute_trade crate)
+minute-trading = []
+# Include trading math utilities (included from trade_math crate)
+trading-math = [] 

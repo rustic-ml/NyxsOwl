@@ -1,0 +1,26 @@
+[package]
+name = "day_trade"
+version = "0.1.0"
+edition = "2021"
+description = "Day trading strategies using daily and minute OHLCV data"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rustic-ml/NyxsOwl"
+readme = "../README.md"
+keywords = ["trading", "finance", "stocks", "strategies", "analysis"]
+categories = ["finance"]
+publish = false
+
+[dependencies]
+# The correct crate name for RusTaLib is ta-lib-in-rust, not rustalib
+# rustalib = "1.0.8"
+ta-lib-in-rust = ">=1.0.8"
+# Required for ta-lib-in-rust functionality
+polars = { version = ">=0.46.0", features = ["lazy", "dtype-full"] }
+oxidiviner = ">=0.3.5"
+chrono = { version = ">=0.4.41", features = ["serde"] }
+serde = { version = ">=1.0.219", features = ["derive"] }
+serde_json = ">=1.0.140"
+thiserror = ">=2.0.12"
+trade_math = { path = "../trade_math" }
+rand = ">=0.8.5"

@@ -14,6 +14,42 @@ Our mission is to help you build your financial acumen and approach each trading
 
 ---
 
+## 📦 Project Structure
+
+NyxsOwl is organized as a Rust workspace with multiple crates:
+
+- **nyxs_owl**: The core library containing fundamental components and utilities
+- **day_trade**: A crate focused on day trading strategies that processes both daily and minute-level OHLCV (Open, High, Low, Close, Volume) data
+
+### Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/nyxs_owl.git
+cd nyxs_owl
+
+# Build all workspace crates
+cargo build
+
+# Run tests
+cargo test
+
+# Update dependencies to latest versions
+./update_deps.sh
+```
+
+### Dependency Management
+
+NyxsOwl follows a policy of using the latest stable versions of dependencies to ensure we have the most up-to-date features, performance improvements, and security fixes. We achieve this through:
+
+1. **Version Range Specifications**: Dependencies in Cargo.toml use the `>=x.y.z` format to allow automatic updates to newer versions.
+2. **Automated Updates**: Weekly checks for dependency updates via GitHub Actions.
+3. **Update Script**: The `update_deps.sh` script can be run anytime to manually update all dependencies.
+
+This approach helps us stay current with the Rust ecosystem while maintaining project stability.
+
+---
+
 ## 🦉 The Wisdom of the Night: How Bubo Works For You
 
 Bubo's strength lies in the power of nocturnal preparation:
