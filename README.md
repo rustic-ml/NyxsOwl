@@ -1,6 +1,6 @@
 # NyxsOwl: Your Nocturnal Stock Strategist 🦉✨
 
-![NyxsOwl Banner](https://i.imgur.com/your-owl-banner-placeholder.png) *"When the world sleeps, wisdom awakens. Let Bubo guide your trades by dawn."*
+![NyxsOwl Banner](IMG_2167_250px.jpg) *"When the world sleeps, wisdom awakens. Let Bubo guide your trades by dawn."*
 
 ---
 
