@@ -1,0 +1,63 @@
+name: Forecast Trade Tests and Coverage
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'forecast_trade/**'
+      - '.github/workflows/forecast_trade_coverage.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'forecast_trade/**'
+      - '.github/workflows/forecast_trade_coverage.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test_and_coverage:
+    name: Test and Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+      
+      - name: Run tests
+        run: cd forecast_trade && cargo test --verbose
+      
+      - name: Generate coverage report
+        run: cd forecast_trade && cargo tarpaulin --verbose --out Xml --out Html --output-dir coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./forecast_trade/coverage/tarpaulin-report.xml
+          flags: forecast_trade
+          fail_ci_if_error: true
+          verbose: true
+      
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report
+          path: forecast_trade/coverage/ 

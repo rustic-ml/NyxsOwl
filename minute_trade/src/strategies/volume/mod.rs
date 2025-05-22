@@ -227,10 +227,10 @@ mod volume_profile_strategy {
                                 if closest_below.is_none() || *price > closest_below.unwrap() {
                                     closest_below = Some(*price);
                                 }
-                            } else if *price > current.close {
-                                if closest_above.is_none() || *price < closest_above.unwrap() {
-                                    closest_above = Some(*price);
-                                }
+                            } else if *price > current.close
+                                && (closest_above.is_none() || *price < closest_above.unwrap())
+                            {
+                                closest_above = Some(*price);
                             }
                         }
 
@@ -270,7 +270,7 @@ mod volume_profile_strategy {
                         } else if in_long {
                             // In long position - check for exit at resistance
                             if let Some(resistance) = closest_above {
-                                if (current.close >= resistance) {
+                                if current.close >= resistance {
                                     in_long = false;
                                     Signal::Sell // Take profit at resistance
                                 } else {
@@ -283,7 +283,7 @@ mod volume_profile_strategy {
                             // in_short
                             // In short position - check for exit at support
                             if let Some(support) = closest_below {
-                                if (current.close <= support) {
+                                if current.close <= support {
                                     in_short = false;
                                     Signal::Buy // Take profit at support
                                 } else {
@@ -388,6 +388,12 @@ mod relative_volume_strategy {
     #[derive(Debug, Clone)]
     pub struct RelativeVolumeStrategy;
 
+    impl Default for RelativeVolumeStrategy {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl RelativeVolumeStrategy {
         /// Create a new instance (placeholder)
         pub fn new() -> Self {
@@ -401,7 +407,7 @@ mod relative_volume_strategy {
         }
 
         fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
-            let mut signals = vec![Signal::Hold; data.len()];
+            let signals = vec![Signal::Hold; data.len()];
             Ok(signals)
         }
 

@@ -86,6 +86,12 @@ pub struct OnBalanceVolume {
     previous_close: Option<f64>,
 }
 
+impl Default for OnBalanceVolume {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OnBalanceVolume {
     /// Create a new On-Balance Volume indicator
     pub fn new() -> Self {
@@ -221,6 +227,12 @@ impl VolumeRateOfChange {
 pub struct VolumePriceTrend {
     vpt: f64,
     previous_close: Option<f64>,
+}
+
+impl Default for VolumePriceTrend {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VolumePriceTrend {

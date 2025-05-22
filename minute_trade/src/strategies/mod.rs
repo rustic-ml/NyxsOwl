@@ -39,10 +39,3 @@ pub mod volatility;
 pub mod volume;
 
 // Re-export all strategies for convenient access
-pub use mean_reversion::{MeanReversionOscillatorStrategy, StatisticalArbitrageStrategy};
-pub use momentum::{MomentumBreakoutStrategy, ScalpingStrategy};
-pub use pattern::{ChartPatternStrategy, SupportResistanceStrategy};
-pub use statistical::{RegressionStrategy, ZScoreStrategy};
-pub use time_based::{SessionTransitionStrategy, TimeOfDayStrategy};
-pub use volatility::{BollingerBandContractionStrategy, VolatilityBreakoutStrategy};
-pub use volume::{RelativeVolumeStrategy, VolumeProfileStrategy};

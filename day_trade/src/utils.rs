@@ -86,16 +86,16 @@ pub fn generate_test_data(
 
     for i in 0..num_points {
         // Create a random price movement
-        let price_change = current_price * volatility * (rng.gen::<f64>() - 0.5);
+        let price_change = current_price * volatility * (rng.random::<f64>() - 0.5);
         let open = current_price;
         let close = open + price_change;
 
         // High and low based on open/close with some randomness
-        let high = open.max(close) + rng.gen::<f64>() * volatility * open * 0.5;
-        let low = open.min(close) - rng.gen::<f64>() * volatility * open * 0.5;
+        let high = open.max(close) + rng.random::<f64>() * volatility * open * 0.5;
+        let low = open.min(close) - rng.random::<f64>() * volatility * open * 0.5;
 
         // Random volume between 1000 and 10000
-        let volume = rng.gen_range(1000..10000);
+        let volume = rng.random_range(1000..10000);
 
         // Create the data point
         let date = base_date
@@ -141,4 +141,64 @@ pub fn validate_range(value: f64, min: f64, max: f64, name: &str) -> Result<(), 
         return Err(format!("{} must be between {} and {}", name, min, max));
     }
     Ok(())
+}
+
+pub mod data_generation {
+    use crate::DailyOhlcv;
+    use chrono::NaiveDate;
+    use rand::Rng;
+
+    /// Generate test data with a given trend and volatility
+    pub fn generate_daily_data(
+        days: usize,
+        starting_price: f64,
+        volatility: f64,
+        trend: f64,
+    ) -> Vec<DailyOhlcv> {
+        let mut data = Vec::with_capacity(days);
+        let mut current_price = starting_price;
+
+        // Use rng instead of thread_rng
+        use rand::thread_rng;
+        let mut rng = thread_rng();
+
+        for i in 0..days {
+            // Add a small random component to the price change, influenced by volatility
+            let price_change = current_price * volatility * (rng.random::<f64>() - 0.5);
+
+            // Apply the trend factor (can be positive or negative)
+            current_price = current_price * (1.0 + trend) + price_change;
+
+            // Generate open price with small offset from previous close or starting price
+            let open = if i == 0 {
+                starting_price
+            } else {
+                current_price * (1.0 + (rng.random::<f64>() - 0.5) * 0.01)
+            };
+            let close = current_price;
+
+            // Generate high and low with reasonable ranges
+            let high = open.max(close) + rng.random::<f64>() * volatility * open * 0.5;
+            let low = open.min(close) - rng.random::<f64>() * volatility * open * 0.5;
+
+            // Generate a plausible volume
+            let volume = rng.random_range(1000..10000);
+
+            // Create a date for this candle (just for testing)
+            let date = NaiveDate::from_ymd_opt(2023, 1, i as u32 % 28 + 1).unwrap();
+
+            data.push(DailyOhlcv {
+                date,
+                data: crate::OhlcvData {
+                    open,
+                    high,
+                    low,
+                    close,
+                    volume,
+                },
+            });
+        }
+
+        data
+    }
 }

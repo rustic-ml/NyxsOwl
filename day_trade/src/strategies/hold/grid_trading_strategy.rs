@@ -5,7 +5,6 @@
 //! Profits from price oscillations in a range-bound market
 
 use crate::{DailyOhlcv, Signal, TradeError, TradingStrategy};
-use std::collections::HashMap;
 use trade_math::volatility::AverageTrueRange;
 
 /// Price level with status for grid trading

@@ -286,7 +286,7 @@ mod tests {
 
         // Now we have enough data
         let first_ema = ema.value().unwrap();
-        assert!(first_ema >= 3.9 && first_ema <= 4.1); // Approximately 4.0
+        assert!((3.9..=4.1).contains(&first_ema)); // Approximately 4.0
 
         // Add another value
         ema.update(8.0).unwrap();

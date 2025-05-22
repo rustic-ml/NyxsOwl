@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use intraday_trade::{VolatilityBreakoutStrategy, IntradayStrategy};
-//! use intraday_trade::utils::generate_minute_data;
+//! use minute_trade::{VolatilityBreakoutStrategy, IntradayStrategy};
+//! use minute_trade::utils::generate_minute_data;
 //!
 //! // Create a volatility breakout strategy
 //! let strategy = VolatilityBreakoutStrategy::new(20, 5, 1.5).unwrap();

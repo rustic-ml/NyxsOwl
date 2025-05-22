@@ -5,7 +5,6 @@
 
 use crate::{MinuteOhlcv, OhlcvData, PerformanceMetrics, Signal, Trade, TradeError};
 use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc};
-use std::cmp;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -133,7 +132,7 @@ pub fn generate_minute_data(
             // Calculate timestamp (9:30 AM + minute)
             let time = market_open + Duration::minutes(minute as i64);
             let datetime = current_date.and_time(time);
-            let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(datetime.into(), Utc);
+            let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(datetime, Utc);
 
             // Add intraday volatility pattern (more at open and close)
             let minute_factor = minute as f64 / points_per_day as f64;
@@ -592,7 +591,7 @@ pub fn is_market_hours(timestamp: DateTime<Utc>) -> bool {
     }
 
     // Check if time is between 9:30 AM and 4:00 PM ET
-    if et_hour < 9 || et_hour > 16 {
+    if !(9..=16).contains(&et_hour) {
         return false;
     }
 

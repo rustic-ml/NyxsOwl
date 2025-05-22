@@ -401,7 +401,7 @@ mod tests {
                     high: price + 0.2,
                     low: price - 0.2,
                     close: price,
-                    volume: 1000 + (minute % 10) * 100,
+                    volume: (1000 + (minute % 10) * 100) as u64,
                 },
             });
         }

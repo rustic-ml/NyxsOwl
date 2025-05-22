@@ -268,7 +268,7 @@ impl IntradayTradingStrategy for VwapStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{TimeZone, Timelike};
+    use chrono::{Duration, TimeZone, Timelike};
 
     fn create_test_minute_data() -> Vec<MinuteOhlcv> {
         let mut data = Vec::new();
@@ -306,11 +306,11 @@ mod tests {
             price *= 1.0 + price_change;
 
             // Generate some volume variation
-            volume = 1000 + (minute % 5) * 100 + if minute % 15 == 0 { 500 } else { 0 };
+            volume = (1000 + (minute % 10) * 100) as u64;
 
             data.push(MinuteOhlcv {
                 timestamp,
-                data: OhlcvData {
+                data: crate::OhlcvData {
                     open: price * 0.999,
                     high: price * 1.002,
                     low: price * 0.998,

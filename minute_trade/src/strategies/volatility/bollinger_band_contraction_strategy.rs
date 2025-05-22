@@ -29,7 +29,6 @@
 
 use crate::utils::{
     calculate_basic_performance, calculate_bollinger_bands, validate_period, validate_positive,
-    validate_range,
 };
 use crate::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
@@ -67,7 +66,7 @@ impl BollingerBandContractionStrategy {
         validate_positive(std_dev_multiplier, "Standard deviation multiplier")?;
         validate_positive(contraction_threshold, "Contraction threshold")?;
 
-        if std_dev_multiplier < 1.0 || std_dev_multiplier > 3.0 {
+        if !(1.0..=3.0).contains(&std_dev_multiplier) {
             return Err(
                 "Standard deviation multiplier should typically be between 1.0 and 3.0".to_string(),
             );

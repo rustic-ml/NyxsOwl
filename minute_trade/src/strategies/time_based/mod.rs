@@ -8,10 +8,9 @@ pub use self::time_of_day_strategy::TimeOfDayStrategy;
 
 // These will be implemented in the future
 mod time_of_day_strategy {
-    use crate::utils::{calculate_basic_performance, validate_range};
+    use crate::utils::calculate_basic_performance;
     use crate::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
-    use chrono::{DateTime, NaiveTime, Timelike, Utc};
-    use std::time::{Duration, UNIX_EPOCH};
+    use chrono::{DateTime, Timelike, Utc};
 
     /// TimeOfDay strategy for trading specific times of the trading day
     #[derive(Debug, Clone)]
@@ -198,7 +197,6 @@ mod time_of_day_strategy {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::tests::create_test_data;
 
         #[test]
         fn test_time_of_day_parameters() {
@@ -242,14 +240,18 @@ mod time_of_day_strategy {
         fn test_signal_generation() {
             // Use test data with predefined timestamps
             let mut data = Vec::new();
+            use chrono::{TimeZone, Utc};
 
             // Create a day's worth of 1-minute data with timestamp
-            let day_start = 1609459200; // 2021-01-01 00:00:00 UTC
+            let day_start = Utc.with_ymd_and_hms(2021, 1, 1, 0, 0, 0).unwrap();
 
             for i in 0..390 {
                 // 6.5 hour trading day (390 minutes)
                 // Start at 9:30 AM
-                let timestamp = day_start + 9 * 60 * 60 + 30 * 60 + i * 60;
+                let timestamp = day_start
+                    + chrono::Duration::hours(9)
+                    + chrono::Duration::minutes(30)
+                    + chrono::Duration::minutes(i as i64);
 
                 let ohlcv = MinuteOhlcv {
                     timestamp,
@@ -298,6 +300,12 @@ mod session_transition_strategy {
     #[derive(Debug, Clone)]
     pub struct SessionTransitionStrategy;
 
+    impl Default for SessionTransitionStrategy {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl SessionTransitionStrategy {
         /// Create a new instance (placeholder)
         pub fn new() -> Self {
@@ -311,7 +319,7 @@ mod session_transition_strategy {
         }
 
         fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
-            let mut signals = vec![Signal::Hold; data.len()];
+            let signals = vec![Signal::Hold; data.len()];
             Ok(signals)
         }
 

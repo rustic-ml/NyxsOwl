@@ -1,12 +1,12 @@
 //! # NyxsOwl
-//! 
+//!
 //! `nyxs_owl` is a Rust library that provides utilities for the NyxsOwl project.
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```
 //! use nyxs_owl::Owl;
-//! 
+//!
 //! let my_owl = Owl::new("Hedwig");
 //! assert_eq!(my_owl.name(), "Hedwig");
 //! ```

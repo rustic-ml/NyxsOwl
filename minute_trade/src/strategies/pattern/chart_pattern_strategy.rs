@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use intraday_trade::{ChartPatternStrategy, IntradayStrategy};
-//! use intraday_trade::utils::generate_minute_data;
+//! use minute_trade::{ChartPatternStrategy, IntradayStrategy};
+//! use minute_trade::utils::generate_minute_data;
 //!
 //! // Create a chart pattern strategy
 //! let strategy = ChartPatternStrategy::new(
@@ -167,8 +167,8 @@ impl ChartPatternStrategy {
 
         // Look for strong uptrend followed by consolidation
         let mut max_high = data[start_index].data.high;
-        let mut min_low = data[start_index].data.low;
-        let mut trend_start = start_index;
+        let min_low = data[start_index].data.low;
+        let trend_start = start_index;
         let mut trend_end = start_index;
         let mut max_move = 0.0;
 
@@ -322,7 +322,7 @@ impl ChartPatternStrategy {
         }
 
         // Check for narrowing price action
-        let mut last_range_start = index - self.lookback_period / 3;
+        let last_range_start = index - self.lookback_period / 3;
         let mut last_highest = data[last_range_start].data.high;
         let mut last_lowest = data[last_range_start].data.low;
 
@@ -339,7 +339,8 @@ impl ChartPatternStrategy {
         }
 
         // Break direction depends on most recent moves
-        let break_level = if data[index].data.close > data[index - 1].data.high {
+
+        if data[index].data.close > data[index - 1].data.high {
             // Upside break
             Some((last_range_start, last_lowest * 0.99))
         } else if data[index].data.close < data[index - 1].data.low {
@@ -347,9 +348,7 @@ impl ChartPatternStrategy {
             Some((last_range_start, last_highest * 1.01))
         } else {
             None
-        };
-
-        break_level
+        }
     }
 
     /// Detect a head and shoulders pattern
@@ -667,6 +666,9 @@ mod tests {
 
         // Create a manual test case with known data that forms a H&S pattern
         let mut custom_data = Vec::new();
+        use chrono::{TimeZone, Utc};
+        let base_time = Utc.with_ymd_and_hms(2023, 1, 1, 9, 30, 0).unwrap();
+
         for i in 0..100 {
             let base_price = 100.0;
             let mut price = match i {
@@ -683,7 +685,7 @@ mod tests {
             price += (i as f64 * 0.01).sin();
 
             let ohlcv = MinuteOhlcv {
-                timestamp: i as i64 * 60,
+                timestamp: base_time + chrono::Duration::minutes(i as i64),
                 data: crate::OhlcvData {
                     open: price,
                     high: price + 0.5,

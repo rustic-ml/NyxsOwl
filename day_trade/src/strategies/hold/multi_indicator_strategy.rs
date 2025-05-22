@@ -2,7 +2,6 @@
 
 use crate::mock_indicators::{Macd, RelativeStrengthIndex, SimpleMovingAverage};
 use crate::{DailyOhlcv, Signal, TradeError, TradingStrategy};
-use chrono;
 
 /// Strength of a trading signal
 #[derive(Debug, Clone, Copy)]
@@ -565,15 +564,19 @@ mod tests {
         let mut ohlcv_data = Vec::with_capacity(prices.len());
 
         for (i, &close) in prices.iter().enumerate() {
-            let open = if i == 0 { close } else { prices[i - 1] };
-            let high = close.max(open) + (close * 0.01); // 1% above max of open/close
-            let low = close.min(open) - (close * 0.01); // 1% below min of open/close
+            let open: f64 = if i == 0 { close } else { prices[i - 1] };
+            let high: f64 = close.max(open) + (close * 0.01); // 1% above max of open/close
+            let low: f64 = close.min(open) - (close * 0.01); // 1% below min of open/close
             let volume = close * 1000.0; // Just a placeholder
 
             ohlcv_data.push(DailyOhlcv {
-                date: chrono::NaiveDate::from_ymd_opt(2023, (i / 30) + 1, (i % 30) + 1)
-                    .unwrap_or_default(),
-                data: OhlcvData {
+                date: chrono::NaiveDate::from_ymd_opt(
+                    2023,
+                    ((i / 30) + 1) as u32,
+                    ((i % 30) + 1) as u32,
+                )
+                .unwrap_or_default(),
+                data: crate::OhlcvData {
                     open,
                     high,
                     low,

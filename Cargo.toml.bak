@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "nyxs_owl",
+    "day_trade", "trade_math", "minute_trade",
+]
+resolver = "2"
+
+[workspace.metadata.tarpaulin]
+# Global tarpaulin settings
+exclude-files = [
+    "examples/**/*",
+    "benches/**/*",
+]
+timeout = "120"
+
+[[example]]
+name = "explore_libs"
+path = "examples/explore_libs.rs" 

@@ -1,6 +1,8 @@
 # NyxsOwl: Your Nocturnal Stock Strategist 🦉✨
 
-![NyxsOwl Banner](IMG_2167_250px.jpg) *"When the world sleeps, wisdom awakens. Let Bubo guide your trades by dawn."*
+![NyxsOwl Banner](https://raw.githubusercontent.com/yourusername/nyxs_owl/main/IMG_2167_250px.jpg) *"When the world sleeps, wisdom awakens. Let Bubo guide your trades by dawn."*
+
+[![codecov](https://codecov.io/gh/yourusername/nyxs_owl/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/nyxs_owl)
 
 ---
 
@@ -20,6 +22,7 @@ NyxsOwl is organized as a Rust workspace with multiple crates:
 
 - **nyxs_owl**: The core library containing fundamental components and utilities
 - **day_trade**: A crate focused on day trading strategies that processes both daily and minute-level OHLCV (Open, High, Low, Close, Volume) data
+- **minute_trade**: A crate providing intraday trading strategies optimized for minute-level data analysis
 
 ### Getting Started
 
@@ -33,6 +36,9 @@ cargo build
 
 # Run tests
 cargo test
+
+# Run code coverage
+./run_coverage.sh
 
 # Update dependencies to latest versions
 ./update_deps.sh

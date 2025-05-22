@@ -14,6 +14,12 @@ mod regression_strategy {
     #[derive(Debug, Clone)]
     pub struct RegressionStrategy;
 
+    impl Default for RegressionStrategy {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl RegressionStrategy {
         /// Create a new instance (placeholder)
         pub fn new() -> Self {
@@ -27,7 +33,7 @@ mod regression_strategy {
         }
 
         fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
-            let mut signals = vec![Signal::Hold; data.len()];
+            let signals = vec![Signal::Hold; data.len()];
             Ok(signals)
         }
 
@@ -42,9 +48,7 @@ mod regression_strategy {
 }
 
 mod z_score_strategy {
-    use crate::utils::{
-        calculate_basic_performance, validate_period, validate_positive, validate_range,
-    };
+    use crate::utils::{calculate_basic_performance, validate_period, validate_positive};
     use crate::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
     /// Z-Score strategy for trading statistical deviations from the mean

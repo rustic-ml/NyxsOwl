@@ -400,7 +400,7 @@ mod tests {
 
         // Now we have enough data to calculate RSI
         let rsi_value = rsi.value().unwrap();
-        assert!(rsi_value >= 0.0 && rsi_value <= 100.0);
+        assert!((0.0..=100.0).contains(&rsi_value));
 
         // Test downtrend: should produce lower RSI
         rsi.update(10.0).unwrap();
@@ -441,13 +441,13 @@ mod tests {
 
         // Now we have enough data for %K
         let k_value = stochastic.k_value().unwrap();
-        assert!(k_value >= 0.0 && k_value <= 100.0);
+        assert!((0.0..=100.0).contains(&k_value));
 
         // Add one more for %D
         stochastic.update(125.0, 115.0, 120.0).unwrap();
 
         // Now we should have enough for %D
         let d_value = stochastic.d_value().unwrap();
-        assert!(d_value >= 0.0 && d_value <= 100.0);
+        assert!((0.0..=100.0).contains(&d_value));
     }
 }

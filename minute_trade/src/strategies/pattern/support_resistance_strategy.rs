@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use intraday_trade::{SupportResistanceStrategy, IntradayStrategy};
-//! use intraday_trade::utils::generate_minute_data;
+//! use minute_trade::{SupportResistanceStrategy, IntradayStrategy};
+//! use minute_trade::utils::generate_minute_data;
 //!
 //! // Create a support/resistance strategy
 //! let strategy = SupportResistanceStrategy::new(

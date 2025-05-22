@@ -1,5 +1,7 @@
 //! # Minute Trade
 //!
+//! [![Minute Trade](https://raw.githubusercontent.com/yourusername/nyxs_owl/main/IMG_2167_250px.jpg)](https://github.com/yourusername/nyxs_owl)
+//!
 //! `minute_trade` is a Rust library for implementing intraday trading strategies
 //! using minute-by-minute OHLCV (Open, High, Low, Close, Volume) data spanning multiple days.
 //!
@@ -41,7 +43,7 @@ use thiserror::Error;
 
 // Strategy modules
 mod strategies;
-mod utils;
+pub mod utils;
 
 // Re-export all strategies for convenient access
 pub use strategies::mean_reversion::{

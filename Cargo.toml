@@ -1,6 +1,30 @@
+[package]
+name = "nyxs_owl_workspace"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
 [workspace]
 members = [
     "nyxs_owl",
-    "day_trade", "trade_math", "minute_trade",
+    "day_trade", "trade_math", "minute_trade", "forecast_trade",
 ]
-resolver = "2" 
+resolver = "2"
+
+[workspace.metadata.tarpaulin]
+# Global tarpaulin settings
+exclude-files = [
+    "examples/**/*",
+    "benches/**/*",
+]
+timeout = "120"
+
+[dependencies]
+nyxs_owl = { path = "nyxs_owl" }
+day_trade = { path = "day_trade" }
+minute_trade = { path = "minute_trade" }
+trade_math = { path = "trade_math" }
+
+[[example]]
+name = "explore_libs"
+path = "examples/explore_libs.rs" 
