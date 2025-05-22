@@ -21,8 +21,8 @@ thiserror = "1.0"
 day_trade = { version = "0.1", path = "../day_trade" }
 minute_trade = { version = "0.1", path = "../minute_trade" }
 
-# OxiDiviner dependencies from crates.io
-oxidiviner = "0.2"
+# OxiDiviner dependency - use local copy of the main crate
+oxidiviner = { version = "0.4.1", path = "/home/orange/workspace/OxiDiviner/oxidiviner" }
 
 # Statistics and math
 statrs = "0.16"

@@ -5,8 +5,8 @@
 //! ## Features
 //!
 //! - Time series data handling (OHLCV data)
-//! - Forecasting models (Exponential Smoothing, Moving Average, ARIMA)
-//! - Trading strategies (Mean Reversion, Trend Following, Volatility Breakout)
+//! - Forecasting models from OxiDiviner (Exponential Smoothing, Moving Average, ARIMA, GARCH)
+//! - Trading strategies (Mean Reversion, Trend Following, Volatility Breakout, ARIMA, Volatility)
 //! - Strategy backtesting with performance metrics
 //! - Support for both daily and minute-level data
 //!
@@ -31,28 +31,21 @@
 //!
 //! ```rust
 //! use forecast_trade::data::DataLoader;
-//! use forecast_trade::models::exponential_smoothing::ExponentialSmoothing;
-//! use forecast_trade::strategies::mean_reversion::MeanReversionStrategy;
+//! use forecast_trade::models::oxidiviner::ExponentialSmoothingAdapter;
+//! use forecast_trade::strategies::arima_strategy::ArimaStrategy;
 //! use forecast_trade::strategies::{ForecastStrategy, TimeGranularity};
 //!
 //! // Load data
 //! let data = DataLoader::from_csv("data.csv")?;
 //!
 //! // Create a forecasting model
-//! let model = ExponentialSmoothing::new(0.7)?;
+//! let model = ExponentialSmoothingAdapter::new(0.7)?;
 //!
 //! // Create a trading strategy for daily data
-//! let daily_strategy = MeanReversionStrategy::new_with_granularity(
+//! let daily_strategy = ArimaStrategy::new_with_granularity(
 //!     model.clone(),
 //!     2.0, // Threshold
 //!     TimeGranularity::Daily
-//! )?;
-//!
-//! // Create a trading strategy for minute data
-//! let minute_strategy = MeanReversionStrategy::new_with_granularity(
-//!     model.clone(),
-//!     1.5, // Lower threshold for minute data
-//!     TimeGranularity::Minute
 //! )?;
 //!
 //! // Generate trading signals
@@ -68,20 +61,23 @@ pub mod models;
 pub mod strategies;
 pub mod backtest;
 
-// Re-export commonly used types
+// Re-export common types
 pub use crate::data::{DataLoader, TimeSeriesData};
 pub use crate::error::ForecastError;
-pub use crate::models::{ForecastModel, ForecastResult};
-pub use crate::strategies::ForecastStrategy;
 
 // Re-export from models
 pub use models::ForecastModel;
 pub use models::ForecastResult;
+pub use models::oxidiviner::{
+    ExponentialSmoothingAdapter, MovingAverageAdapter, 
+    ArimaAdapter, GarchAdapter
+};
 
 // Re-export from strategies
 pub use strategies::{
     BacktestResult, ForecastStrategy, TimeGranularity, TradingSignal,
-    arima_strategy::ArimaStrategy, volatility_strategy::VolatilityStrategy,
+    arima_strategy::{ArimaStrategy, create_sarima_strategy}, 
+    volatility_strategy::{VolatilityStrategy, create_garch_strategy},
 };
 
 // Re-export common utilities

@@ -8,6 +8,7 @@ publish = false
 members = [
     "nyxs_owl",
     "day_trade", "trade_math", "minute_trade", "forecast_trade",
+    "strategy_lib",
 ]
 resolver = "2"
 
@@ -24,6 +25,7 @@ nyxs_owl = { path = "nyxs_owl" }
 day_trade = { path = "day_trade" }
 minute_trade = { path = "minute_trade" }
 trade_math = { path = "trade_math" }
+strategy_lib = { path = "strategy_lib" }
 
 [[example]]
 name = "explore_libs"

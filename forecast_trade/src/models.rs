@@ -29,7 +29,7 @@ pub struct ErrorMetrics {
 }
 
 /// Common interface for forecasting models
-pub trait ForecastModel: Clone {
+pub trait ForecastModel {
     /// Train the model on time series data
     fn train(&self, data: &TimeSeriesData) -> Result<Box<dyn ForecastModel>>;
     
@@ -45,11 +45,21 @@ pub trait ForecastModel: Clone {
         TimeGranularity::Daily
     }
     
-    /// Set the model's time granularity
-    fn with_granularity(self, granularity: TimeGranularity) -> Self;
+    /// Create a boxed clone of this model (replacement for Clone trait which is not object-safe)
+    fn box_clone(&self) -> Box<dyn ForecastModel>;
     
     /// Adjust model parameters based on time granularity
     fn adjust_for_granularity(&mut self, granularity: TimeGranularity) -> Result<()>;
+}
+
+// Macro to help implement box_clone for ForecastModel implementors
+#[macro_export]
+macro_rules! impl_box_clone {
+    ($type:ty) => {
+        fn box_clone(&self) -> Box<dyn ForecastModel> {
+            Box::new(self.clone())
+        }
+    };
 }
 
 // Export only the OxiDiviner module, removing our custom implementations

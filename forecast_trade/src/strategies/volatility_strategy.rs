@@ -4,6 +4,7 @@ use crate::backtest;
 use crate::data::TimeSeriesData;
 use crate::error::{ForecastError, Result};
 use crate::models::ForecastModel;
+use crate::models::oxidiviner::GarchAdapter;
 use crate::strategies::{BacktestResult, BaseStrategy, ForecastStrategy, TimeGranularity, TradingSignal};
 
 /// A trading strategy based on volatility forecasts from GARCH models
@@ -189,4 +190,16 @@ impl<M: ForecastModel> ForecastStrategy for VolatilityStrategy<M> {
     fn time_granularity(&self) -> TimeGranularity {
         self.base.time_granularity
     }
+}
+
+/// Convenience function to create a VolatilityStrategy with GARCH model
+pub fn create_garch_strategy(
+    p: usize, q: usize,
+    threshold_multiplier: f64,
+    granularity: TimeGranularity
+) -> Result<VolatilityStrategy<GarchAdapter>> {
+    let model = GarchAdapter::with_params(p, q)?
+        .with_granularity(granularity);
+    
+    VolatilityStrategy::new_with_granularity(model, threshold_multiplier, granularity)
 } 

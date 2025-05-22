@@ -4,6 +4,7 @@ use crate::backtest;
 use crate::data::TimeSeriesData;
 use crate::error::{ForecastError, Result};
 use crate::models::ForecastModel;
+use crate::models::oxidiviner::ArimaAdapter;
 use crate::strategies::{BacktestResult, BaseStrategy, ForecastStrategy, TimeGranularity, TradingSignal};
 
 /// A trading strategy based on ARIMA models, suitable for trending markets with seasonal patterns
@@ -141,4 +142,18 @@ impl<M: ForecastModel> ForecastStrategy for ArimaStrategy<M> {
     fn time_granularity(&self) -> TimeGranularity {
         self.base.time_granularity
     }
+}
+
+/// Convenience function to create an ArimaStrategy with SARIMA model
+pub fn create_sarima_strategy(
+    p: usize, d: usize, q: usize, 
+    seasonal_p: usize, seasonal_d: usize, seasonal_q: usize, 
+    seasonal_period: usize,
+    threshold: f64,
+    granularity: TimeGranularity
+) -> Result<ArimaStrategy<ArimaAdapter>> {
+    let model = ArimaAdapter::sarima(p, d, q, seasonal_p, seasonal_d, seasonal_q, seasonal_period)?
+        .with_granularity(granularity);
+    
+    ArimaStrategy::new_with_granularity(model, threshold, granularity)
 } 

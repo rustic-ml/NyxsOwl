@@ -15,13 +15,19 @@ cargo tarpaulin --verbose --workspace --timeout 120 --out Html --out Xml
 echo "Running forecast_trade crate coverage..."
 cd forecast_trade && cargo tarpaulin --verbose --timeout 120 --out Html --out Xml --output-dir coverage
 
+# Run specific coverage for strategy_lib crate
+echo "Running strategy_lib crate coverage..."
+cd ../strategy_lib && cargo tarpaulin --verbose --timeout 120 --out Html --out Xml --output-dir coverage
+
 echo "Code coverage reports generated:"
 echo "- Workspace: tarpaulin-report.html"
 echo "- forecast_trade: forecast_trade/coverage/tarpaulin-report.html"
+echo "- strategy_lib: strategy_lib/coverage/tarpaulin-report.html"
 
 # Optional: Upload to codecov if CI
 if [ "$CI" = "true" ]; then
     echo "Uploading coverage reports to codecov..."
     bash <(curl -s https://codecov.io/bash) -f tarpaulin-report.xml
     bash <(curl -s https://codecov.io/bash) -f forecast_trade/coverage/tarpaulin-report.xml -F forecast_trade
+    bash <(curl -s https://codecov.io/bash) -f strategy_lib/coverage/tarpaulin-report.xml -F strategy_lib
 fi 

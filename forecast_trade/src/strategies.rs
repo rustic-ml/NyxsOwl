@@ -174,8 +174,11 @@ pub trait ForecastStrategy {
 }
 
 /// Base strategy implementation that reduces boilerplate code
-#[derive(Debug, Clone)]
-pub struct BaseStrategy<M: ForecastModel> {
+#[derive(Debug)]
+pub struct BaseStrategy<M> 
+where
+    M: ForecastModel + Clone
+{
     /// Strategy name
     pub name: String,
     /// Forecast model
@@ -186,13 +189,16 @@ pub struct BaseStrategy<M: ForecastModel> {
     pub is_trained: bool,
 }
 
-impl<M: ForecastModel> BaseStrategy<M> {
+impl<M> BaseStrategy<M> 
+where
+    M: ForecastModel + Clone
+{
     /// Create a new base strategy
     pub fn new(name: &str, model: M) -> Self {
         Self {
             name: name.to_string(),
-            model,
             time_granularity: model.time_granularity(),
+            model,
             is_trained: false,
         }
     }
@@ -212,7 +218,21 @@ impl<M: ForecastModel> BaseStrategy<M> {
         if !self.is_trained {
             self.model.train(data)
         } else {
-            Ok(Box::new(self.model.clone()))
+            Ok(self.model.box_clone())
+        }
+    }
+}
+
+impl<M> Clone for BaseStrategy<M>
+where
+    M: ForecastModel + Clone
+{
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            model: self.model.clone(),
+            time_granularity: self.time_granularity,
+            is_trained: self.is_trained,
         }
     }
 }
@@ -423,6 +443,16 @@ impl ForecastStrategy for TrendFollowingStrategy {
             None
         };
 
+        let performance_metrics = if let Some(sharpe) = sharpe_ratio {
+            Some(PerformanceMetrics {
+                sharpe_ratio: Some(sharpe),
+                sortino_ratio: None,
+                calmar_ratio: None,
+            })
+        } else {
+            None
+        };
+
         Ok(BacktestResult {
             final_balance: balance,
             total_return: (balance - initial_balance) / initial_balance,
@@ -430,7 +460,7 @@ impl ForecastStrategy for TrendFollowingStrategy {
             win_rate,
             equity_curve: Vec::new(),
             trades: total_trades,
-            performance_metrics: sharpe_ratio,
+            performance_metrics,
         })
     }
 
@@ -672,6 +702,16 @@ impl ForecastStrategy for MeanReversionStrategy {
             None
         };
 
+        let performance_metrics = if let Some(sharpe) = sharpe_ratio {
+            Some(PerformanceMetrics {
+                sharpe_ratio: Some(sharpe),
+                sortino_ratio: None,
+                calmar_ratio: None,
+            })
+        } else {
+            None
+        };
+
         Ok(BacktestResult {
             final_balance: balance,
             total_return: (balance - initial_balance) / initial_balance,
@@ -679,7 +719,7 @@ impl ForecastStrategy for MeanReversionStrategy {
             win_rate,
             equity_curve: Vec::new(),
             trades: total_trades,
-            performance_metrics: sharpe_ratio,
+            performance_metrics,
         })
     }
 
@@ -928,6 +968,16 @@ impl ForecastStrategy for VolatilityStrategy {
             None
         };
 
+        let performance_metrics = if let Some(sharpe) = sharpe_ratio {
+            Some(PerformanceMetrics {
+                sharpe_ratio: Some(sharpe),
+                sortino_ratio: None,
+                calmar_ratio: None,
+            })
+        } else {
+            None
+        };
+
         Ok(BacktestResult {
             final_balance: balance,
             total_return: (balance - initial_balance) / initial_balance,
@@ -935,7 +985,7 @@ impl ForecastStrategy for VolatilityStrategy {
             win_rate,
             equity_curve: Vec::new(),
             trades: total_trades,
-            performance_metrics: sharpe_ratio,
+            performance_metrics,
         })
     }
 

@@ -1,0 +1,36 @@
+[package]
+name = "strategy_lib"
+version = "0.1.0"
+edition = "2021"
+description = "Trading strategies built on top of RusTaLib technical indicators"
+authors = ["NyxsOwl Team"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+rustalib = { path = "/home/orange/workspace/RusTaLib" }
+polars = { version = "0.47.1", features = ["lazy", "strings", "temporal", "rolling_window", "parquet", "dtype-categorical", "dtype-struct"] }
+chrono = "0.4.34"
+thiserror = "2.0.11"
+serde = { version = "1.0", features = ["derive"] }
+nyxs_owl = { path = "../nyxs_owl" }
+trade_math = { path = "../trade_math" }
+
+[dev-dependencies]
+approx = "0.5.1"
+tempfile = "3.10.1"
+criterion = "0.5.1"
+
+# Basic examples
+[[example]]
+name = "ma_crossover_example"
+path = "examples/ma_crossover_example.rs"
+
+# Import styles example
+[[example]]
+name = "import_styles"
+path = "examples/import_styles.rs"
+
+# Detailed examples by strategy category
+[[example]]
+name = "trend_following_ma_crossover"
+path = "examples/trend_following/moving_average_crossover_detailed.rs"
