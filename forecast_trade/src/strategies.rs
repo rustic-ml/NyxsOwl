@@ -1,49 +1,68 @@
 //! Trading strategies based on forecasting models
+//!
+//! This module provides a framework for implementing trading strategies based on forecasting models.
+//! It includes the core traits, common implementations, and utility functions for strategy development.
 
 use crate::data::TimeSeriesData;
 use crate::error::Result;
-use crate::models::ForecastResult;
+use crate::models::ForecastModel;
 use day_trade::{DailyOhlcv, Signal};
 
-/// Time granularity for strategies
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TimeGranularity {
-    /// Daily data
-    Daily,
-    /// Minute data
-    Minute,
-}
-
-impl Default for TimeGranularity {
-    fn default() -> Self {
-        TimeGranularity::Daily
-    }
-}
-
-/// Trading signal emitted by strategies
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Trading signal types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TradingSignal {
     /// Buy signal
     Buy,
     /// Sell signal
     Sell,
-    /// Hold signal (no action)
+    /// Hold/neutral signal
     Hold,
 }
 
-/// Backtest results
+/// Time granularity for trading strategies
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeGranularity {
+    /// Daily trading data
+    Daily,
+    /// Minute-level trading data
+    Minute,
+}
+
+impl TimeGranularity {
+    /// Get default commission rate for this granularity
+    pub fn default_commission_rate(&self) -> f64 {
+        match self {
+            TimeGranularity::Daily => 0.001,   // 0.1% commission for daily
+            TimeGranularity::Minute => 0.0005, // 0.05% commission for minute
+        }
+    }
+    
+    /// Get default slippage for this granularity
+    pub fn default_slippage(&self) -> f64 {
+        match self {
+            TimeGranularity::Daily => 0.0005,  // 0.05% slippage for daily
+            TimeGranularity::Minute => 0.0002, // 0.02% slippage for minute
+        }
+    }
+}
+
+/// Result of a strategy backtest
 #[derive(Debug, Clone)]
-pub struct BacktestResults {
-    /// Final portfolio balance
+pub struct BacktestResult {
+    /// Final account balance
     pub final_balance: f64,
-    /// Total number of trades executed
-    pub total_trades: usize,
-    /// Win rate (ratio of profitable trades)
-    pub win_rate: f64,
-    /// Maximum drawdown
+    /// Total percentage return
+    pub total_return: f64,
+    /// Maximum drawdown (percentage)
     pub max_drawdown: f64,
+    /// Win rate (percentage of profitable trades)
+    pub win_rate: f64,
+    /// Equity curve (account balance over time)
+    pub equity_curve: Vec<f64>,
+    /// Number of trades executed
+    pub trades: usize,
     /// Performance metrics
-    pub performance_metrics: PerformanceMetrics,
+    pub performance_metrics: Option<PerformanceMetrics>,
 }
 
 /// Performance metrics for strategies
@@ -57,29 +76,36 @@ pub struct PerformanceMetrics {
     pub calmar_ratio: Option<f64>,
 }
 
-/// Common interface for forecast-based trading strategies
+/// Common interface for trading strategies based on forecasting models
 pub trait ForecastStrategy {
-    /// Generate trading signals from time series data
+    /// Generate trading signals based on forecasts
     fn generate_signals(&self, data: &TimeSeriesData) -> Result<Vec<TradingSignal>>;
-
-    /// Run backtest with default parameters
-    fn backtest(&self, data: &TimeSeriesData, initial_balance: f64) -> Result<BacktestResults>;
-
-    /// Run backtest with custom parameters
+    
+    /// Backtest the strategy on historical data
+    fn backtest(&self, data: &TimeSeriesData, initial_capital: f64) -> Result<BacktestResult> {
+        // Get default commission and slippage based on granularity
+        let granularity = self.time_granularity();
+        let commission_rate = granularity.default_commission_rate();
+        let slippage = granularity.default_slippage();
+        
+        self.backtest_with_params(data, initial_capital, commission_rate, slippage)
+    }
+    
+    /// Backtest with custom parameters for commission and slippage
     fn backtest_with_params(
         &self,
         data: &TimeSeriesData,
         initial_balance: f64,
         commission_rate: f64,
         slippage: f64,
-    ) -> Result<BacktestResults>;
-
-    /// Get the strategy's time granularity
+    ) -> Result<BacktestResult>;
+    
+    /// Get the strategy's time granularity preference
     fn time_granularity(&self) -> TimeGranularity;
 
     /// Generate signals with daily OHLCV data
     fn generate_signals_daily(&self, data: &[day_trade::DailyOhlcv]) -> Result<Vec<TradingSignal>> {
-        let time_series = self.convert_daily_to_time_series(data)?;
+        let time_series = Self::convert_daily_to_time_series(data)?;
         self.generate_signals(&time_series)
     }
 
@@ -88,7 +114,7 @@ pub trait ForecastStrategy {
         &self,
         data: &[minute_trade::MinuteOhlcv],
     ) -> Result<Vec<TradingSignal>> {
-        let time_series = self.convert_minute_to_time_series(data)?;
+        let time_series = Self::convert_minute_to_time_series(data)?;
         self.generate_signals(&time_series)
     }
 
@@ -97,8 +123,8 @@ pub trait ForecastStrategy {
         &self,
         data: &[day_trade::DailyOhlcv],
         initial_balance: f64,
-    ) -> Result<BacktestResults> {
-        let time_series = self.convert_daily_to_time_series(data)?;
+    ) -> Result<BacktestResult> {
+        let time_series = Self::convert_daily_to_time_series(data)?;
         self.backtest(&time_series, initial_balance)
     }
 
@@ -107,14 +133,13 @@ pub trait ForecastStrategy {
         &self,
         data: &[minute_trade::MinuteOhlcv],
         initial_balance: f64,
-    ) -> Result<BacktestResults> {
-        let time_series = self.convert_minute_to_time_series(data)?;
+    ) -> Result<BacktestResult> {
+        let time_series = Self::convert_minute_to_time_series(data)?;
         self.backtest(&time_series, initial_balance)
     }
 
     /// Helper method to convert daily OHLCV data to TimeSeriesData
     fn convert_daily_to_time_series(
-        &self,
         data: &[day_trade::DailyOhlcv],
     ) -> Result<TimeSeriesData> {
         let dates = data
@@ -135,7 +160,6 @@ pub trait ForecastStrategy {
 
     /// Helper method to convert minute OHLCV data to TimeSeriesData
     fn convert_minute_to_time_series(
-        &self,
         data: &[minute_trade::MinuteOhlcv],
     ) -> Result<TimeSeriesData> {
         let dates = data.iter().map(|d| d.timestamp).collect();
@@ -146,6 +170,50 @@ pub trait ForecastStrategy {
             .collect();
 
         TimeSeriesData::new_ohlc(dates, ohlc_data)
+    }
+}
+
+/// Base strategy implementation that reduces boilerplate code
+#[derive(Debug, Clone)]
+pub struct BaseStrategy<M: ForecastModel> {
+    /// Strategy name
+    pub name: String,
+    /// Forecast model
+    pub model: M,
+    /// Time granularity
+    pub time_granularity: TimeGranularity,
+    /// Whether the model has been trained
+    pub is_trained: bool,
+}
+
+impl<M: ForecastModel> BaseStrategy<M> {
+    /// Create a new base strategy
+    pub fn new(name: &str, model: M) -> Self {
+        Self {
+            name: name.to_string(),
+            model,
+            time_granularity: model.time_granularity(),
+            is_trained: false,
+        }
+    }
+    
+    /// Create a new base strategy with specific granularity
+    pub fn new_with_granularity(name: &str, model: M, granularity: TimeGranularity) -> Self {
+        Self {
+            name: name.to_string(),
+            model,
+            time_granularity: granularity,
+            is_trained: false,
+        }
+    }
+    
+    /// Get the trained model, training it if necessary
+    pub fn get_trained_model(&self, data: &TimeSeriesData) -> Result<Box<dyn ForecastModel>> {
+        if !self.is_trained {
+            self.model.train(data)
+        } else {
+            Ok(Box::new(self.model.clone()))
+        }
     }
 }
 
@@ -210,23 +278,13 @@ impl ForecastStrategy for TrendFollowingStrategy {
         Ok(signals)
     }
 
-    fn backtest(&self, data: &TimeSeriesData, initial_balance: f64) -> Result<BacktestResults> {
-        // Default commission and slippage values based on time granularity
-        let (commission_rate, slippage) = match self.time_granularity {
-            TimeGranularity::Daily => (0.001, 0.0005), // 0.1% commission, 0.05% slippage
-            TimeGranularity::Minute => (0.0005, 0.001), // 0.05% commission, 0.1% slippage
-        };
-
-        self.backtest_with_params(data, initial_balance, commission_rate, slippage)
-    }
-
     fn backtest_with_params(
         &self,
         data: &TimeSeriesData,
         initial_balance: f64,
         commission_rate: f64,
         slippage: f64,
-    ) -> Result<BacktestResults> {
+    ) -> Result<BacktestResult> {
         if data.is_empty() {
             return Err(crate::error::ForecastError::DataError(
                 "Empty data".to_string(),
@@ -365,16 +423,14 @@ impl ForecastStrategy for TrendFollowingStrategy {
             None
         };
 
-        Ok(BacktestResults {
+        Ok(BacktestResult {
             final_balance: balance,
-            total_trades,
-            win_rate,
+            total_return: (balance - initial_balance) / initial_balance,
             max_drawdown,
-            performance_metrics: PerformanceMetrics {
-                sharpe_ratio,
-                sortino_ratio: None, // Not implemented
-                calmar_ratio: None,  // Not implemented
-            },
+            win_rate,
+            equity_curve: Vec::new(),
+            trades: total_trades,
+            performance_metrics: sharpe_ratio,
         })
     }
 
@@ -471,23 +527,13 @@ impl ForecastStrategy for MeanReversionStrategy {
         Ok(signals)
     }
 
-    fn backtest(&self, data: &TimeSeriesData, initial_balance: f64) -> Result<BacktestResults> {
-        // Default commission and slippage values based on time granularity
-        let (commission_rate, slippage) = match self.time_granularity {
-            TimeGranularity::Daily => (0.001, 0.0005), // 0.1% commission, 0.05% slippage
-            TimeGranularity::Minute => (0.0005, 0.001), // 0.05% commission, 0.1% slippage
-        };
-
-        self.backtest_with_params(data, initial_balance, commission_rate, slippage)
-    }
-
     fn backtest_with_params(
         &self,
         data: &TimeSeriesData,
         initial_balance: f64,
         commission_rate: f64,
         slippage: f64,
-    ) -> Result<BacktestResults> {
+    ) -> Result<BacktestResult> {
         if data.is_empty() {
             return Err(crate::error::ForecastError::DataError(
                 "Empty data".to_string(),
@@ -626,16 +672,14 @@ impl ForecastStrategy for MeanReversionStrategy {
             None
         };
 
-        Ok(BacktestResults {
+        Ok(BacktestResult {
             final_balance: balance,
-            total_trades,
-            win_rate,
+            total_return: (balance - initial_balance) / initial_balance,
             max_drawdown,
-            performance_metrics: PerformanceMetrics {
-                sharpe_ratio,
-                sortino_ratio: None, // Not implemented
-                calmar_ratio: None,  // Not implemented
-            },
+            win_rate,
+            equity_curve: Vec::new(),
+            trades: total_trades,
+            performance_metrics: sharpe_ratio,
         })
     }
 
@@ -739,23 +783,13 @@ impl ForecastStrategy for VolatilityStrategy {
         Ok(signals)
     }
 
-    fn backtest(&self, data: &TimeSeriesData, initial_balance: f64) -> Result<BacktestResults> {
-        // Default commission and slippage values based on time granularity
-        let (commission_rate, slippage) = match self.time_granularity {
-            TimeGranularity::Daily => (0.001, 0.0005), // 0.1% commission, 0.05% slippage
-            TimeGranularity::Minute => (0.0005, 0.001), // 0.05% commission, 0.1% slippage
-        };
-
-        self.backtest_with_params(data, initial_balance, commission_rate, slippage)
-    }
-
     fn backtest_with_params(
         &self,
         data: &TimeSeriesData,
         initial_balance: f64,
         commission_rate: f64,
         slippage: f64,
-    ) -> Result<BacktestResults> {
+    ) -> Result<BacktestResult> {
         if data.is_empty() {
             return Err(crate::error::ForecastError::DataError(
                 "Empty data".to_string(),
@@ -894,16 +928,14 @@ impl ForecastStrategy for VolatilityStrategy {
             None
         };
 
-        Ok(BacktestResults {
+        Ok(BacktestResult {
             final_balance: balance,
-            total_trades,
-            win_rate,
+            total_return: (balance - initial_balance) / initial_balance,
             max_drawdown,
-            performance_metrics: PerformanceMetrics {
-                sharpe_ratio,
-                sortino_ratio: None, // Not implemented
-                calmar_ratio: None,  // Not implemented
-            },
+            win_rate,
+            equity_curve: Vec::new(),
+            trades: total_trades,
+            performance_metrics: sharpe_ratio,
         })
     }
 
@@ -912,6 +944,9 @@ impl ForecastStrategy for VolatilityStrategy {
     }
 }
 
+// Export individual strategy modules
 pub mod mean_reversion;
 pub mod trend_following;
 pub mod volatility_breakout;
+pub mod arima_strategy;
+pub mod volatility_strategy;

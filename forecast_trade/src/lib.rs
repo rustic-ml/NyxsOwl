@@ -66,12 +66,26 @@ pub mod data;
 pub mod error;
 pub mod models;
 pub mod strategies;
+pub mod backtest;
 
 // Re-export commonly used types
 pub use crate::data::{DataLoader, TimeSeriesData};
 pub use crate::error::ForecastError;
 pub use crate::models::{ForecastModel, ForecastResult};
 pub use crate::strategies::ForecastStrategy;
+
+// Re-export from models
+pub use models::ForecastModel;
+pub use models::ForecastResult;
+
+// Re-export from strategies
+pub use strategies::{
+    BacktestResult, ForecastStrategy, TimeGranularity, TradingSignal,
+    arima_strategy::ArimaStrategy, volatility_strategy::VolatilityStrategy,
+};
+
+// Re-export common utilities
+pub use backtest::run_backtest;
 
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

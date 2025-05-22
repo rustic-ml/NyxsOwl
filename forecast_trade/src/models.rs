@@ -52,6 +52,5 @@ pub trait ForecastModel: Clone {
     fn adjust_for_granularity(&mut self, granularity: TimeGranularity) -> Result<()>;
 }
 
-pub mod exponential_smoothing;
-pub mod moving_average;
-pub mod arima; 
+// Export only the OxiDiviner module, removing our custom implementations
+pub mod oxidiviner; 

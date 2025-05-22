@@ -21,6 +21,9 @@ thiserror = "1.0"
 day_trade = { version = "0.1", path = "../day_trade" }
 minute_trade = { version = "0.1", path = "../minute_trade" }
 
+# OxiDiviner dependencies from crates.io
+oxidiviner = "0.2"
+
 # Statistics and math
 statrs = "0.16"
 rand = "0.8"
@@ -47,3 +50,15 @@ path = "examples/basic_forecast.rs"
 [[example]]
 name = "backtest_strategy"
 path = "examples/backtest_strategy.rs"
+
+[[example]]
+name = "time_granularity_example"
+path = "examples/time_granularity_example.rs"
+
+[[example]]
+name = "oxidiviner_models"
+path = "examples/oxidiviner_models.rs"
+
+[[example]]
+name = "all_oxidiviner_strategies"
+path = "examples/all_oxidiviner_strategies.rs"
