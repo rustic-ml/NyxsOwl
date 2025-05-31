@@ -1,40 +1,183 @@
 [package]
 name = "nyxs_owl"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "A Rust library for the NyxsOwl project integrating day trading and minute trading capabilities"
+description = "A comprehensive Rust library for trading, forecasting, and financial analysis"
 authors = ["Celsis Durham <durhamcelsis@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rustic-ml/NyxsOwl"
 readme = "../README.md"
-keywords = ["nyxs", "strategies", "trading", "finance", "algorithms"]
+keywords = ["nyxs", "strategies", "trading", "finance", "algorithms", "forecasting"]
 categories = ["finance", "algorithms"]
 exclude = [
-    "*.jpg",
-    ".gitignore",
-    "examples/*",
-    "test/*",
-    "Cargo.lock"
+    # Build and target directories
+    "target*/",
+    "target/**/*",
+    "Cargo.lock",
+    
+    # Git and version control
+    ".git*",
+    ".github/**/*",
+    
+    # IDE and editor files
+    ".vscode/**/*", ".idea/**/*", ".vim/**/*", ".emacs.d/**/*",
+    "*.swp", "*.swo", "*~",
+    
+    # OS-specific files
+    ".DS_Store", "Thumbs.db", "desktop.ini", "*.lnk",
+    
+    # Media files
+    "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp", "*.tiff", "*.svg",
+    
+    # Data and configuration files
+    "*.csv", "*.json", "*.xml", "*.y*ml", "*.db", "*.sqlite*",
+    ".env*", "config.local.*",
+    
+    # Build artifacts and backups
+    "*.profraw", "*.bak", "*.orig", "*.rej", "*.toml.bak",
+    
+    # Log and temporary files
+    "*.log", "*.out", "*.err", "*.tmp", "*.temp", "*.cache",
+    
+    # Test and coverage output
+    "coverage/**/*", "tarpaulin-report.html", "cobertura.xml", "lcov.info",
+    "*.gcda", "*.gcno", "*.profdata",
+    
+    # Documentation builds
+    "docs/**/*", "doc/**/*", "book/**/*", "_build/**/*",
+    
+    # Benchmark and profiling
+    "criterion/**/*", "flamegraph.svg", "perf.data*",
+    
+    # Development tools and scripts
+    "scripts/**/*", "tools/**/*", "ci/**/*", "run_coverage.sh",
+    
+    # Example data directories
+    "examples/csv/**/*", "examples/data/**/*", "examples/output/**/*",
+    
+    # Archive files
+    "*.zip", "*.tar.*", "*.7z", "*.rar",
+    
+    # Rust-specific files
+    "rust-toolchain*", ".cargo/config*",
+    
+    # Security files
+    "*.pem", "*.key", "*.crt", "*.p12", "*.pfx",
+    
+    # Development documentation
+    "../*.md",
+    "CHANGELOG.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
 ]
 
-# Core dependencies that will be included in the published crate
 [dependencies]
+# Core dependencies
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "1.0"
+csv = "1.2"
+rand = "0.8"
 
-# Dependencies only needed for development or testing
+# Math and statistics
+num-traits = "0.2"
+statrs = "0.16"
+rand_distr = "0.4"
+
+# Data processing
+polars = { version = "0.47.1", features = ["lazy", "strings", "temporal", "rolling_window", "parquet", "dtype-categorical", "dtype-struct", "dtype-full", "csv"] }
+
+# Technical analysis
+ta-lib-in-rust = "1.0.8"
+
+# Forecasting - Using published version
+oxidiviner = "0.4.3"
+
+# Logging and error handling for production
+log = "0.4"
+env_logger = "0.10"
+anyhow = "1.0"
+
 [dev-dependencies]
-day_trade = { path = "../day_trade" }
-trade_math = { path = "../trade_math" }
-minute_trade = { path = "../minute_trade" }
+# Core testing framework
+rstest = { workspace = true }
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+approx = { workspace = true }
+
+# Property-based testing
+proptest = { workspace = true }
+quickcheck = { workspace = true }
+
+# Mock testing
+mockall = { workspace = true }
+
+# Benchmarking
+criterion = { workspace = true }
+
+# Test data generation
+fake = { workspace = true }
+
+# Additional testing utilities
+serial_test = "3.0"
+tokio-test = "0.4"
+
+# Working examples demonstrating NyxsOwl trade_math functionality
+[[example]]
+name = "trade_math_demo"
+path = "examples/trade_math_demo.rs"
+
+[[example]]
+name = "comprehensive_trading_analysis"
+path = "examples/comprehensive_trading_analysis.rs"
+
+[[example]]
+name = "performance_monitoring"
+path = "examples/performance_monitoring.rs"
+
+[[example]]
+name = "forecasting_example"
+path = "examples/forecasting_example.rs"
+
+[[example]]
+name = "lib_check"
+path = "examples/lib_check.rs"
+
+# Production readiness examples
+[[example]]
+name = "production_oxidiviner_demo"
+path = "examples/production_oxidiviner_demo.rs"
+
+# Benchmarks for performance testing
+[[bench]]
+name = "trade_math_bench"
+harness = false
+
+[[bench]]
+name = "forecast_bench"
+harness = false
 
 # Optional features that can be enabled by users
 [features]
-default = []
-# Include day trading functionality (included from day_trade crate)
+default = ["day-trading", "minute-trading", "trading-math", "forecasting", "strategies"]
+# Include day trading functionality
 day-trading = []
-# Include minute-level trading functionality (included from minute_trade crate)
+# Include minute-level trading functionality
 minute-trading = []
-# Include trading math utilities (included from trade_math crate)
-trading-math = [] 
+# Include trading math utilities
+trading-math = []
+# Include forecasting functionality
+forecasting = []
+# Include strategy library
+strategies = []
+
+[package.metadata.tarpaulin]
+# Package-specific tarpaulin settings
+exclude-files = [
+    "examples/**/*",
+    "benches/**/*",
+]
+timeout = "300"
+
+[[example]]
+name = "advanced_forecasting_demo"
+path = "examples/advanced_forecasting_demo.rs" 
