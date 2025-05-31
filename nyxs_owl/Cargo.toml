@@ -7,7 +7,7 @@ authors = ["Celsis Durham <durhamcelsis@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rustic-ml/NyxsOwl"
 readme = "../README.md"
-keywords = ["nyxs", "strategies", "trading", "finance", "algorithms", "forecasting"]
+keywords = ["trading", "finance", "algorithms", "forecasting", "strategies"]
 categories = ["finance", "algorithms"]
 exclude = [
     # Build and target directories
