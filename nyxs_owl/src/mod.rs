@@ -1,13 +1,6 @@
 //! # NyxsOwl
 //!
-//! A comprehensive Rust library for trading, forecasting, and financial analysis.
-//!
-//! This library provides:
-//! - Day trading strategies and analysis
-//! - Minute-level trading strategies
-//! - Financial forecasting with OxiDiviner integration
-//! - Mathematical utilities for trading
-//! - Strategy libraries built on technical indicators
+//! `nyxs_owl` is a Rust library that provides utilities for the NyxsOwl project.
 //!
 //! ## Example
 //!
@@ -17,49 +10,16 @@
 //! let my_owl = Owl::new("Hedwig");
 //! assert_eq!(my_owl.name(), "Hedwig");
 //! ```
-//!
-//! ## Modules
-//!
-//! - [`day_trade`] - Day trading strategies using daily OHLCV data
-//! - [`minute_trade`] - Minute-level intraday trading strategies
-//! - [`forecast_trade`] - Financial forecasting and prediction models
-//! - [`trade_math`] - Mathematical calculations for trading indicators
-//! - [`strategy_lib`] - Trading strategies built on technical indicators
-//! - [`performance_utils`] - Common performance utilities
-//! - [`advanced_optimizations`] - Advanced optimizations for trading strategies
 
-// Core modules - always available
-pub mod trade_math;
-
-// Feature-gated modules
+// Re-export subcrates conditionally based on features
 #[cfg(feature = "day-trading")]
-pub mod day_trade;
+pub use day_trade;
 
 #[cfg(feature = "minute-trading")]
-pub mod minute_trade;
+pub use minute_trade;
 
-#[cfg(feature = "forecasting")]
-pub mod forecast_trade;
-
-#[cfg(feature = "strategies")]
-pub mod strategy_lib;
-
-#[cfg(any(feature = "day-trading", feature = "minute-trading"))]
-pub mod performance_utils;
-
-pub mod advanced_optimizations;
-
-// Re-export commonly used types for convenience
-pub use trade_math::{MathError, Result as MathResult};
-
-#[cfg(feature = "day-trading")]
-pub use day_trade::{DailyOhlcv, Signal, TradingStrategy};
-
-#[cfg(feature = "minute-trading")]
-pub use minute_trade::{MinuteOhlcv, ScalpingStrategy};
-
-#[cfg(feature = "forecasting")]
-pub use forecast_trade::{ForecastModel, ForecastResult, TimeSeriesData};
+#[cfg(feature = "trading-math")]
+pub use trade_math;
 
 /// An owl from the NyxsOwl project.
 #[derive(Debug, Clone, PartialEq, Eq)]

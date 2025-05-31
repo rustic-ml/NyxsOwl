@@ -1,0 +1,26 @@
+# Optimized Cargo configuration for better test performance
+[build]
+# Use fewer codegen units for faster compilation in debug mode
+codegen-units = 1
+
+[profile.dev]
+# Reduce debug info to speed up compilation and reduce binary size
+debug = 1
+# Optimize for compilation speed
+opt-level = 0
+# Reduce memory usage during compilation
+codegen-units = 4
+
+[profile.test]
+# Optimize test builds
+debug = 1
+opt-level = 1
+codegen-units = 4
+
+[target.'cfg(test)']
+# Reduce incremental compilation overhead for tests
+rustflags = ["-C", "incremental=off"]
+
+[env]
+# Limit test parallelism to prevent system overload
+RUST_TEST_THREADS = "4" 

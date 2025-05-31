@@ -4,13 +4,14 @@
 [![Documentation](https://docs.rs/nyxs_owl/badge.svg)](https://docs.rs/nyxs_owl)
 [![MIT/Apache-2.0 licensed](https://img.shields.io/crates/l/nyxs_owl.svg)](./LICENSE)
 
-A comprehensive Rust library for stock trading strategies and analysis.
+A comprehensive Rust library for trading, forecasting, and financial analysis.
 
 ## Features
 
-- **Day trading strategies** - Tools for daily market analysis and trading
-- **Minute-level trading** - High-frequency trading strategies for minute-level data
-- **Mathematical utilities** - Core calculations for technical analysis and strategy evaluation
+- **Technical Indicators** - Complete suite of trading indicators (SMA, EMA, RSI, MACD, Bollinger Bands, etc.)
+- **Trading Math** - Core mathematical functions for financial analysis
+- **Forecasting** - Time series forecasting with OxiDiviner integration
+- **Strategy Library** - Advanced trading strategies for multiple timeframes
 
 ## Installation
 
@@ -18,60 +19,51 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyxs_owl = "0.1.0"
+nyxs_owl = { version = "0.2.0", features = ["trading-math"] }
 ```
 
-## Usage Examples
-
-### Basic Usage
+## Quick Start
 
 ```rust
-use nyxs_owl::Owl;
-
-fn main() {
-    // Create a new owl with default wisdom level
-    let owl = Owl::new("Bubo");
-    println!("Owl name: {}", owl.name());
-    println!("Wisdom level: {}", owl.wisdom_level());
-}
-```
-
-### Using Day Trading Strategies
-
-```rust
-use nyxs_owl::day_trade::strategies::MovingAverageStrategy;
-use nyxs_owl::day_trade::DayTradeStrategy;
+use nyxs_owl::trade_math::{
+    moving_averages::SimpleMovingAverage,
+    volatility::BollingerBands,
+    oscillators::RelativeStrengthIndex,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = nyxs_owl::day_trade::utils::load_daily_data("AAPL.csv")?;
-    
-    let strategy = MovingAverageStrategy::new(20, 50)?;
-    let signals = strategy.generate_signals(&data)?;
-    
-    let performance = strategy.calculate_performance(&data, &signals)?;
-    println!("Strategy performance: {}%", performance);
-    
+    // Create indicators
+    let mut sma = SimpleMovingAverage::new(20)?;
+    let mut bb = BollingerBands::new(20, 2.0)?;
+    let mut rsi = RelativeStrengthIndex::new(14)?;
+
+    // Sample price data
+    let prices = vec![100.0, 102.0, 101.5, 103.0, 104.5];
+
+    for price in prices {
+        sma.update(price)?;
+        bb.update(price)?;
+        rsi.update(price)?;
+
+        if let Ok(sma_val) = sma.value() {
+            println!("SMA: {:.2}", sma_val);
+        }
+    }
+
     Ok(())
 }
 ```
 
-### Using Minute Trading Strategies
+## Examples
 
-```rust
-use nyxs_owl::minute_trade::ScalpingStrategy;
-use nyxs_owl::minute_trade::IntradayStrategy;
+Run the working examples:
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let data = nyxs_owl::minute_trade::utils::load_minute_data("AAPL_minute_data.csv")?;
-    
-    let strategy = ScalpingStrategy::new(5, 0.1)?;
-    let signals = strategy.generate_signals(&data)?;
-    
-    let performance = strategy.calculate_performance(&data, &signals)?;
-    println!("Strategy performance: {}%", performance);
-    
-    Ok(())
-}
+```bash
+# Technical indicators demo
+cargo run --example trade_math_demo --features="trading-math"
+
+# Comprehensive trading analysis
+cargo run --example comprehensive_trading_analysis --features="trading-math"
 ```
 
 ## License
@@ -81,8 +73,4 @@ Licensed under either of:
 - Apache License, Version 2.0 ([LICENSE-APACHE](../LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT license ([LICENSE-MIT](../LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-at your option.
-
-## Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you shall be dual licensed as above, without any additional terms or conditions. 
+at your option. 

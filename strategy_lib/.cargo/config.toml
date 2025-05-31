@@ -1,3 +1,0 @@
-[build]
-# Only build this crate, not the entire workspace
-target-dir = "target-local" 
