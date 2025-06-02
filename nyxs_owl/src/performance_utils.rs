@@ -354,11 +354,11 @@ fn validate_inputs(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[cfg(feature = "day-trading")]
     use crate::day_trade::OhlcvData;
     #[cfg(feature = "minute-trading")]
     use crate::minute_trade::OhlcvData as MinuteOhlcvData;
+    #[cfg(feature = "minute-trading")]
     use chrono::{DateTime, Utc};
 
     #[cfg(feature = "day-trading")]

@@ -5,7 +5,7 @@
 
 use crate::strategy_lib::strategy::{Signal, Strategy, StrategyError};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 

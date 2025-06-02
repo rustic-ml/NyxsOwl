@@ -1,7 +1,8 @@
-//! # NyxsOwl - Financial Trading Library
+//! # NyxsOwl
 //!
-//! A comprehensive Rust library for financial time series analysis, trading strategies,
-//! forecasting, and technical indicators with a focus on simplicity and performance.
+//! A comprehensive Rust library for trading, forecasting, and financial analysis
+//! Named after Nyx (Greek goddess of night, symbolizing strategic advantage) and
+//! Bubo (wise owl, representing wisdom and strategy).
 //!
 //! ## Quick Start
 //!

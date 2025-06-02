@@ -1,92 +1,165 @@
-use nyxs_owl::trade_math::forecasting::{
-    DoubleExponentialSmoothing, ExponentialSmoothing, LinearRegression,
-};
+//! # Forecasting Example
+//!
+//! This example demonstrates the forecasting capabilities of NyxsOwl using OxiDiviner.
+//! Shows how to perform time series forecasting for financial data.
 
-fn main() {
-    println!("Forecasting Methods Example");
-    println!("==========================\n");
+use chrono::{DateTime, Duration, Utc};
+use nyxs_owl::forecast_trade::easy::*;
+use nyxs_owl::forecast_trade::*;
 
-    // Sample price data (simulated stock prices)
-    let prices = vec![
-        100.0, 102.5, 101.8, 104.3, 107.1, 106.5, 108.2, 110.0, 109.7, 111.5, 113.2, 114.8, 116.4,
-        115.9, 117.2, 119.0, 121.5, 122.8, 124.0, 123.5,
-    ];
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🦉 NyxsOwl Forecasting Example");
+    println!("==================================");
 
-    println!("Using {} price points", prices.len());
+    // Generate sample financial data (e.g., stock prices)
+    let start_date = Utc::now() - Duration::days(60);
+    let timestamps: Vec<DateTime<Utc>> = (0..60)
+        .map(|i| start_date + Duration::days(i as i64))
+        .collect();
 
-    // 1. Linear Regression Example
-    println!("\n1. Linear Regression");
-    println!("-------------------");
-
-    let mut lr = LinearRegression::new(10).unwrap();
-
-    // Process all prices
-    for (i, &price) in prices.iter().enumerate() {
-        lr.update(price).unwrap();
-
-        // Once we have enough data, show regression stats
-        if i >= 9 {
-            let slope = lr.slope().unwrap();
-            let forecast_next = lr.forecast(1).unwrap();
-            let r_squared = lr.r_squared().unwrap();
-
-            println!(
-                "After {} points: Slope = {:.4}, R² = {:.4}, Next forecast = {:.2}",
-                i + 1,
-                slope,
-                r_squared,
-                forecast_next
-            );
-        }
+    // Create realistic stock price data with trend and volatility
+    let mut prices = Vec::new();
+    let base_price = 100.0;
+    for i in 0..60 {
+        let trend = i as f64 * 0.2; // Upward trend
+        let volatility = (i as f64 * 0.1).sin() * 3.0; // Some volatility
+        let noise = (i as f64 * 0.05).cos() * 1.5; // Additional noise
+        prices.push(base_price + trend + volatility + noise);
     }
 
-    // 2. Simple Exponential Smoothing
-    println!("\n2. Simple Exponential Smoothing");
-    println!("-----------------------------");
+    println!("\n📊 Sample Data:");
+    println!(
+        "Generated {} price points from {} days ago to today",
+        prices.len(),
+        60
+    );
+    println!(
+        "Price range: ${:.2} - ${:.2}",
+        prices.iter().fold(f64::INFINITY, |a, &b| a.min(b)),
+        prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
+    );
 
-    let mut es = ExponentialSmoothing::new(0.3).unwrap();
-
-    for (i, &price) in prices.iter().enumerate() {
-        es.update(price).unwrap();
-
-        let smoothed = es.value().unwrap();
-        println!("Price: {:.2}, Smoothed: {:.2}", price, smoothed);
-
-        if i == prices.len() - 1 {
-            let forecast = es.forecast().unwrap();
-            println!("Forecast for next period: {:.2}", forecast);
-        }
-    }
-
-    // 3. Double Exponential Smoothing (Holt's method)
-    println!("\n3. Double Exponential Smoothing (Holt's method)");
-    println!("-------------------------------------------");
-
-    let mut des = DoubleExponentialSmoothing::new(0.4, 0.3).unwrap();
-
-    for (i, &price) in prices.iter().enumerate() {
-        des.update(price).unwrap();
-
-        if i > 0 {
-            let level = des.level().unwrap();
-            let trend = des.trend().unwrap();
-
+    // 1. Quick Financial Forecast (automatic model selection)
+    println!("\n🚀 1. Auto Financial Forecast:");
+    match financial_forecast(&prices, 10) {
+        Ok((forecast, model_name)) => {
+            println!("   ✅ Model: {}", model_name);
             println!(
-                "Price: {:.2}, Level: {:.2}, Trend: {:.4}",
-                price, level, trend
+                "   📈 10-day forecast: ${:.2} - ${:.2}",
+                forecast.iter().fold(f64::INFINITY, |a, &b| a.min(b)),
+                forecast.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
             );
-
-            if i == prices.len() - 1 {
-                // Forecast 1, 3, and 5 periods ahead
-                let forecast1 = des.forecast(1).unwrap();
-                let forecast3 = des.forecast(3).unwrap();
-                let forecast5 = des.forecast(5).unwrap();
-
-                println!("\nForecasts:");
-                println!("1 period ahead: {:.2}", forecast1);
-                println!("3 periods ahead: {:.2}", forecast3);
-                println!("5 periods ahead: {:.2}", forecast5);
+            for (i, &price) in forecast.iter().enumerate() {
+                println!("      Day {}: ${:.2}", i + 1, price);
             }
         }
+        Err(e) => println!("   ❌ Auto forecast failed: {}", e),
     }
+
+    // 2. Manual forecasting methods
+    println!("\n🔬 2. Individual Forecasting Methods:");
+
+    // Moving Average
+    println!("\n   📊 Moving Average:");
+    match forecast_moving_average(&prices, 10, 5) {
+        Ok(forecast) => {
+            println!(
+                "      ✅ 5-day MA forecast: {:?}",
+                forecast
+                    .iter()
+                    .map(|&x| format!("${:.2}", x))
+                    .collect::<Vec<_>>()
+            );
+        }
+        Err(e) => println!("      ❌ MA failed: {}", e),
+    }
+
+    // Exponential Smoothing
+    println!("\n   📈 Exponential Smoothing (α=0.3):");
+    match forecast_exponential_smoothing(&prices, 0.3, 5) {
+        Ok(forecast) => {
+            println!(
+                "      ✅ 5-day ES forecast: {:?}",
+                forecast
+                    .iter()
+                    .map(|&x| format!("${:.2}", x))
+                    .collect::<Vec<_>>()
+            );
+        }
+        Err(e) => println!("      ❌ ES failed: {}", e),
+    }
+
+    // ARIMA
+    println!("\n   🎯 ARIMA(1,1,1):");
+    match forecast_arima(&prices, (1, 1, 1), 5) {
+        Ok(forecast) => {
+            println!(
+                "      ✅ 5-day ARIMA forecast: {:?}",
+                forecast
+                    .iter()
+                    .map(|&x| format!("${:.2}", x))
+                    .collect::<Vec<_>>()
+            );
+        }
+        Err(e) => println!("      ❌ ARIMA failed: {}", e),
+    }
+
+    // 3. Model Comparison
+    println!("\n⚖️  3. Model Comparison:");
+    match model_comparison(&timestamps, &prices, 7) {
+        Ok(results) => {
+            println!("   Successfully compared {} models:", results.len());
+            for (model_name, forecast) in results {
+                let avg_price = forecast.iter().sum::<f64>() / forecast.len() as f64;
+                println!(
+                    "      {} - Avg 7-day forecast: ${:.2}",
+                    model_name, avg_price
+                );
+            }
+        }
+        Err(e) => println!("   ❌ Model comparison failed: {}", e),
+    }
+
+    // 4. Using Easy API with timestamps
+    println!("\n🎯 4. Easy API with Timestamps:");
+    match auto_forecast(&timestamps, &prices, 5) {
+        Ok((forecast, model_name)) => {
+            println!("   ✅ Selected Model: {}", model_name);
+            println!("   📅 5-day detailed forecast:");
+            let forecast_start = *timestamps.last().unwrap() + Duration::days(1);
+            for (i, &price) in forecast.iter().enumerate() {
+                let forecast_date = forecast_start + Duration::days(i as i64);
+                println!("      {} - ${:.2}", forecast_date.format("%Y-%m-%d"), price);
+            }
+        }
+        Err(e) => println!("   ❌ Easy API failed: {}", e),
+    }
+
+    // 5. Time Series Data Structure
+    println!("\n📋 5. Time Series Data Structure:");
+    match TimeSeriesData::new(timestamps.clone(), prices.clone()) {
+        Ok(ts_data) => {
+            println!("   ✅ Time series created successfully");
+            println!("   📊 Length: {} data points", ts_data.len());
+            println!(
+                "   📈 Last value: ${:.2}",
+                ts_data.last_value().unwrap_or(0.0)
+            );
+            println!(
+                "   📉 Recent 5 values: {:?}",
+                ts_data
+                    .recent_values(5)
+                    .iter()
+                    .map(|&x| format!("${:.2}", x))
+                    .collect::<Vec<_>>()
+            );
+        }
+        Err(e) => println!("   ❌ Time series creation failed: {}", e),
+    }
+
+    println!("\n🎉 Forecasting example completed!");
+    println!("\n💡 Note: Forecasting accuracy depends on data quality and market conditions.");
+    println!("   Always combine multiple models and validate results before making decisions.");
+
+    Ok(())
 }

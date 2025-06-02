@@ -146,15 +146,6 @@ path = "examples/forecasting_example.rs"
 name = "lib_check"
 path = "examples/lib_check.rs"
 
-[[example]]
-name = "strategy_showcase"
-path = "examples/strategy_showcase.rs"
-
-# Production readiness examples
-[[example]]
-name = "production_oxidiviner_demo"
-path = "examples/production_oxidiviner_demo.rs"
-
 # Benchmarks for performance testing
 [[bench]]
 name = "trade_math_bench"
@@ -195,10 +186,6 @@ exclude-files = [
 timeout = "300"
 
 [[example]]
-name = "advanced_forecasting_demo"
-path = "examples/advanced_forecasting_demo.rs"
-
-[[example]]
 name = "backtest_integration_demo"
 path = "examples/backtest_integration_demo.rs"
 
@@ -206,6 +193,4 @@ path = "examples/backtest_integration_demo.rs"
 name = "quick_start"
 path = "examples/quick_start.rs"
 
-[[example]]
-name = "debug_timeseries"
-path = "examples/debug_timeseries.rs" 
+# Removed debug_timeseries example 
