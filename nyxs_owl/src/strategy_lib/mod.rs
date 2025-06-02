@@ -59,9 +59,15 @@ pub mod prelude;
 pub mod strategy;
 pub mod utils;
 
+// Integration utilities for async backtesting frameworks
+pub mod integration;
+
 // Re-export commonly used items for convenience
 pub use backtest::{run_backtest, BacktestConfig, BacktestMetrics, BacktestResults};
 pub use strategy::{Signal, Strategy, StrategyConfig, StrategyError};
+
+// Re-export integration utilities
+pub use integration::{AsyncStrategy, DataConverter, StrategyAdapter};
 
 // Re-export specific strategies for direct access
 pub use strategy::trend_following::MovingAverageCrossover;

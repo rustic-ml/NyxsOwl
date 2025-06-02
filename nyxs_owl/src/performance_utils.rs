@@ -221,10 +221,15 @@ pub fn calculate_detailed_minute_performance(
     let (max_drawdown, sharpe_ratio, volatility) =
         calculate_risk_metrics(&portfolio_values, &daily_returns);
 
-    let (win_rate, profit_factor) = if !trades.is_empty() {
-        calculate_trade_metrics(&trades)
-    } else {
-        (0.0, 0.0)
+    let (win_rate, profit_factor) = {
+        #[cfg(feature = "minute-trading")]
+        {
+            calculate_trade_metrics(&trades)
+        }
+        #[cfg(not(feature = "minute-trading"))]
+        {
+            (0.0, 0.0)
+        }
     };
 
     let annualized_return = if data.len() > 252 * 24 * 60 {
@@ -292,6 +297,7 @@ fn calculate_risk_metrics(portfolio_values: &[f64], daily_returns: &[f64]) -> (f
 }
 
 /// Optimized trade metrics calculation
+#[cfg(feature = "minute-trading")]
 fn calculate_trade_metrics(trades: &[crate::minute_trade::Trade]) -> (f64, f64) {
     if trades.is_empty() {
         return (0.0, 0.0);
@@ -325,16 +331,20 @@ fn calculate_trade_metrics(trades: &[crate::minute_trade::Trade]) -> (f64, f64) 
 }
 
 /// Input validation helper
+#[cfg(feature = "minute-trading")]
 #[inline]
-fn validate_inputs(data_len: usize, signals_len: usize) -> Result<(), MinuteTradeError> {
+fn validate_inputs(
+    data_len: usize,
+    signals_len: usize,
+) -> Result<(), crate::minute_trade::TradeError> {
     if data_len != signals_len {
-        return Err(MinuteTradeError::InvalidData(
+        return Err(crate::minute_trade::TradeError::InvalidData(
             "Data and signals arrays must be the same length".to_string(),
         ));
     }
 
     if data_len <= 1 {
-        return Err(MinuteTradeError::InsufficientData(
+        return Err(crate::minute_trade::TradeError::InsufficientData(
             "Need at least 2 data points to calculate performance".to_string(),
         ));
     }
@@ -345,10 +355,13 @@ fn validate_inputs(data_len: usize, signals_len: usize) -> Result<(), MinuteTrad
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "day-trading")]
     use crate::day_trade::OhlcvData;
+    #[cfg(feature = "minute-trading")]
     use crate::minute_trade::OhlcvData as MinuteOhlcvData;
     use chrono::{DateTime, Utc};
 
+    #[cfg(feature = "day-trading")]
     #[test]
     fn test_daily_performance_calculation() {
         let data = create_test_daily_data();
@@ -363,6 +376,7 @@ mod tests {
         assert!(performance.abs() < 100.0); // Reasonable performance range
     }
 
+    #[cfg(feature = "minute-trading")]
     #[test]
     fn test_minute_performance_calculation() {
         let data = create_test_minute_data();
@@ -377,6 +391,7 @@ mod tests {
         assert!(performance.abs() < 100.0); // Reasonable performance range
     }
 
+    #[cfg(feature = "day-trading")]
     fn create_test_daily_data() -> Vec<DailyOhlcv> {
         vec![
             DailyOhlcv {
@@ -422,6 +437,7 @@ mod tests {
         ]
     }
 
+    #[cfg(feature = "minute-trading")]
     fn create_test_minute_data() -> Vec<crate::minute_trade::MinuteOhlcv> {
         vec![
             crate::minute_trade::MinuteOhlcv {

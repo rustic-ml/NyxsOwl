@@ -161,9 +161,10 @@ impl TimeSeriesData {
             "date".into(),
             dates
                 .iter()
-                .map(|d| d.timestamp_millis())
+                .map(|d| d.timestamp_nanos_opt().unwrap_or(0))
                 .collect::<Vec<i64>>(),
-        );
+        )
+        .cast(&DataType::Datetime(TimeUnit::Nanoseconds, None))?;
         let values_series = Series::new("close".into(), values);
 
         // Create a dataframe with the dates and values

@@ -1,6 +1,6 @@
 [package]
 name = "nyxs_owl"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 description = "A comprehensive Rust library for trading, forecasting, and financial analysis"
 authors = ["Celsis Durham <durhamcelsis@gmail.com>"]
@@ -77,6 +77,10 @@ serde_json = "1.0"
 thiserror = "1.0"
 csv = "1.2"
 rand = "0.8"
+
+# Async support for better integration
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread"], optional = true }
 
 # Math and statistics
 num-traits = "0.2"
@@ -162,17 +166,25 @@ harness = false
 
 # Optional features that can be enabled by users
 [features]
-default = ["day-trading", "minute-trading", "trading-math", "forecasting", "strategies"]
-# Include day trading functionality
-day-trading = []
-# Include minute-level trading functionality
-minute-trading = []
-# Include trading math utilities
-trading-math = []
-# Include forecasting functionality
-forecasting = []
-# Include strategy library
-strategies = []
+# Smart defaults for most users - includes essential technical analysis and backtesting
+default = ["trading-math", "backtesting"]
+
+# Core feature sets
+trading-math = []          # Essential technical indicators (SMA, EMA, RSI, Bollinger Bands, etc.)
+backtesting = []           # Strategy backtesting engine
+forecasting = []           # Time series forecasting with OxiDiviner
+
+# Advanced features
+day-trading = []           # Day trading strategies using daily OHLCV data
+minute-trading = []        # Minute-level intraday trading strategies
+async-support = ["tokio"]  # Async runtime support for integration
+
+# Convenience meta-features
+basic = ["trading-math"]                                           # Just technical indicators
+standard = ["trading-math", "backtesting"]                        # Technical analysis + backtesting
+advanced = ["trading-math", "backtesting", "forecasting"]         # Standard + forecasting
+professional = ["trading-math", "backtesting", "forecasting", "day-trading", "minute-trading"]  # Everything
+all = ["professional", "async-support"]                           # Everything including async
 
 [package.metadata.tarpaulin]
 # Package-specific tarpaulin settings
@@ -184,4 +196,16 @@ timeout = "300"
 
 [[example]]
 name = "advanced_forecasting_demo"
-path = "examples/advanced_forecasting_demo.rs" 
+path = "examples/advanced_forecasting_demo.rs"
+
+[[example]]
+name = "backtest_integration_demo"
+path = "examples/backtest_integration_demo.rs"
+
+[[example]]
+name = "quick_start"
+path = "examples/quick_start.rs"
+
+[[example]]
+name = "debug_timeseries"
+path = "examples/debug_timeseries.rs" 

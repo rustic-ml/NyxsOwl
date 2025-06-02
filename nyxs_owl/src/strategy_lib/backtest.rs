@@ -214,14 +214,15 @@ pub fn run_backtest<S: Strategy>(
         equity_values.push(current_equity);
 
         // Track returns for metrics calculation
-        if i > 0 {
-            let prev_equity = equity_values[i - 1]; // Previous equity is now at i-1
+        let equity_count = equity_values.len();
+        if equity_count > 1 {
+            let prev_equity = equity_values[equity_count - 2]; // Previous equity value
             if prev_equity > 0.0 {
                 let daily_return = (current_equity - prev_equity) / prev_equity;
                 returns.push(daily_return);
             }
         } else {
-            // For the first data point, calculate return vs initial capital
+            // For the first valid data point, calculate return vs initial capital
             if config.initial_capital > 0.0 {
                 let daily_return =
                     (current_equity - config.initial_capital) / config.initial_capital;
@@ -422,10 +423,11 @@ mod tests {
         description: String,
         required_cols: Vec<String>,
         signals: Series,
+        config: StrategyConfig,
     }
 
     impl Strategy for MockStrategy {
-        fn new(_config: StrategyConfig) -> Self {
+        fn new(config: StrategyConfig) -> Self {
             Self {
                 name: "Mock Strategy".to_string(),
                 description: "A mock strategy for testing".to_string(),
@@ -434,6 +436,7 @@ mod tests {
                     "signal".into(),
                     vec![Signal::Hold as i32, Signal::Buy as i32, Signal::Sell as i32],
                 ),
+                config,
             }
         }
 
@@ -452,6 +455,28 @@ mod tests {
         fn required_columns(&self) -> Vec<&str> {
             self.required_cols.iter().map(|s| s.as_str()).collect()
         }
+
+        fn config(&self) -> &StrategyConfig {
+            &self.config
+        }
+    }
+
+    /// Create a simple test strategy that returns the given signals
+    fn create_mock_strategy_with_signals(signals: Vec<Signal>) -> MockStrategy {
+        let signal_values: Vec<i32> = signals.iter().map(|s| *s as i32).collect();
+        MockStrategy {
+            name: "Test Strategy".to_string(),
+            description: "Test description".to_string(),
+            required_cols: vec!["close".to_string()],
+            signals: Series::new("signal".into(), signal_values),
+            config: StrategyConfig::default(),
+        }
+    }
+
+    /// Create a test DataFrame with given prices
+    fn create_test_data_with_prices(prices: Vec<f64>) -> DataFrame {
+        let close = Series::new("close".into(), prices);
+        DataFrame::new(vec![close.into()]).unwrap()
     }
 
     /// Create a test DataFrame
@@ -481,6 +506,7 @@ mod tests {
                 "signal".into(),
                 vec![Signal::Hold as i32, Signal::Buy as i32, Signal::Sell as i32],
             ),
+            config: StrategyConfig::default(),
         };
 
         let config = BacktestConfig::default();
@@ -530,6 +556,7 @@ mod tests {
                 "signal".into(),
                 vec![Signal::Hold as i32, Signal::Buy as i32, Signal::Sell as i32],
             ),
+            config: StrategyConfig::default(),
         };
 
         let config = BacktestConfig::default();
@@ -543,5 +570,702 @@ mod tests {
             }
             _ => panic!("Expected MissingData error"),
         }
+    }
+
+    #[test]
+    fn test_run_backtest_only_hold_signals() {
+        let data = create_test_data_with_prices(vec![100.0, 101.0, 102.0, 103.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Hold,
+            Signal::Hold,
+            Signal::Hold,
+            Signal::Hold,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Equity curve should exist for all periods
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 4); // Should match data length
+
+        // The actual behavior might vary, so let's just check that we get valid results
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+        assert!(results.metrics.profit_factor >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_only_buy_signals() {
+        let data = create_test_data_with_prices(vec![100.0, 105.0, 110.0, 115.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Buy,
+            Signal::Buy,
+            Signal::Buy,
+            Signal::Buy,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should have some trading activity
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 4); // Should match data length
+
+        // Check that we get valid results
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_buy_then_sell() {
+        let data = create_test_data_with_prices(vec![100.0, 105.0, 110.0, 115.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Buy,
+            Signal::Hold,
+            Signal::Sell,
+            Signal::Hold,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should have some trades
+        assert!(results.trades.height() >= 1);
+
+        // Check equity curve length
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 4);
+
+        // Metrics should be valid
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_with_negative_prices() {
+        let data = create_test_data_with_prices(vec![100.0, 0.0, -10.0, 50.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Buy,
+            Signal::Hold,
+            Signal::Sell,
+            Signal::Hold,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should handle negative/zero prices gracefully by skipping them
+        // Only valid prices (100.0 and 50.0) should generate equity values
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert!(equity_values.len() >= 1); // Should have at least one valid equity value
+        assert!(equity_values.len() <= 2); // Only for valid prices (100.0 and 50.0)
+        assert!(results.metrics.total_return.is_finite());
+    }
+
+    #[test]
+    fn test_run_backtest_sell_then_buy() {
+        let data = create_test_data_with_prices(vec![100.0, 95.0, 90.0, 85.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Sell,
+            Signal::Hold,
+            Signal::Buy,
+            Signal::Hold,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should have some trading activity
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 4);
+
+        // Metrics should be valid
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_alternating_signals() {
+        let data = create_test_data_with_prices(vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0]);
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Buy,
+            Signal::Sell,
+            Signal::Buy,
+            Signal::Sell,
+            Signal::Buy,
+            Signal::Hold,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should have trading activity
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 6);
+
+        // Check that metrics are calculated correctly
+        assert!(results.metrics.win_rate >= 0.0 && results.metrics.win_rate <= 100.0);
+        assert!(results.metrics.profit_factor > 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_high_commission() {
+        let data = create_test_data_with_prices(vec![100.0, 101.0, 102.0]);
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 10000.0,
+            commission: 0.1, // 10% commission
+            slippage: 0.0,
+            position_size: 0.1,
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // High commission should impact performance
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 3);
+
+        // Metrics should be valid
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_high_slippage() {
+        let data = create_test_data_with_prices(vec![100.0, 110.0, 120.0]);
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 10000.0,
+            commission: 0.0,
+            slippage: 0.1, // 10% slippage
+            position_size: 0.1,
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // High slippage should impact performance
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 3);
+
+        // Metrics should be valid
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_large_position_size() {
+        let data = create_test_data_with_prices(vec![100.0, 110.0, 120.0]);
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 10000.0,
+            commission: 0.001,
+            slippage: 0.0005,
+            position_size: 0.9, // 90% position size
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Large position size should amplify returns
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 3);
+
+        // Metrics should be valid and potentially larger magnitude
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_empty_data() {
+        let data =
+            DataFrame::new(vec![Series::new("close".into(), Vec::<f64>::new()).into()]).unwrap();
+        let strategy = create_mock_strategy_with_signals(vec![]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Empty data should result in empty results
+        assert_eq!(results.trades.height(), 0);
+        assert_eq!(results.equity_curve.len(), 0);
+        assert_eq!(results.metrics.total_return, 0.0);
+        assert_eq!(results.metrics.win_rate, 0.0);
+        assert_eq!(results.metrics.profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_metrics_empty_data() {
+        let metrics = calculate_metrics(&[], &[], &[], &[], 10000.0);
+
+        // When equity_values is empty, final_equity defaults to initial_capital, so return is 0%
+        assert_eq!(metrics.total_return, 0.0);
+        assert_eq!(metrics.annualized_return, 0.0);
+        assert_eq!(metrics.max_drawdown, 0.0);
+        assert_eq!(metrics.sharpe_ratio, 0.0);
+        assert_eq!(metrics.win_rate, 0.0);
+        assert_eq!(metrics.profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_metrics_profitable_scenario() {
+        let equity_values = vec![10000.0, 11000.0, 12000.0, 13000.0];
+        let returns = vec![0.1, 0.0909, 0.0833]; // Corresponding returns
+        let drawdown_series = vec![0.0, 0.0, 0.0, 0.0];
+
+        // Create profitable trade records
+        let trade_records = vec![
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "long_close".to_string(),
+                price: 110.0,
+                quantity: 100.0,
+                value: 11000.0,
+                commission: 11.0,
+            },
+        ];
+
+        let metrics = calculate_metrics(
+            &equity_values,
+            &returns,
+            &drawdown_series,
+            &trade_records,
+            10000.0,
+        );
+
+        assert!(metrics.total_return > 0.0);
+        assert!(metrics.annualized_return.is_finite());
+        assert_eq!(metrics.max_drawdown, 0.0);
+        assert!(metrics.sharpe_ratio.is_finite());
+        assert_eq!(metrics.win_rate, 100.0); // 100% winning trades
+        assert!(metrics.profit_factor.is_infinite() || metrics.profit_factor > 1.0);
+        // All profitable trades
+    }
+
+    #[test]
+    fn test_calculate_metrics_loss_scenario() {
+        let equity_values = vec![10000.0, 9000.0, 8000.0, 7000.0];
+        let returns = vec![-0.1, -0.111, -0.125];
+        let drawdown_series = vec![0.0, 0.1, 0.2, 0.3];
+
+        // Create losing trade records
+        let trade_records = vec![
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "long_close".to_string(),
+                price: 90.0,
+                quantity: 100.0,
+                value: 9000.0,
+                commission: 9.0,
+            },
+        ];
+
+        let metrics = calculate_metrics(
+            &equity_values,
+            &returns,
+            &drawdown_series,
+            &trade_records,
+            10000.0,
+        );
+
+        assert!(metrics.total_return < 0.0);
+        assert!(metrics.max_drawdown > 0.0);
+        assert_eq!(metrics.win_rate, 0.0); // No winning trades
+                                           // When there are only losses: gross_profit = 0, gross_loss > 0, so profit_factor = 0/gross_loss = 0
+        assert_eq!(metrics.profit_factor, 0.0); // Actually 0.0 for only losing trades
+    }
+
+    #[test]
+    fn test_calculate_trade_metrics_mixed_trades() {
+        let trade_records = vec![
+            // First profitable trade
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "long_close".to_string(),
+                price: 110.0,
+                quantity: 100.0,
+                value: 11000.0,
+                commission: 11.0,
+            },
+            // Second losing trade
+            TradeRecord {
+                id: 3,
+                trade_type: "short_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 4,
+                trade_type: "short_close".to_string(),
+                price: 110.0,
+                quantity: 100.0,
+                value: 11000.0,
+                commission: 11.0,
+            },
+        ];
+
+        let (win_rate, profit_factor) = calculate_trade_metrics(&trade_records);
+
+        assert_eq!(win_rate, 50.0); // 1 out of 2 trades won
+        assert!(profit_factor > 0.0 && profit_factor.is_finite());
+    }
+
+    #[test]
+    fn test_calculate_trade_metrics_no_trades() {
+        let (win_rate, profit_factor) = calculate_trade_metrics(&[]);
+
+        assert_eq!(win_rate, 0.0);
+        assert_eq!(profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_trade_metrics_unmatched_trades() {
+        // Only open trades without closes
+        let trade_records = vec![
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "short_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+        ];
+
+        let (win_rate, profit_factor) = calculate_trade_metrics(&trade_records);
+
+        // Unmatched trades should result in default values
+        assert_eq!(win_rate, 0.0);
+        assert_eq!(profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_run_backtest_invalid_signal_values() {
+        let data = create_test_data_with_prices(vec![100.0, 101.0, 102.0]);
+
+        // Create strategy with invalid signal values
+        let mock_strategy = MockStrategy {
+            name: "Invalid Signal Strategy".to_string(),
+            description: "Strategy with invalid signals".to_string(),
+            required_cols: vec!["close".to_string()],
+            signals: Series::new("signal".into(), vec![999, -1, 42]), // Invalid signal values
+            config: StrategyConfig::default(),
+        };
+
+        let config = BacktestConfig::default();
+        let initial_capital = config.initial_capital;
+        let results = run_backtest(&mock_strategy, &data, config).unwrap();
+
+        // Invalid signals should be treated as Hold
+        assert_eq!(results.trades.height(), 0);
+
+        let equity_values = results.equity_curve.f64().unwrap();
+        for i in 0..equity_values.len() {
+            assert_eq!(equity_values.get(i).unwrap(), initial_capital);
+        }
+    }
+
+    #[test]
+    fn test_backtest_results_structure() {
+        let data = create_test_data();
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Verify the structure of BacktestResults
+        assert_eq!(results.equity_curve.name().as_str(), "equity");
+        let column_names = results.trades.get_column_names();
+        assert!(column_names.iter().any(|name| name.as_str() == "type"));
+        assert!(column_names.iter().any(|name| name.as_str() == "price"));
+        assert!(column_names.iter().any(|name| name.as_str() == "quantity"));
+        assert!(column_names.iter().any(|name| name.as_str() == "value"));
+
+        // Verify metrics structure
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.annualized_return.is_finite());
+        assert!(results.metrics.max_drawdown >= 0.0);
+        assert!(results.metrics.sharpe_ratio.is_finite());
+        assert!(results.metrics.win_rate >= 0.0 && results.metrics.win_rate <= 100.0);
+        assert!(results.metrics.profit_factor >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_zero_initial_capital() {
+        let data = create_test_data();
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 0.0,
+            commission: 0.001,
+            slippage: 0.0005,
+            position_size: 0.1,
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // With zero capital, no trades should be possible
+        let equity_values = results.equity_curve.f64().unwrap();
+        for i in 0..equity_values.len() {
+            assert_eq!(equity_values.get(i).unwrap(), 0.0);
+        }
+    }
+
+    #[test]
+    fn test_run_backtest_zero_position_size() {
+        let data = create_test_data();
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 10000.0,
+            commission: 0.001,
+            slippage: 0.0005,
+            position_size: 0.0, // Zero position size
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // With zero position size, no significant trades should occur
+        let equity_values = results.equity_curve.f64().unwrap();
+        let initial_capital = 10000.0;
+        for i in 0..equity_values.len() {
+            let equity = equity_values.get(i).unwrap();
+            // Should remain close to initial capital
+            assert!((equity - initial_capital).abs() < 1.0);
+        }
+    }
+
+    #[test]
+    fn test_run_backtest_very_high_position_size() {
+        let data = create_test_data();
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig {
+            initial_capital: 10000.0,
+            commission: 0.001,
+            slippage: 0.0005,
+            position_size: 1.5, // 150% position size (leverage)
+        };
+
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should handle high position sizes without crashing
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_single_data_point() {
+        let data = create_test_data_with_prices(vec![100.0]);
+        let strategy = create_mock_strategy_with_signals(vec![Signal::Buy]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // With single data point, should handle gracefully
+        let equity_values = results.equity_curve.f64().unwrap();
+        assert_eq!(equity_values.len(), 1);
+    }
+
+    #[test]
+    fn test_calculate_metrics_single_period() {
+        let equity_values = vec![10000.0];
+        let returns = vec![];
+        let drawdown_series = vec![0.0];
+        let trade_records = vec![];
+
+        let metrics = calculate_metrics(
+            &equity_values,
+            &returns,
+            &drawdown_series,
+            &trade_records,
+            10000.0,
+        );
+
+        assert_eq!(metrics.total_return, 0.0);
+        assert_eq!(metrics.annualized_return, 0.0);
+        assert_eq!(metrics.max_drawdown, 0.0);
+        assert_eq!(metrics.sharpe_ratio, 0.0);
+        assert_eq!(metrics.win_rate, 0.0);
+        assert_eq!(metrics.profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_metrics_volatile_returns() {
+        let equity_values = vec![10000.0, 12000.0, 8000.0, 11000.0, 9000.0];
+        let returns = vec![0.2, -0.333, 0.375, -0.182];
+        let drawdown_series = vec![0.0, 0.0, 0.333, 0.083, 0.25];
+        let trade_records = vec![];
+
+        let metrics = calculate_metrics(
+            &equity_values,
+            &returns,
+            &drawdown_series,
+            &trade_records,
+            10000.0,
+        );
+
+        assert!(metrics.total_return.is_finite());
+        assert!(metrics.annualized_return.is_finite());
+        assert!(metrics.max_drawdown > 0.0);
+        assert!(metrics.sharpe_ratio.is_finite());
+    }
+
+    #[test]
+    fn test_calculate_trade_metrics_only_opens() {
+        // Only open trades without closes (incomplete trading cycle)
+        let trade_records = vec![
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "short_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+        ];
+
+        let (win_rate, profit_factor) = calculate_trade_metrics(&trade_records);
+
+        // Unmatched trades should result in default values
+        assert_eq!(win_rate, 0.0);
+        assert_eq!(profit_factor, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_trade_metrics_mixed_matched_unmatched() {
+        let trade_records = vec![
+            // Matched profitable trade
+            TradeRecord {
+                id: 1,
+                trade_type: "long_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+            TradeRecord {
+                id: 2,
+                trade_type: "long_close".to_string(),
+                price: 110.0,
+                quantity: 100.0,
+                value: 11000.0,
+                commission: 11.0,
+            },
+            // Unmatched open
+            TradeRecord {
+                id: 3,
+                trade_type: "short_open".to_string(),
+                price: 100.0,
+                quantity: 100.0,
+                value: 10000.0,
+                commission: 10.0,
+            },
+        ];
+
+        let (win_rate, profit_factor) = calculate_trade_metrics(&trade_records);
+
+        // Should only count the matched trade
+        assert_eq!(win_rate, 100.0); // 1 out of 1 matched trades won
+        assert!(profit_factor.is_infinite() || profit_factor > 1.0); // Only profitable trades
+    }
+
+    #[test]
+    fn test_backtest_config_custom_values() {
+        let config = BacktestConfig {
+            initial_capital: 50000.0,
+            commission: 0.002,
+            slippage: 0.001,
+            position_size: 0.2,
+        };
+
+        assert_eq!(config.initial_capital, 50000.0);
+        assert_eq!(config.commission, 0.002);
+        assert_eq!(config.slippage, 0.001);
+        assert_eq!(config.position_size, 0.2);
+    }
+
+    #[test]
+    fn test_run_backtest_extreme_prices() {
+        let data = create_test_data_with_prices(vec![0.01, 1000000.0, 0.01]);
+        let strategy =
+            create_mock_strategy_with_signals(vec![Signal::Buy, Signal::Sell, Signal::Hold]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should handle extreme price variations
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_run_backtest_repeated_signals() {
+        let data = create_test_data_with_prices(vec![100.0, 101.0, 102.0, 103.0, 104.0]);
+        // Multiple consecutive buy signals
+        let strategy = create_mock_strategy_with_signals(vec![
+            Signal::Buy,
+            Signal::Buy,
+            Signal::Buy,
+            Signal::Sell,
+            Signal::Sell,
+        ]);
+
+        let config = BacktestConfig::default();
+        let results = run_backtest(&strategy, &data, config).unwrap();
+
+        // Should handle repeated signals gracefully (ignoring subsequent buys when already long)
+        assert!(results.metrics.total_return.is_finite());
+        assert!(results.metrics.win_rate >= 0.0);
     }
 }

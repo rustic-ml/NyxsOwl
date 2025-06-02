@@ -1,42 +1,98 @@
-//! # NyxsOwl
+//! # NyxsOwl - Financial Trading Library
 //!
-//! A comprehensive Rust library for trading, forecasting, and financial analysis.
+//! A comprehensive Rust library for financial time series analysis, trading strategies,
+//! forecasting, and technical indicators with a focus on simplicity and performance.
 //!
-//! This library provides:
-//! - Day trading strategies and analysis
-//! - Minute-level trading strategies
-//! - Financial forecasting with OxiDiviner integration
-//! - Mathematical utilities for trading
-//! - Strategy libraries built on technical indicators
+//! ## Quick Start
 //!
-//! ## Example
+//! ```rust
+//! use nyxs_owl::prelude::*;
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let prices = vec![100.0, 102.0, 101.5, 103.0, 104.5];
+//!
+//! // Simple technical analysis
+//! let sma_values = sma(&prices, 3)?;
+//! let rsi_values = rsi(&prices, 14)?;
+//!
+//! println!("SMA: {:?}", sma_values);
+//! # Ok(())
+//! # }
 //! ```
-//! use nyxs_owl::Owl;
-//!
-//! let my_owl = Owl::new("Hedwig");
-//! assert_eq!(my_owl.name(), "Hedwig");
-//! ```
-//!
-//! ## Modules
-//!
-//! - [`day_trade`] - Day trading strategies using daily OHLCV data
-//! - [`minute_trade`] - Minute-level intraday trading strategies
-//! - [`forecast_trade`] - Financial forecasting and prediction models
-//! - [`trade_math`] - Mathematical calculations for trading indicators
-//! - [`strategy_lib`] - Trading strategies built on technical indicators
-//! - [`performance_utils`] - Common performance utilities
-//! - [`advanced_optimizations`] - Advanced optimizations for trading strategies
-//! - [`common`] - Common utilities and shared functionality
 
-// Common utilities and shared functionality
+#![warn(missing_docs)]
+#![warn(clippy::all)]
+
+// Common types and utilities
 pub mod common;
 
-// Core trading functionality
+pub mod prelude {
+    //! Common imports for typical NyxsOwl usage
+    //!
+    //! This module provides a convenient way to import the most commonly used
+    //! types and functions with a single `use nyxs_owl::prelude::*;` statement.
+
+    // Re-export essential technical indicators
+    #[cfg(feature = "trading-math")]
+    pub use crate::trade_math::simple_api::*;
+
+    // Re-export backtesting essentials
+    #[cfg(feature = "backtesting")]
+    pub use crate::strategy_lib::backtest::{run_backtest, BacktestConfig, BacktestResults};
+
+    // Re-export common types and new simplified types
+    pub use crate::simple_types::{NyxsOwlError, Price, Result, Signal};
+}
+
+pub mod simple_types {
+    //! Shared types and error definitions for the simplified API
+
+    /// Price type alias for clarity
+    pub type Price = f64;
+
+    /// Trading signal enumeration
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Signal {
+        /// Hold current position
+        Hold = 0,
+        /// Buy signal
+        Buy = 1,
+        /// Sell signal
+        Sell = 2,
+    }
+
+    /// Main error type for NyxsOwl operations
+    #[derive(Debug, thiserror::Error)]
+    pub enum NyxsOwlError {
+        /// Invalid parameter provided
+        #[error("Invalid parameter: {0}")]
+        InvalidParameter(String),
+
+        /// Data processing error
+        #[error("Data error: {0}")]
+        DataError(String),
+
+        /// Strategy execution error
+        #[error("Strategy error: {0}")]
+        StrategyError(String),
+
+        /// Backtest execution error
+        #[error("Backtest error: {0}")]
+        BacktestError(String),
+
+        /// Missing required data
+        #[error("Missing data: {0}")]
+        MissingData(String),
+    }
+
+    /// Result type alias for convenience
+    pub type Result<T> = std::result::Result<T, NyxsOwlError>;
+}
+
+// Export main modules with feature gates
 #[cfg(feature = "trading-math")]
 pub mod trade_math;
 
-// Feature-gated modules
 #[cfg(feature = "day-trading")]
 pub mod day_trade;
 
@@ -46,12 +102,12 @@ pub mod minute_trade;
 #[cfg(feature = "forecasting")]
 pub mod forecast_trade;
 
-#[cfg(feature = "strategies")]
+#[cfg(feature = "backtesting")]
 pub mod strategy_lib;
 
-#[cfg(any(feature = "day-trading", feature = "minute-trading"))]
 pub mod performance_utils;
 
+// Always include advanced optimizations
 pub mod advanced_optimizations;
 
 // Re-export commonly used types for convenience

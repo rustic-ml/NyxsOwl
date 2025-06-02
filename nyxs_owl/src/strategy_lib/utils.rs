@@ -15,7 +15,7 @@ pub fn raw_values_to_signals(raw_signals: &Series) -> Result<Series, StrategyErr
 
     let signals = raw_signals
         .i32()
-        .map_err(|e| StrategyError::PolarsError(e))?
+        .map_err(StrategyError::PolarsError)?
         .into_iter()
         .map(|opt_val| match opt_val {
             Some(1) => Some(Signal::Buy as i32),
@@ -59,13 +59,13 @@ pub fn calculate_crossovers(series1: &Series, series2: &Series) -> Result<Series
     // Convert to f64 to ensure compatibility
     let s1 = series1
         .cast(&DataType::Float64)
-        .map_err(|e| StrategyError::PolarsError(e))?;
+        .map_err(StrategyError::PolarsError)?;
     let s2 = series2
         .cast(&DataType::Float64)
-        .map_err(|e| StrategyError::PolarsError(e))?;
+        .map_err(StrategyError::PolarsError)?;
 
-    let s1 = s1.f64().map_err(|e| StrategyError::PolarsError(e))?;
-    let s2 = s2.f64().map_err(|e| StrategyError::PolarsError(e))?;
+    let s1 = s1.f64().map_err(StrategyError::PolarsError)?;
+    let s2 = s2.f64().map_err(StrategyError::PolarsError)?;
 
     // Calculate current and previous differences
     let mut current_diff = Vec::new();
@@ -139,8 +139,8 @@ pub fn calculate_pct_change(series: &Series) -> Result<Series, StrategyError> {
 
     let s = series
         .cast(&DataType::Float64)
-        .map_err(|e| StrategyError::PolarsError(e))?;
-    let s = s.f64().map_err(|e| StrategyError::PolarsError(e))?;
+        .map_err(StrategyError::PolarsError)?;
+    let s = s.f64().map_err(StrategyError::PolarsError)?;
 
     let mut pct_changes = Vec::new();
     let mut prev_val = None;
@@ -166,7 +166,7 @@ pub fn calculate_pct_change(series: &Series) -> Result<Series, StrategyError> {
     let name = format!("{}_pct_change", series.name());
     Series::new(name.into(), pct_changes)
         .cast(&DataType::Float64)
-        .map_err(|e| StrategyError::PolarsError(e))
+        .map_err(StrategyError::PolarsError)
 }
 
 #[cfg(test)]

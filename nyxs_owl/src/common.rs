@@ -2,6 +2,7 @@
 //!
 //! This module provides shared functionality to reduce code duplication
 
+#[cfg(feature = "minute-trading")]
 pub mod strategy_params {
     //! Common parameter validation and configuration structures
 
@@ -88,6 +89,7 @@ pub mod strategy_params {
     }
 }
 
+#[cfg(feature = "minute-trading")]
 pub mod test_utils {
     //! Common test data generation and utilities
 
@@ -105,14 +107,19 @@ pub mod test_utils {
     }
 }
 
+#[cfg(any(feature = "day-trading", feature = "minute-trading"))]
 pub mod imports {
     //! Commonly used imports grouped for convenience
 
     // Core trading types
+    #[cfg(feature = "day-trading")]
     pub use crate::day_trade::{DailyOhlcv, TradingStrategy};
+
+    #[cfg(feature = "minute-trading")]
     pub use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
     // Utility functions
+    #[cfg(feature = "minute-trading")]
     pub use crate::minute_trade::utils::{
         calculate_basic_performance, validate_period, validate_positive,
     };

@@ -231,6 +231,12 @@ impl<T: Copy + Default> AlignedBuffer<T> {
         self.size
     }
 
+    /// Check if buffer is empty
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+
     /// Check if buffer is full
     #[inline]
     pub fn is_full(&self) -> bool {
@@ -281,6 +287,12 @@ struct ColdData {
 }
 
 impl FastIndicatorManager {
+    /// Create a new fast indicator manager
+    ///
+    /// # Arguments
+    /// * `sma_period` - Period for Simple Moving Average calculation
+    /// * `ema_period` - Period for Exponential Moving Average calculation  
+    /// * `rsi_period` - Period for RSI calculation
     pub fn new(sma_period: usize, ema_period: usize, rsi_period: usize) -> Self {
         Self {
             hot_data: HotData {
@@ -337,9 +349,9 @@ impl FastIndicatorManager {
                 if change > 0.0 {
                     self.hot_data.rsi_avg_gain =
                         alpha * change + (1.0 - alpha) * self.hot_data.rsi_avg_gain;
-                    self.hot_data.rsi_avg_loss = (1.0 - alpha) * self.hot_data.rsi_avg_loss;
+                    self.hot_data.rsi_avg_loss *= 1.0 - alpha;
                 } else {
-                    self.hot_data.rsi_avg_gain = (1.0 - alpha) * self.hot_data.rsi_avg_gain;
+                    self.hot_data.rsi_avg_gain *= 1.0 - alpha;
                     self.hot_data.rsi_avg_loss =
                         alpha * (-change) + (1.0 - alpha) * self.hot_data.rsi_avg_loss;
                 }
