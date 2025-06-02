@@ -1,8 +1,7 @@
 //! Moving Average Convergence Divergence (MACD) trading strategy
 
 use crate::day_trade::mock_indicators::Macd;
-use crate::day_trade::OhlcvData;
-use crate::day_trade::{DailyOhlcv, Signal, TradeError, TradingStrategy};
+use crate::day_trade::{DailyOhlcv, OhlcvData, Signal, TradeError, TradingStrategy};
 
 /// MACD (Moving Average Convergence Divergence) strategy implementation
 pub struct MacdStrategy {
@@ -136,7 +135,6 @@ impl TradingStrategy for MacdStrategy {
 mod tests {
     use super::*;
     use chrono::NaiveDate;
-    use OhlcvData;
 
     fn create_test_data() -> Vec<DailyOhlcv> {
         // Create data for testing MACD strategy

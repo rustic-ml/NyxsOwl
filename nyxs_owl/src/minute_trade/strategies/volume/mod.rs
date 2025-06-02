@@ -8,7 +8,6 @@ pub use self::volume_profile_strategy::VolumeProfileStrategy;
 
 // These will be implemented in the future
 mod volume_profile_strategy {
-    use crate::minute_trade::create_test_data;
     use crate::minute_trade::utils::{
         calculate_basic_performance, validate_period, validate_positive,
     };
@@ -266,41 +265,302 @@ mod volume_profile_strategy {
 }
 
 mod relative_volume_strategy {
+    use crate::minute_trade::utils::{calculate_basic_performance, validate_period, validate_positive};
     use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
-    /// Placeholder for the Relative Volume Strategy
+    /// Relative Volume Strategy - trades based on volume anomalies compared to historical averages
     #[derive(Debug, Clone)]
-    pub struct RelativeVolumeStrategy;
+    pub struct RelativeVolumeStrategy {
+        /// Period for calculating average volume
+        lookback_period: usize,
+        /// Volume multiplier threshold for entry signals (e.g., 2.0 means 2x average volume)
+        volume_threshold: f64,
+        /// Price change threshold for confirmation (percentage)
+        price_change_threshold: f64,
+        /// Strategy name
+        name: String,
+    }
 
     impl Default for RelativeVolumeStrategy {
         fn default() -> Self {
-            Self::new()
+            Self::new(20, 2.0, 0.5).unwrap()
         }
     }
 
     impl RelativeVolumeStrategy {
-        /// Create a new instance (placeholder)
-        pub fn new() -> Self {
-            Self
+        /// Create a new Relative Volume Strategy
+        ///
+        /// # Arguments
+        ///
+        /// * `lookback_period` - Period for calculating average volume (typically 20-60)
+        /// * `volume_threshold` - Volume multiplier for signal generation (typically 1.5-3.0)
+        /// * `price_change_threshold` - Minimum price change percentage for confirmation (typically 0.3-1.0)
+        ///
+        /// # Returns
+        ///
+        /// * `Result<Self, String>` - New strategy instance or error message
+        pub fn new(
+            lookback_period: usize,
+            volume_threshold: f64,
+            price_change_threshold: f64,
+        ) -> Result<Self, String> {
+            validate_period(lookback_period, 10)?;
+            validate_positive(volume_threshold, "Volume threshold")?;
+            validate_positive(price_change_threshold, "Price change threshold")?;
+
+            if volume_threshold < 1.2 {
+                return Err("Volume threshold should be at least 1.2 to detect meaningful anomalies.".to_string());
+            }
+
+            if price_change_threshold > 5.0 {
+                return Err("Price change threshold seems too high (>5%). Consider using a lower value.".to_string());
+            }
+
+            Ok(Self {
+                lookback_period,
+                volume_threshold,
+                price_change_threshold,
+                name: format!(
+                    "Relative Volume ({}p, {}x vol, {}% price)",
+                    lookback_period, volume_threshold, price_change_threshold
+                ),
+            })
+        }
+
+        /// Get the lookback period
+        pub fn lookback_period(&self) -> usize {
+            self.lookback_period
+        }
+
+        /// Get the volume threshold
+        pub fn volume_threshold(&self) -> f64 {
+            self.volume_threshold
+        }
+
+        /// Get the price change threshold
+        pub fn price_change_threshold(&self) -> f64 {
+            self.price_change_threshold
+        }
+
+        /// Calculate average volume over the lookback period
+        fn calculate_average_volume(&self, data: &[MinuteOhlcv], end_index: usize) -> Option<f64> {
+            if end_index < self.lookback_period {
+                return None;
+            }
+
+            let start_index = end_index - self.lookback_period;
+            let total_volume: f64 = data[start_index..end_index]
+                .iter()
+                .map(|d| d.data.volume)
+                .sum();
+
+            Some(total_volume / self.lookback_period as f64)
+        }
+
+        /// Calculate price change percentage
+        fn calculate_price_change(&self, previous_close: f64, current_close: f64) -> f64 {
+            if previous_close <= 0.0 {
+                return 0.0;
+            }
+            ((current_close - previous_close) / previous_close) * 100.0
+        }
+
+        /// Check if volume and price conditions are met for a signal
+        fn check_signal_conditions(&self, current_volume: f64, avg_volume: f64, price_change: f64) -> Option<Signal> {
+            let volume_ratio = current_volume / avg_volume;
+            
+            if volume_ratio >= self.volume_threshold {
+                let abs_price_change = price_change.abs();
+                
+                if abs_price_change >= self.price_change_threshold {
+                    // High volume with significant price movement
+                    if price_change > 0.0 {
+                        // Price moving up with high volume - buy signal
+                        Some(Signal::Buy)
+                    } else {
+                        // Price moving down with high volume - sell signal
+                        Some(Signal::Sell)
+                    }
+                } else {
+                    // High volume but insufficient price movement - hold
+                    Some(Signal::Hold)
+                }
+            } else {
+                // Normal volume - hold
+                None
+            }
         }
     }
 
     impl IntradayStrategy for RelativeVolumeStrategy {
         fn name(&self) -> &str {
-            "Relative Volume Strategy (placeholder)"
+            &self.name
         }
 
-        fn generate_signals(&self, _data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
-            let signals = vec![Signal::Hold; _data.len()];
+        fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
+            if data.len() < self.lookback_period + 1 {
+                return Err(TradeError::InsufficientData(format!(
+                    "Need at least {} data points for Relative Volume strategy",
+                    self.lookback_period + 1
+                )));
+            }
+
+            let mut signals = Vec::with_capacity(data.len());
+
+            // First entries are hold signals due to insufficient data
+            for _ in 0..self.lookback_period {
+                signals.push(Signal::Hold);
+            }
+
+            // Track position state
+            let mut in_position = false;
+            let mut position_is_long = false;
+
+            // Generate signals for the remaining data points
+            for i in self.lookback_period..data.len() {
+                let current_candle = &data[i];
+                let previous_candle = &data[i - 1];
+                
+                // Calculate average volume for the lookback period
+                let avg_volume = self.calculate_average_volume(data, i);
+                
+                let signal = if let Some(avg_vol) = avg_volume {
+                    let current_volume = current_candle.data.volume;
+                    let price_change = self.calculate_price_change(
+                        previous_candle.data.close,
+                        current_candle.data.close,
+                    );
+
+                    if !in_position {
+                        // No position - look for entry signals
+                        if let Some(entry_signal) = self.check_signal_conditions(current_volume, avg_vol, price_change) {
+                            match entry_signal {
+                                Signal::Buy => {
+                                    in_position = true;
+                                    position_is_long = true;
+                                    Signal::Buy
+                                }
+                                Signal::Sell => {
+                                    in_position = true;
+                                    position_is_long = false;
+                                    Signal::Sell
+                                }
+                                Signal::Hold => Signal::Hold,
+                            }
+                        } else {
+                            Signal::Hold
+                        }
+                    } else {
+                        // In position - look for exit conditions
+                        let volume_ratio = current_volume / avg_vol;
+                        
+                        // Exit if volume drops significantly or price reverses
+                        let should_exit = volume_ratio < (self.volume_threshold * 0.5) || 
+                                        (position_is_long && price_change < -self.price_change_threshold) ||
+                                        (!position_is_long && price_change > self.price_change_threshold);
+                        
+                        if should_exit {
+                            in_position = false;
+                            if position_is_long {
+                                Signal::Sell // Close long position
+                            } else {
+                                Signal::Buy // Close short position  
+                            }
+                        } else {
+                            Signal::Hold
+                        }
+                    }
+                } else {
+                    Signal::Hold
+                };
+
+                signals.push(signal);
+            }
+
             Ok(signals)
         }
 
         fn calculate_performance(
             &self,
-            _data: &[MinuteOhlcv],
-            _signals: &[Signal],
+            data: &[MinuteOhlcv],
+            signals: &[Signal],
         ) -> Result<f64, TradeError> {
-            Ok(0.0) // Placeholder
+            // Use higher commission for volume-based strategies due to more frequent trading
+            let commission = 0.03; // 0.03% per trade
+            calculate_basic_performance(data, signals, 10000.0, commission)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::minute_trade::create_test_data;
+
+        #[test]
+        fn test_relative_volume_parameters() {
+            // Test valid parameters
+            let strategy = RelativeVolumeStrategy::new(20, 2.0, 0.5);
+            assert!(strategy.is_ok());
+
+            // Test invalid lookback period
+            let strategy = RelativeVolumeStrategy::new(5, 2.0, 0.5);
+            assert!(strategy.is_err());
+
+            // Test invalid volume threshold
+            let strategy = RelativeVolumeStrategy::new(20, 1.0, 0.5);
+            assert!(strategy.is_err());
+
+            // Test invalid price change threshold
+            let strategy = RelativeVolumeStrategy::new(20, 2.0, 6.0);
+            assert!(strategy.is_err());
+        }
+
+        #[test]
+        fn test_volume_calculations() {
+            let strategy = RelativeVolumeStrategy::new(20, 2.0, 0.5).unwrap();
+            let data = create_test_data(50);
+
+            // Test average volume calculation
+            let avg_volume = strategy.calculate_average_volume(&data, 30);
+            assert!(avg_volume.is_some());
+            assert!(avg_volume.unwrap() > 0.0);
+
+            // Test insufficient data
+            let avg_volume = strategy.calculate_average_volume(&data, 10);
+            assert!(avg_volume.is_none());
+        }
+
+        #[test]
+        fn test_signal_generation() {
+            let data = create_test_data(50);
+            let strategy = RelativeVolumeStrategy::new(20, 2.0, 0.5).unwrap();
+
+            let signals = strategy.generate_signals(&data).unwrap();
+
+            // Check that we have the correct number of signals
+            assert_eq!(signals.len(), data.len());
+
+            // Check that the first 'lookback_period' signals are Hold
+            for i in 0..strategy.lookback_period() {
+                assert_eq!(signals[i], Signal::Hold);
+            }
+        }
+
+        #[test]
+        fn test_price_change_calculation() {
+            let strategy = RelativeVolumeStrategy::new(20, 2.0, 0.5).unwrap();
+
+            // Test positive price change
+            let change = strategy.calculate_price_change(100.0, 102.0);
+            assert!((change - 2.0).abs() < f64::EPSILON);
+
+            // Test negative price change
+            let change = strategy.calculate_price_change(100.0, 98.0);
+            assert!((change - (-2.0)).abs() < f64::EPSILON);
+
+            // Test zero previous price
+            let change = strategy.calculate_price_change(0.0, 100.0);
+            assert_eq!(change, 0.0);
         }
     }
 }

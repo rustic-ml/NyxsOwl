@@ -27,7 +27,6 @@
 //! let signals = strategy.generate_signals(&data).unwrap();
 //! ```
 
-use crate::minute_trade::create_test_data;
 use crate::minute_trade::utils::{calculate_basic_performance, validate_period, validate_positive};
 use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 

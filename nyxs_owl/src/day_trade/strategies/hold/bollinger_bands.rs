@@ -3,19 +3,20 @@
 //! This strategy uses Bollinger Bands for identifying volatility and potential reversal points
 //! in intraday trading with minute-level data.
 
-use crate::day_trade::OhlcvData;
-use crate::day_trade::{IntradayTradingStrategy, MinuteOhlcv, Signal, TradeError};
+use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, OhlcvData, Signal, TradeError};
+use crate::trade_math::volatility::BollingerBands;
+use chrono::{DateTime, Timelike, Utc};
 use std::collections::VecDeque;
 
 /// Bollinger Bands calculation implementation
 #[derive(Debug)]
-struct BollingerBands {
+struct BollingerBandsCalculator {
     period: usize,           // The period for SMA calculation
     std_dev_multiplier: f64, // Number of standard deviations for bands
     prices: VecDeque<f64>,   // Queue of recent prices
 }
 
-impl BollingerBands {
+impl BollingerBandsCalculator {
     pub fn new(period: usize, std_dev_multiplier: f64) -> Self {
         Self {
             period,
@@ -252,7 +253,11 @@ impl Default for BollingerBandsStrategy {
     }
 }
 
-impl IntradayTradingStrategy for BollingerBandsStrategy {
+impl IntradayStrategy for BollingerBandsStrategy {
+    fn name(&self) -> &str {
+        "Bollinger Bands Strategy"
+    }
+
     fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
         if data.len() < self.period + self.trend_confirmation_length {
             return Err(TradeError::InsufficientData(format!(
@@ -262,7 +267,7 @@ impl IntradayTradingStrategy for BollingerBandsStrategy {
         }
 
         let mut signals = vec![Signal::Hold; data.len()];
-        let mut bb_indicator = BollingerBands::new(self.period, self.std_dev_multiplier);
+        let mut bb_indicator = BollingerBandsCalculator::new(self.period, self.std_dev_multiplier);
 
         // Arrays to store calculated values for each data point
         let mut percent_bs = vec![0.5; data.len()]; // default to middle
@@ -416,7 +421,7 @@ mod tests {
                     high: price + 0.2,
                     low: price - 0.2,
                     close: price,
-                    volume: (1000 + (minute % 10) * 100) as u64,
+                    volume: (1000 + (minute % 10) * 100) as f64,
                 },
             });
         }
@@ -427,7 +432,7 @@ mod tests {
     #[test]
     fn test_bollinger_bands_calculation() {
         let data = create_test_minute_data();
-        let mut bb = BollingerBands::new(20, 2.0);
+        let mut bb = BollingerBandsCalculator::new(20, 2.0);
 
         // Update with initial data
         for i in 0..30 {

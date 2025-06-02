@@ -27,8 +27,13 @@
 //! - [`strategy_lib`] - Trading strategies built on technical indicators
 //! - [`performance_utils`] - Common performance utilities
 //! - [`advanced_optimizations`] - Advanced optimizations for trading strategies
+//! - [`common`] - Common utilities and shared functionality
 
-// Core modules - always available
+// Common utilities and shared functionality
+pub mod common;
+
+// Core trading functionality
+#[cfg(feature = "trading-math")]
 pub mod trade_math;
 
 // Feature-gated modules

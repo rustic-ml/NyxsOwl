@@ -42,7 +42,7 @@ use std::fmt;
 use thiserror::Error;
 
 // Strategy modules
-mod strategies;
+pub mod strategies;
 pub mod utils;
 
 // Re-export all strategies for convenient access

@@ -3,8 +3,6 @@
 //! This module provides a framework for implementing trading strategies based on forecasting models.
 //! It includes the core traits, common implementations, and utility functions for strategy development.
 
-#[cfg(any(feature = "day-trading", feature = "minute-trading"))]
-use crate::day_trade::{DailyOhlcv, Signal};
 use crate::forecast_trade::data::TimeSeriesData;
 use crate::forecast_trade::error::Result;
 use crate::forecast_trade::models::ForecastModel;

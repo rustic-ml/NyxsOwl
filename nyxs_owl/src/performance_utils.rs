@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use crate::day_trade::{DailyOhlcv, Signal as DaySignal, TradeError as DayTradeError};
 
 #[cfg(feature = "minute-trading")]
-use crate::minute_trade::{MinuteOhlcv, Signal as MinuteSignal, TradeError as MinuteTradeError, Trade};
+use crate::minute_trade::{Signal as MinuteSignal, TradeError as MinuteTradeError};
 
 /// Performance metrics for trading strategies
 #[derive(Debug, Clone, PartialEq)]
@@ -160,7 +160,7 @@ pub fn calculate_detailed_minute_performance(
 
     let mut cash = initial_cash;
     let mut position = 0.0;
-    let mut current_trade: Option<Trade> = None;
+    let mut current_trade: Option<crate::minute_trade::Trade> = None;
 
     portfolio_values.push(initial_cash);
 
@@ -286,7 +286,7 @@ fn calculate_risk_metrics(portfolio_values: &[f64], daily_returns: &[f64]) -> (f
 }
 
 /// Optimized trade metrics calculation
-fn calculate_trade_metrics(trades: &[Trade]) -> (f64, f64) {
+fn calculate_trade_metrics(trades: &[crate::minute_trade::Trade]) -> (f64, f64) {
     if trades.is_empty() {
         return (0.0, 0.0);
     }
@@ -406,9 +406,9 @@ mod tests {
         ]
     }
 
-    fn create_test_minute_data() -> Vec<MinuteOhlcv> {
+    fn create_test_minute_data() -> Vec<crate::minute_trade::MinuteOhlcv> {
         vec![
-            MinuteOhlcv {
+            crate::minute_trade::MinuteOhlcv {
                 timestamp: DateTime::parse_from_rfc3339("2023-01-01T09:30:00Z")
                     .unwrap()
                     .with_timezone(&Utc),
@@ -420,7 +420,7 @@ mod tests {
                     volume: 1000.0,
                 },
             },
-            MinuteOhlcv {
+            crate::minute_trade::MinuteOhlcv {
                 timestamp: DateTime::parse_from_rfc3339("2023-01-01T09:31:00Z")
                     .unwrap()
                     .with_timezone(&Utc),
@@ -432,7 +432,7 @@ mod tests {
                     volume: 1100.0,
                 },
             },
-            MinuteOhlcv {
+            crate::minute_trade::MinuteOhlcv {
                 timestamp: DateTime::parse_from_rfc3339("2023-01-01T09:32:00Z")
                     .unwrap()
                     .with_timezone(&Utc),
@@ -444,7 +444,7 @@ mod tests {
                     volume: 1200.0,
                 },
             },
-            MinuteOhlcv {
+            crate::minute_trade::MinuteOhlcv {
                 timestamp: DateTime::parse_from_rfc3339("2023-01-01T09:33:00Z")
                     .unwrap()
                     .with_timezone(&Utc),

@@ -1,7 +1,6 @@
 //! Error types for the forecast_trade crate
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use thiserror::Error;
 
 /// Main error type for forecast trading operations

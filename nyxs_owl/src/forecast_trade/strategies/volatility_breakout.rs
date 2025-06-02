@@ -1,6 +1,6 @@
 use crate::forecast_trade::data::TimeSeriesData;
 use crate::forecast_trade::error::{ForecastError, Result};
-use crate::forecast_trade::models::{ErrorMetrics, ForecastModel, ForecastResult};
+use crate::forecast_trade::models::ForecastModel;
 use crate::forecast_trade::strategies::{
     BacktestResult, ForecastStrategy, PerformanceMetrics, TimeGranularity, TradingSignal,
 };

@@ -3,9 +3,8 @@
 //! This strategy uses VWAP as a reference point for trading decisions, including
 //! mean reversion and trend following approaches.
 
-use crate::day_trade::OhlcvData;
 use crate::day_trade::{IntradayTradingStrategy, MinuteOhlcv, Signal, TradeError};
-use chrono::{DateTime, Duration, Timelike, Utc};
+use chrono::{DateTime, Timelike, Utc};
 
 /// VWAP calculation implementation
 #[derive(Debug)]

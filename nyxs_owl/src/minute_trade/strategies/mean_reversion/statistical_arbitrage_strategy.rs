@@ -27,7 +27,6 @@
 //! let signals = strategy.generate_signals(&data).unwrap();
 //! ```
 
-use crate::minute_trade::create_test_data;
 use crate::minute_trade::utils::{
     calculate_basic_performance, calculate_sma, validate_period, validate_positive,
 };

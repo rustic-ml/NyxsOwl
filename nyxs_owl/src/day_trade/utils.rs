@@ -3,7 +3,6 @@
 //! Contains common implementations and utilities used across multiple strategies
 
 use crate::day_trade::{DailyOhlcv, OhlcvData, Signal, TradeError};
-use rand::Rng;
 
 /// Calculate strategy performance based on signals and data
 ///

@@ -1,6 +1,6 @@
 [package]
 name = "nyxs_owl"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "A comprehensive Rust library for trading, forecasting, and financial analysis"
 authors = ["Celsis Durham <durhamcelsis@gmail.com>"]
@@ -141,6 +141,10 @@ path = "examples/forecasting_example.rs"
 [[example]]
 name = "lib_check"
 path = "examples/lib_check.rs"
+
+[[example]]
+name = "strategy_showcase"
+path = "examples/strategy_showcase.rs"
 
 # Production readiness examples
 [[example]]

@@ -27,7 +27,6 @@
 //! let signals = strategy.generate_signals(&data).unwrap();
 //! ```
 
-use crate::minute_trade::create_test_data;
 use crate::minute_trade::utils::{
     calculate_basic_performance, calculate_bollinger_bands, validate_period, validate_positive,
 };
@@ -116,7 +115,7 @@ impl BollingerBandContractionStrategy {
 
     /// Check if bands are contracted based on threshold
     fn is_contracted(&self, band_width: f64) -> bool {
-        band_width < self.contraction_threshold * 100.0
+        band_width < self.contraction_threshold
     }
 }
 
@@ -283,23 +282,23 @@ mod tests {
 
     #[test]
     fn test_contraction_detection() {
-        let strategy = BollingerBandContractionStrategy::new(20, 2.0, 0.3).unwrap();
+        let strategy = BollingerBandContractionStrategy::new(20, 2.0, 0.5).unwrap(); // 0.5% threshold (valid)
 
         // Test below threshold (contracted) - should be contracted when width < threshold
-        let contracted = strategy.is_contracted(0.2); // 0.2 < 0.3, so contracted
-        assert!(contracted, "Width 0.2 should be contracted (< 0.3 threshold)");
+        let contracted = strategy.is_contracted(0.3); // 0.3% < 0.5%, so contracted
+        assert!(contracted, "Width 0.3% should be contracted (< 0.5% threshold)");
 
         // Test above threshold (not contracted) - should not be contracted when width > threshold  
-        let contracted = strategy.is_contracted(0.5); // 0.5 > 0.3, so not contracted
-        assert!(!contracted, "Width 0.5 should not be contracted (> 0.3 threshold)");
+        let contracted = strategy.is_contracted(0.8); // 0.8% > 0.5%, so not contracted
+        assert!(!contracted, "Width 0.8% should not be contracted (> 0.5% threshold)");
 
         // Test at threshold - should not be contracted (needs to be strictly less than)
-        let contracted = strategy.is_contracted(0.3); // 0.3 == 0.3, so not contracted
-        assert!(!contracted, "Width 0.3 should not be contracted (== 0.3 threshold)");
+        let contracted = strategy.is_contracted(0.5); // 0.5% == 0.5%, so not contracted
+        assert!(!contracted, "Width 0.5% should not be contracted (== 0.5% threshold)");
         
         // Test edge case: very small width should be contracted
         let contracted = strategy.is_contracted(0.1);
-        assert!(contracted, "Width 0.1 should be contracted (< 0.3 threshold)");
+        assert!(contracted, "Width 0.1% should be contracted (< 0.5% threshold)");
     }
 
     #[test]
@@ -324,7 +323,7 @@ mod tests {
             });
         }
         
-        let strategy = BollingerBandContractionStrategy::new(20, 2.0, 0.3).unwrap();
+        let strategy = BollingerBandContractionStrategy::new(20, 2.0, 0.5).unwrap(); // Use valid threshold
 
         let signals = strategy.generate_signals(&data).unwrap();
 

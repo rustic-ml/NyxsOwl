@@ -123,7 +123,7 @@ impl IndicatorManager {
         }
     }
 
-    fn get_current_values(&self) -> Result<IndicatorValues, Box<dyn std::error::Error>> {
+    fn get_current_values(&mut self) -> Result<IndicatorValues, Box<dyn std::error::Error>> {
         Ok(IndicatorValues {
             sma: self.sma.value().ok(),
             ema: self.ema.value().ok(),

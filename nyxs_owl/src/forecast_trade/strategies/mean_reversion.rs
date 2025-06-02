@@ -4,7 +4,6 @@ use crate::forecast_trade::models::ForecastModel;
 use crate::forecast_trade::strategies::{
     BacktestResult, ForecastStrategy, TimeGranularity, TradingSignal,
 };
-use std::marker::PhantomData;
 
 /// Mean reversion strategy configuration
 #[derive(Debug, Clone)]
