@@ -114,7 +114,9 @@ impl<M: ForecastModel + Clone + ForecastStrategy + 'static> VolatilityStrategy<M
     }
 }
 
-impl<M: ForecastModel + Clone + ForecastStrategy + 'static> ForecastStrategy for VolatilityStrategy<M> {
+impl<M: ForecastModel + Clone + ForecastStrategy + 'static> ForecastStrategy
+    for VolatilityStrategy<M>
+{
     fn generate_signals(&self, data: &TimeSeriesData) -> Result<Vec<TradingSignal>> {
         if data.len() <= self.lookback_window {
             return Err(ForecastError::ValidationError(format!(

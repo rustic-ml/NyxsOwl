@@ -1,4 +1,4 @@
-use crate::forecast_trade::{ForecastError, TimeGranularity, data::TimeSeriesData};
+use crate::forecast_trade::{data::TimeSeriesData, ForecastError, TimeGranularity};
 
 /// Error metrics for forecast evaluation
 #[derive(Debug, Clone)]
@@ -64,16 +64,20 @@ macro_rules! impl_box_clone {
 pub trait ForecastModel: Send + Sync + BoxClone {
     /// Train the model on historical data
     fn train(&self, data: &TimeSeriesData) -> Result<Box<dyn ForecastModel>>;
-    
+
     /// Generate forecasts for the given number of periods
     fn forecast(&self, data: &TimeSeriesData, periods: usize) -> Result<ForecastResult>;
-    
+
     /// Validate the model using train/test split
-    fn validate(&self, train_data: &TimeSeriesData, test_data: &TimeSeriesData) -> Result<ErrorMetrics>;
-    
+    fn validate(
+        &self,
+        train_data: &TimeSeriesData,
+        test_data: &TimeSeriesData,
+    ) -> Result<ErrorMetrics>;
+
     /// Get the time granularity for this model
     fn time_granularity(&self) -> TimeGranularity;
-    
+
     /// Adjust model for different time granularities
     fn adjust_for_granularity(&mut self, granularity: TimeGranularity) -> Result<()>;
 
@@ -86,4 +90,4 @@ pub trait ForecastModel: Send + Sync + BoxClone {
     }
 }
 
-pub mod oxidiviner; 
+pub mod oxidiviner;

@@ -496,7 +496,7 @@ pub fn calculate_bollinger_bands(
         let start_idx = i.saturating_sub(period - 1);
         let slice = &data[start_idx..=i];
         let actual_period = slice.len();
-        
+
         let mean = slice.iter().sum::<f64>() / actual_period as f64;
 
         let variance = slice.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / actual_period as f64;

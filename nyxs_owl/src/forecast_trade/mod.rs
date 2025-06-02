@@ -33,13 +33,13 @@
 //! ### Easy API
 //! ```rust
 //! use forecast_trade::models::oxidiviner::easy;
-//! 
+//!
 //! // Automatic model selection with performance comparison
 //! let (forecast, best_model) = easy::auto_forecast(dates, values, 5)?;
-//! 
+//!
 //! // Advanced model comparison with metrics
 //! let comparison = easy::model_comparison(dates, values, 5, 0.8)?;
-//! 
+//!
 //! // Specific advanced models
 //! let ets_forecast = easy::ets_forecast(dates, values, 5, Some(12))?;
 //! let ar_forecast = easy::ar_forecast(dates, values, 5, Some(3))?;
@@ -103,11 +103,16 @@ pub use crate::forecast_trade::error::ForecastError;
 
 // Re-export from models
 pub use models::oxidiviner::{
-    OxiDivinerAdapter, ExponentialSmoothingAdapter, MovingAverageAdapter, ArimaAdapter, GarchAdapter,
+    ARAdapter,
+    ArimaAdapter,
     // Advanced adapters for backward compatibility
-    ETSAdapter, ARAdapter,
+    ETSAdapter,
+    ExponentialSmoothingAdapter,
+    GarchAdapter,
+    MovingAverageAdapter,
+    OxiDivinerAdapter,
 };
-pub use models::{ForecastModel, ErrorMetrics, ForecastResult};
+pub use models::{ErrorMetrics, ForecastModel, ForecastResult};
 
 // Re-export from strategies
 pub use strategies::{

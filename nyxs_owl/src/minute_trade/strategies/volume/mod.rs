@@ -265,7 +265,9 @@ mod volume_profile_strategy {
 }
 
 mod relative_volume_strategy {
-    use crate::minute_trade::utils::{calculate_basic_performance, validate_period, validate_positive};
+    use crate::minute_trade::utils::{
+        calculate_basic_performance, validate_period, validate_positive,
+    };
     use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
     /// Relative Volume Strategy - trades based on volume anomalies compared to historical averages
@@ -309,11 +311,17 @@ mod relative_volume_strategy {
             validate_positive(price_change_threshold, "Price change threshold")?;
 
             if volume_threshold < 1.2 {
-                return Err("Volume threshold should be at least 1.2 to detect meaningful anomalies.".to_string());
+                return Err(
+                    "Volume threshold should be at least 1.2 to detect meaningful anomalies."
+                        .to_string(),
+                );
             }
 
             if price_change_threshold > 5.0 {
-                return Err("Price change threshold seems too high (>5%). Consider using a lower value.".to_string());
+                return Err(
+                    "Price change threshold seems too high (>5%). Consider using a lower value."
+                        .to_string(),
+                );
             }
 
             Ok(Self {
@@ -366,12 +374,17 @@ mod relative_volume_strategy {
         }
 
         /// Check if volume and price conditions are met for a signal
-        fn check_signal_conditions(&self, current_volume: f64, avg_volume: f64, price_change: f64) -> Option<Signal> {
+        fn check_signal_conditions(
+            &self,
+            current_volume: f64,
+            avg_volume: f64,
+            price_change: f64,
+        ) -> Option<Signal> {
             let volume_ratio = current_volume / avg_volume;
-            
+
             if volume_ratio >= self.volume_threshold {
                 let abs_price_change = price_change.abs();
-                
+
                 if abs_price_change >= self.price_change_threshold {
                     // High volume with significant price movement
                     if price_change > 0.0 {
@@ -420,10 +433,10 @@ mod relative_volume_strategy {
             for i in self.lookback_period..data.len() {
                 let current_candle = &data[i];
                 let previous_candle = &data[i - 1];
-                
+
                 // Calculate average volume for the lookback period
                 let avg_volume = self.calculate_average_volume(data, i);
-                
+
                 let signal = if let Some(avg_vol) = avg_volume {
                     let current_volume = current_candle.data.volume;
                     let price_change = self.calculate_price_change(
@@ -433,7 +446,9 @@ mod relative_volume_strategy {
 
                     if !in_position {
                         // No position - look for entry signals
-                        if let Some(entry_signal) = self.check_signal_conditions(current_volume, avg_vol, price_change) {
+                        if let Some(entry_signal) =
+                            self.check_signal_conditions(current_volume, avg_vol, price_change)
+                        {
                             match entry_signal {
                                 Signal::Buy => {
                                     in_position = true;
@@ -453,18 +468,18 @@ mod relative_volume_strategy {
                     } else {
                         // In position - look for exit conditions
                         let volume_ratio = current_volume / avg_vol;
-                        
+
                         // Exit if volume drops significantly or price reverses
-                        let should_exit = volume_ratio < (self.volume_threshold * 0.5) || 
-                                        (position_is_long && price_change < -self.price_change_threshold) ||
-                                        (!position_is_long && price_change > self.price_change_threshold);
-                        
+                        let should_exit = volume_ratio < (self.volume_threshold * 0.5)
+                            || (position_is_long && price_change < -self.price_change_threshold)
+                            || (!position_is_long && price_change > self.price_change_threshold);
+
                         if should_exit {
                             in_position = false;
                             if position_is_long {
                                 Signal::Sell // Close long position
                             } else {
-                                Signal::Buy // Close short position  
+                                Signal::Buy // Close short position
                             }
                         } else {
                             Signal::Hold

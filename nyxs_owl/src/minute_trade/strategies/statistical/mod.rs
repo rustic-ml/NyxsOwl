@@ -8,7 +8,9 @@ pub use self::z_score_strategy::ZScoreStrategy;
 
 // These will be implemented in the future
 mod regression_strategy {
-    use crate::minute_trade::utils::{calculate_basic_performance, validate_period, validate_positive};
+    use crate::minute_trade::utils::{
+        calculate_basic_performance, validate_period, validate_positive,
+    };
     use crate::minute_trade::{IntradayStrategy, MinuteOhlcv, Signal, TradeError};
 
     /// Regression Strategy - uses linear regression to identify trends and generate signals
@@ -64,7 +66,10 @@ mod regression_strategy {
             }
 
             if distance_threshold > 10.0 {
-                return Err("Distance threshold seems too high (>10%). Consider using a lower value.".to_string());
+                return Err(
+                    "Distance threshold seems too high (>10%). Consider using a lower value."
+                        .to_string(),
+                );
             }
 
             Ok(Self {
@@ -119,10 +124,7 @@ mod regression_strategy {
                 .map(|(x, y)| (x - x_mean) * (y - y_mean))
                 .sum();
 
-            let denominator: f64 = x_values
-                .iter()
-                .map(|x| (x - x_mean).powi(2))
-                .sum();
+            let denominator: f64 = x_values.iter().map(|x| (x - x_mean).powi(2)).sum();
 
             if denominator.abs() < f64::EPSILON {
                 return None; // Avoid division by zero
@@ -132,10 +134,8 @@ mod regression_strategy {
             let intercept = y_mean - slope * x_mean;
 
             // Calculate R-squared
-            let predicted_values: Vec<f64> = x_values
-                .iter()
-                .map(|x| slope * x + intercept)
-                .collect();
+            let predicted_values: Vec<f64> =
+                x_values.iter().map(|x| slope * x + intercept).collect();
 
             let ss_res: f64 = prices
                 .iter()
@@ -143,10 +143,7 @@ mod regression_strategy {
                 .map(|(actual, predicted)| (actual - predicted).powi(2))
                 .sum();
 
-            let ss_tot: f64 = prices
-                .iter()
-                .map(|y| (y - y_mean).powi(2))
-                .sum();
+            let ss_tot: f64 = prices.iter().map(|y| (y - y_mean).powi(2)).sum();
 
             let r_squared = if ss_tot.abs() < f64::EPSILON {
                 0.0
@@ -294,8 +291,8 @@ mod regression_strategy {
                         );
 
                         // Exit if price moves back close to regression line or trend weakens
-                        let should_exit = distance < (self.distance_threshold * 0.5) || 
-                                        regression.r_squared < (self.r_squared_threshold * 0.8);
+                        let should_exit = distance < (self.distance_threshold * 0.5)
+                            || regression.r_squared < (self.r_squared_threshold * 0.8);
 
                         if should_exit {
                             in_position = false;
@@ -360,7 +357,7 @@ mod regression_strategy {
         #[test]
         fn test_regression_calculation() {
             let strategy = RegressionStrategy::new(20, 0.7, 0.1, 2.0).unwrap();
-            
+
             // Test with a clear upward trend
             let prices = vec![1.0, 2.0, 3.0, 4.0, 5.0];
             let regression = strategy.calculate_regression(&prices);
@@ -380,7 +377,7 @@ mod regression_strategy {
         #[test]
         fn test_distance_calculation() {
             let strategy = RegressionStrategy::new(20, 0.7, 0.1, 2.0).unwrap();
-            
+
             let regression = RegressionResult {
                 slope: 1.0,
                 intercept: 0.0,
@@ -411,7 +408,7 @@ mod regression_strategy {
         #[test]
         fn test_regression_with_flat_data() {
             let strategy = RegressionStrategy::new(20, 0.7, 0.1, 2.0).unwrap();
-            
+
             // Test with flat data (no trend)
             let prices = vec![5.0; 10]; // All prices the same
             let regression = strategy.calculate_regression(&prices);

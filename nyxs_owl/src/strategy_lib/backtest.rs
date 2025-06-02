@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for backtesting trading strategies.
 
-use crate::strategy_lib::strategy::{Strategy, StrategyError, Signal};
+use crate::strategy_lib::strategy::{Signal, Strategy, StrategyError};
 use polars::prelude::*;
 
 /// Configuration for backtest parameters
@@ -78,7 +78,8 @@ pub fn run_backtest<S: Strategy>(
     let signals = strategy.generate_signals(data)?;
 
     // Get price data
-    let prices = data.column("close")
+    let prices = data
+        .column("close")
         .map_err(|_| StrategyError::MissingData("Close price column not found".to_string()))?
         .f64()
         .map_err(|_| StrategyError::InvalidParameter("Unable to parse close prices".to_string()))?;
@@ -98,7 +99,8 @@ pub fn run_backtest<S: Strategy>(
     // Don't push initial capital - we'll calculate equity for each data point
 
     // Convert signals to i32 for processing
-    let signal_values = signals.i32()
+    let signal_values = signals
+        .i32()
         .map_err(|_| StrategyError::InvalidParameter("Unable to parse signals".to_string()))?;
 
     // Process each signal
@@ -124,7 +126,7 @@ pub fn run_backtest<S: Strategy>(
                     let close_value = -position * price * (1.0 + config.slippage);
                     let commission_cost = close_value * config.commission;
                     cash -= close_value + commission_cost;
-                    
+
                     trade_records.push(TradeRecord {
                         id: trade_id,
                         trade_type: "short_close".to_string(),
@@ -140,11 +142,11 @@ pub fn run_backtest<S: Strategy>(
                 let position_value = cash * config.position_size;
                 let shares = position_value / (price * (1.0 + config.slippage));
                 let commission_cost = position_value * config.commission;
-                
+
                 if shares > 0.0 {
                     position = shares;
                     cash -= position_value + commission_cost;
-                    
+
                     trade_records.push(TradeRecord {
                         id: trade_id,
                         trade_type: "long_open".to_string(),
@@ -162,7 +164,7 @@ pub fn run_backtest<S: Strategy>(
                     let close_value = position * price * (1.0 - config.slippage);
                     let commission_cost = close_value * config.commission;
                     cash += close_value - commission_cost;
-                    
+
                     trade_records.push(TradeRecord {
                         id: trade_id,
                         trade_type: "long_close".to_string(),
@@ -178,11 +180,11 @@ pub fn run_backtest<S: Strategy>(
                 let position_value = cash * config.position_size;
                 let shares = position_value / (price * (1.0 - config.slippage));
                 let commission_cost = position_value * config.commission;
-                
+
                 if shares > 0.0 {
                     position = -shares;
                     cash += position_value - commission_cost;
-                    
+
                     trade_records.push(TradeRecord {
                         id: trade_id,
                         trade_type: "short_open".to_string(),
@@ -203,7 +205,11 @@ pub fn run_backtest<S: Strategy>(
         }
 
         // Calculate current equity
-        let position_value = if position != 0.0 { position * price } else { 0.0 };
+        let position_value = if position != 0.0 {
+            position * price
+        } else {
+            0.0
+        };
         let current_equity = cash + position_value;
         equity_values.push(current_equity);
 
@@ -217,7 +223,8 @@ pub fn run_backtest<S: Strategy>(
         } else {
             // For the first data point, calculate return vs initial capital
             if config.initial_capital > 0.0 {
-                let daily_return = (current_equity - config.initial_capital) / config.initial_capital;
+                let daily_return =
+                    (current_equity - config.initial_capital) / config.initial_capital;
                 returns.push(daily_return);
             }
         }
@@ -231,7 +238,13 @@ pub fn run_backtest<S: Strategy>(
     }
 
     // Calculate performance metrics
-    let metrics = calculate_metrics(&equity_values, &returns, &drawdown_series, &trade_records, config.initial_capital);
+    let metrics = calculate_metrics(
+        &equity_values,
+        &returns,
+        &drawdown_series,
+        &trade_records,
+        config.initial_capital,
+    );
 
     // Create results
     let equity_curve = Series::new("equity".into(), equity_values);
@@ -248,7 +261,8 @@ pub fn run_backtest<S: Strategy>(
             empty_trade_price.into(),
             empty_trade_quantity.into(),
             empty_trade_value.into(),
-        ]).unwrap()
+        ])
+        .unwrap()
     } else {
         let trade_types: Vec<String> = trade_records.iter().map(|t| t.trade_type.clone()).collect();
         let trade_prices: Vec<f64> = trade_records.iter().map(|t| t.price).collect();
@@ -260,7 +274,8 @@ pub fn run_backtest<S: Strategy>(
             Series::new("price".into(), trade_prices).into(),
             Series::new("quantity".into(), trade_quantities).into(),
             Series::new("value".into(), trade_values).into(),
-        ]).unwrap()
+        ])
+        .unwrap()
     };
 
     Ok(BacktestResults {
@@ -310,9 +325,7 @@ fn calculate_metrics(
     };
 
     let return_variance = if returns.len() > 1 {
-        let sum_sq_diff: f64 = returns.iter()
-            .map(|r| (r - mean_return).powi(2))
-            .sum();
+        let sum_sq_diff: f64 = returns.iter().map(|r| (r - mean_return).powi(2)).sum();
         sum_sq_diff / (returns.len() - 1) as f64
     } else {
         0.0
@@ -345,7 +358,8 @@ fn calculate_trade_metrics(trade_records: &[TradeRecord]) -> (f64, f64) {
 
     // Group trades by pairs (open/close)
     let mut trade_pairs = Vec::new();
-    let mut open_trades: std::collections::HashMap<String, &TradeRecord> = std::collections::HashMap::new();
+    let mut open_trades: std::collections::HashMap<String, &TradeRecord> =
+        std::collections::HashMap::new();
 
     for trade in trade_records {
         match trade.trade_type.as_str() {
@@ -354,13 +368,15 @@ fn calculate_trade_metrics(trade_records: &[TradeRecord]) -> (f64, f64) {
             }
             "long_close" => {
                 if let Some(open_trade) = open_trades.remove("long_open") {
-                    let pnl = trade.value - open_trade.value - trade.commission - open_trade.commission;
+                    let pnl =
+                        trade.value - open_trade.value - trade.commission - open_trade.commission;
                     trade_pairs.push(pnl);
                 }
             }
             "short_close" => {
                 if let Some(open_trade) = open_trades.remove("short_open") {
-                    let pnl = open_trade.value - trade.value - trade.commission - open_trade.commission;
+                    let pnl =
+                        open_trade.value - trade.value - trade.commission - open_trade.commission;
                     trade_pairs.push(pnl);
                 }
             }
@@ -378,8 +394,12 @@ fn calculate_trade_metrics(trade_records: &[TradeRecord]) -> (f64, f64) {
 
     // Calculate profit factor
     let gross_profit: f64 = trade_pairs.iter().filter(|&&pnl| pnl > 0.0).sum();
-    let gross_loss: f64 = trade_pairs.iter().filter(|&&pnl| pnl < 0.0).map(|pnl| -pnl).sum();
-    
+    let gross_loss: f64 = trade_pairs
+        .iter()
+        .filter(|&&pnl| pnl < 0.0)
+        .map(|pnl| -pnl)
+        .sum();
+
     let profit_factor = if gross_loss > 0.0 {
         gross_profit / gross_loss
     } else if gross_profit > 0.0 {
@@ -394,7 +414,7 @@ fn calculate_trade_metrics(trade_records: &[TradeRecord]) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::strategy_lib::strategy::{StrategyConfig};
+    use crate::strategy_lib::strategy::StrategyConfig;
 
     /// A simple mock strategy for testing
     struct MockStrategy {
@@ -468,14 +488,20 @@ mod tests {
 
         // Check that we got back a valid results object
         assert_eq!(results.equity_curve.len(), 3); // Should match data length
-        
+
         // Debug: print actual trades count
         println!("Actual trades count: {}", results.trades.height());
-        
+
         // The actual number of trades depends on the backtest logic
         // Let's be flexible and just check that we have some trades
-        assert!(results.trades.height() > 0, "Should have at least one trade");
-        assert!(results.trades.height() <= 10, "Should not have excessive trades"); // Reasonable upper bound
+        assert!(
+            results.trades.height() > 0,
+            "Should have at least one trade"
+        );
+        assert!(
+            results.trades.height() <= 10,
+            "Should not have excessive trades"
+        ); // Reasonable upper bound
 
         // Metrics should be calculated (not necessarily zero)
         assert!(results.metrics.total_return.is_finite());
@@ -484,7 +510,10 @@ mod tests {
         assert!(results.metrics.sharpe_ratio.is_finite());
         assert!(results.metrics.win_rate.is_finite());
         // Profit factor can be infinity if there are only profitable trades (no losses)
-        assert!(results.metrics.profit_factor.is_finite() || results.metrics.profit_factor.is_infinite());
+        assert!(
+            results.metrics.profit_factor.is_finite()
+                || results.metrics.profit_factor.is_infinite()
+        );
     }
 
     #[test]

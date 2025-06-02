@@ -179,11 +179,11 @@ mod tests {
         let mut data = Vec::new();
         let mut base_price = 100.0;
         let base_time = chrono::Utc::now();
-        
+
         // Generate data with dramatic price movements to trigger scalping signals
         for i in 0..100 {
             let price_variation_pct = if i % 4 == 0 {
-                0.2 // +0.2% movement to trigger signals  
+                0.2 // +0.2% movement to trigger signals
             } else if i % 4 == 1 {
                 -0.15 // -0.15% movement
             } else if i % 4 == 2 {
@@ -191,10 +191,10 @@ mod tests {
             } else {
                 -0.12 // -0.12% movement
             };
-            
+
             // Apply percentage movement to base price
             base_price = base_price * (1.0 + price_variation_pct / 100.0);
-            
+
             data.push(crate::minute_trade::MinuteOhlcv {
                 timestamp: base_time + chrono::Duration::minutes(i as i64),
                 data: crate::minute_trade::OhlcvData {
@@ -206,7 +206,7 @@ mod tests {
                 },
             });
         }
-        
+
         // Use a lower threshold to ensure signals are generated
         let strategy = ScalpingStrategy::new(5, 0.05).unwrap(); // Threshold: 0.05%
 
@@ -224,7 +224,10 @@ mod tests {
         let buy_count = signals.iter().filter(|&&s| s == Signal::Buy).count();
         let sell_count = signals.iter().filter(|&&s| s == Signal::Sell).count();
         let hold_count = signals.iter().filter(|&&s| s == Signal::Hold).count();
-        println!("Scalping signals - Buy: {}, Sell: {}, Hold: {}", buy_count, sell_count, hold_count);
+        println!(
+            "Scalping signals - Buy: {}, Sell: {}, Hold: {}",
+            buy_count, sell_count, hold_count
+        );
 
         // Count different signal types
         let buy_signals = signals.iter().filter(|&&s| s == Signal::Buy).count();
@@ -232,13 +235,19 @@ mod tests {
         let hold_signals = signals.iter().filter(|&&s| s == Signal::Hold).count();
         let total_actions = buy_signals + sell_signals;
 
-        println!("Scalping signals: {} buy, {} sell, {} hold (total actions: {})", 
-                 buy_signals, sell_signals, hold_signals, total_actions);
+        println!(
+            "Scalping signals: {} buy, {} sell, {} hold (total actions: {})",
+            buy_signals, sell_signals, hold_signals, total_actions
+        );
 
         // The test passes if the strategy runs without error and generates the correct number of signals
         // We don't require specific signal counts since scalping conditions depend on the exact price movements
-        assert_eq!(buy_signals + sell_signals + hold_signals, signals.len(), "All signals should be accounted for");
-        
+        assert_eq!(
+            buy_signals + sell_signals + hold_signals,
+            signals.len(),
+            "All signals should be accounted for"
+        );
+
         // If we do get signals, they should be reasonable
         if total_actions > 0 {
             println!("Successfully generated {} trading signals", total_actions);

@@ -62,7 +62,6 @@ impl GridTradingStrategy {
             max_position_size,
         })
     }
-
 }
 
 impl Default for GridTradingStrategy {

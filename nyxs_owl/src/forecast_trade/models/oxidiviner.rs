@@ -3,13 +3,13 @@
 //! This module provides integration with the OxiDiviner forecasting library,
 //! offering simplified access to various time series forecasting models.
 
-use oxidiviner::{TimeSeriesData as OxiTimeSeriesData, quick};
 use crate::forecast_trade::{
-    ForecastError, TimeGranularity, 
     data::TimeSeriesData,
-    models::{ForecastModel, ForecastResult, ErrorMetrics, Result},
-    strategies::{ForecastStrategy, TradingSignal, BacktestResult},
+    models::{ErrorMetrics, ForecastModel, ForecastResult, Result},
+    strategies::{BacktestResult, ForecastStrategy, TradingSignal},
+    ForecastError, TimeGranularity,
 };
+use oxidiviner::{quick, TimeSeriesData as OxiTimeSeriesData};
 use std::collections::HashMap;
 
 /// High-level convenience API for OxiDiviner integration
@@ -34,8 +34,9 @@ pub mod easy {
         forecast_periods: usize,
     ) -> Result<Vec<f64>> {
         let ts_data = convert_to_oxidiviner_data(dates, values, "arima_forecast")?;
-        let forecast = quick::arima(ts_data, forecast_periods)
-            .map_err(|e| ForecastError::InvalidParameter(format!("ARIMA forecast failed: {}", e)))?;
+        let forecast = quick::arima(ts_data, forecast_periods).map_err(|e| {
+            ForecastError::InvalidParameter(format!("ARIMA forecast failed: {}", e))
+        })?;
         Ok(forecast)
     }
 
@@ -141,7 +142,7 @@ impl OxiDivinerAdapter {
         if let Some(w) = window {
             params.insert("window".to_string(), w as f64);
         }
-        
+
         Ok(Self {
             model_type: "ma".to_string(),
             params,
@@ -156,7 +157,7 @@ impl OxiDivinerAdapter {
         if let Some(a) = alpha {
             params.insert("alpha".to_string(), a);
         }
-        
+
         Ok(Self {
             model_type: "es".to_string(),
             params,
@@ -177,9 +178,13 @@ impl OxiDivinerAdapter {
 
     /// Create a new SARIMA adapter (falls back to ARIMA for now)
     pub fn sarima(
-        _p: usize, _d: usize, _q: usize,
-        _seasonal_p: usize, _seasonal_d: usize, _seasonal_q: usize,
-        _seasonal_period: usize
+        _p: usize,
+        _d: usize,
+        _q: usize,
+        _seasonal_p: usize,
+        _seasonal_d: usize,
+        _seasonal_q: usize,
+        _seasonal_period: usize,
     ) -> Result<Self> {
         Self::arima() // Fall back to ARIMA since OxiDiviner doesn't have SARIMA yet
     }
@@ -210,29 +215,33 @@ impl ForecastModel for OxiDivinerAdapter {
         })?;
 
         let forecast = match self.model_type.as_str() {
-            "arima" => {
-                quick::arima(ox_data.clone(), periods)
-                    .map_err(|e| ForecastError::InvalidParameter(format!("ARIMA forecast failed: {}", e)))?
-            },
+            "arima" => quick::arima(ox_data.clone(), periods).map_err(|e| {
+                ForecastError::InvalidParameter(format!("ARIMA forecast failed: {}", e))
+            })?,
             "ma" => {
                 let window = self.params.get("window").map(|&w| w as usize);
-                quick::moving_average(ox_data.clone(), periods, window)
-                    .map_err(|e| ForecastError::InvalidParameter(format!("MA forecast failed: {}", e)))?
-            },
+                quick::moving_average(ox_data.clone(), periods, window).map_err(|e| {
+                    ForecastError::InvalidParameter(format!("MA forecast failed: {}", e))
+                })?
+            }
             "es" => {
                 let alpha = self.params.get("alpha").copied();
-                quick::exponential_smoothing(ox_data.clone(), periods, alpha)
-                    .map_err(|e| ForecastError::InvalidParameter(format!("ES forecast failed: {}", e)))?
-            },
+                quick::exponential_smoothing(ox_data.clone(), periods, alpha).map_err(|e| {
+                    ForecastError::InvalidParameter(format!("ES forecast failed: {}", e))
+                })?
+            }
             "auto" => {
                 let (forecast, _model_name) = quick::auto_select(ox_data.clone(), periods)
-                    .map_err(|e| ForecastError::InvalidParameter(format!("Auto forecast failed: {}", e)))?;
+                    .map_err(|e| {
+                        ForecastError::InvalidParameter(format!("Auto forecast failed: {}", e))
+                    })?;
                 forecast
-            },
+            }
             _ => {
-                return Err(ForecastError::InvalidParameter(
-                    format!("Unknown model type: {}", self.model_type)
-                ));
+                return Err(ForecastError::InvalidParameter(format!(
+                    "Unknown model type: {}",
+                    self.model_type
+                )));
             }
         };
 
@@ -247,10 +256,14 @@ impl ForecastModel for OxiDivinerAdapter {
         })
     }
 
-    fn validate(&self, train_data: &TimeSeriesData, test_data: &TimeSeriesData) -> Result<ErrorMetrics> {
+    fn validate(
+        &self,
+        train_data: &TimeSeriesData,
+        test_data: &TimeSeriesData,
+    ) -> Result<ErrorMetrics> {
         let trained_model = self.train(train_data)?;
         let forecast_result = trained_model.forecast(train_data, test_data.close_prices().len())?;
-        
+
         let predicted = &forecast_result.forecasts;
         let actual = test_data.close_prices();
 
@@ -281,20 +294,20 @@ impl ForecastStrategy for OxiDivinerAdapter {
         // Simple signal generation based on the forecast trend
         let trained_model = self.train(data)?;
         let forecast_result = trained_model.forecast(data, 1)?;
-        
+
         if forecast_result.forecasts.is_empty() {
             return Ok(vec![TradingSignal::Hold; data.len()]);
         }
-        
+
         let mut signals = vec![TradingSignal::Hold; data.len() - 1];
         let prices = data.close_prices();
         let current_price = prices.last().unwrap();
         let forecast_price = forecast_result.forecasts[0];
-        
+
         // Simple signal: Buy if forecast is higher, Sell if lower, Hold otherwise
         let threshold = 0.01; // 1% threshold
         let change = (forecast_price - current_price) / current_price;
-        
+
         let signal = if change > threshold {
             TradingSignal::Buy
         } else if change < -threshold {
@@ -302,7 +315,7 @@ impl ForecastStrategy for OxiDivinerAdapter {
         } else {
             TradingSignal::Hold
         };
-        
+
         signals.push(signal);
         Ok(signals)
     }
@@ -319,7 +332,7 @@ impl ForecastStrategy for OxiDivinerAdapter {
         slippage: f64,
     ) -> Result<BacktestResult> {
         let signals = self.generate_signals(data)?;
-        
+
         // Simple backtesting logic
         let prices = data.close_prices();
         let mut balance = initial_balance;
@@ -329,7 +342,7 @@ impl ForecastStrategy for OxiDivinerAdapter {
 
         for i in 1..prices.len() {
             let price = prices[i];
-            
+
             match signals[i] {
                 TradingSignal::Buy if position <= 0.0 => {
                     // Close short position if any, then buy
@@ -365,7 +378,11 @@ impl ForecastStrategy for OxiDivinerAdapter {
         }
 
         let total_return = (balance - initial_balance) / initial_balance;
-        let win_rate = if total_trades > 0 { winning_trades as f64 / total_trades as f64 } else { 0.0 };
+        let win_rate = if total_trades > 0 {
+            winning_trades as f64 / total_trades as f64
+        } else {
+            0.0
+        };
 
         Ok(BacktestResult {
             final_balance: balance,
@@ -385,7 +402,7 @@ impl ForecastStrategy for OxiDivinerAdapter {
 
 // Type aliases for backward compatibility
 pub type ExponentialSmoothingAdapter = OxiDivinerAdapter;
-pub type MovingAverageAdapter = OxiDivinerAdapter;  
+pub type MovingAverageAdapter = OxiDivinerAdapter;
 pub type ArimaAdapter = OxiDivinerAdapter;
 pub type GarchAdapter = OxiDivinerAdapter;
 pub type ETSAdapter = OxiDivinerAdapter;
@@ -479,4 +496,3 @@ fn mean_absolute_percentage_error(actual: &[f64], predicted: &[f64]) -> f64 {
     let n = actual.len();
     (sum / n as f64) * 100.0 // Convert to percentage
 }
-

@@ -6,7 +6,7 @@
 use chrono::{Duration, Utc};
 use nyxs_owl::forecast_trade::{
     data::TimeSeriesData,
-    models::oxidiviner::{easy, OxiDivinerAdapter, ExponentialSmoothingAdapter, ArimaAdapter},
+    models::oxidiviner::{easy, ArimaAdapter, ExponentialSmoothingAdapter, OxiDivinerAdapter},
     ForecastModel,
 };
 
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut dates = Vec::new();
     let mut values = Vec::new();
     let start_date = Utc::now() - Duration::days(365);
-    
+
     for i in 0..100 {
         dates.push(start_date + Duration::days(i));
         // Create synthetic data with trend + seasonality + noise
@@ -29,17 +29,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let time_series = TimeSeriesData::new(dates.clone(), values.clone())?;
-    
+
     println!("📊 Generated {} data points", time_series.len());
-    println!("📈 Price range: {:.2} - {:.2}", 
-             values.iter().fold(f64::INFINITY, |a, &b| a.min(b)),
-             values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b)));
+    println!(
+        "📈 Price range: {:.2} - {:.2}",
+        values.iter().fold(f64::INFINITY, |a, &b| a.min(b)),
+        values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
+    );
     println!();
 
     // Test 1: Quick API Functions
     println!("🚀 Testing Quick API Functions");
     println!("==============================");
-    
+
     // ARIMA forecast using quick API
     match easy::arima_forecast(dates.clone(), values.clone(), 5) {
         Ok(forecast) => {
@@ -75,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 2: Auto Model Selection
     println!("🤖 Testing Auto Model Selection");
     println!("===============================");
-    
+
     match easy::auto_forecast(dates.clone(), values.clone(), 5) {
         Ok((model_name, forecast)) => {
             println!("✅ Auto-selected model: {:?}", model_name);
@@ -97,16 +99,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(arima_model) => {
             println!("✅ ARIMA Adapter created");
             match arima_model.train(&time_series) {
-                Ok(trained_model) => {
-                    match trained_model.forecast(&time_series, 3) {
-                        Ok(result) => {
-                            println!("📈 ARIMA Forecast: {:?}", result.forecasts);
-                        }
-                        Err(e) => {
-                            println!("❌ ARIMA forecast failed: {}", e);
-                        }
+                Ok(trained_model) => match trained_model.forecast(&time_series, 3) {
+                    Ok(result) => {
+                        println!("📈 ARIMA Forecast: {:?}", result.forecasts);
                     }
-                }
+                    Err(e) => {
+                        println!("❌ ARIMA forecast failed: {}", e);
+                    }
+                },
                 Err(e) => {
                     println!("❌ ARIMA training failed: {}", e);
                 }
@@ -122,16 +122,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(es_model) => {
             println!("✅ ES Adapter created");
             match es_model.train(&time_series) {
-                Ok(trained_model) => {
-                    match trained_model.forecast(&time_series, 3) {
-                        Ok(result) => {
-                            println!("📈 ES Forecast: {:?}", result.forecasts);
-                        }
-                        Err(e) => {
-                            println!("❌ ES forecast failed: {}", e);
-                        }
+                Ok(trained_model) => match trained_model.forecast(&time_series, 3) {
+                    Ok(result) => {
+                        println!("📈 ES Forecast: {:?}", result.forecasts);
                     }
-                }
+                    Err(e) => {
+                        println!("❌ ES forecast failed: {}", e);
+                    }
+                },
                 Err(e) => {
                     println!("❌ ES training failed: {}", e);
                 }
@@ -147,25 +145,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 4: Model Comparison
     println!("⚖️  Model Comparison");
     println!("===================");
-    
+
     let models: Vec<(&str, Box<dyn ForecastModel>)> = vec![
         ("ARIMA", Box::new(ArimaAdapter::arima()?)),
-        ("ES(0.3)", Box::new(ExponentialSmoothingAdapter::exponential_smoothing(Some(0.3))?)),
-        ("MA(10)", Box::new(OxiDivinerAdapter::moving_average(Some(10))?)),
+        (
+            "ES(0.3)",
+            Box::new(ExponentialSmoothingAdapter::exponential_smoothing(Some(
+                0.3,
+            ))?),
+        ),
+        (
+            "MA(10)",
+            Box::new(OxiDivinerAdapter::moving_average(Some(10))?),
+        ),
     ];
 
     for (name, model) in models {
         match model.train(&time_series) {
-            Ok(trained_model) => {
-                match trained_model.forecast(&time_series, 1) {
-                    Ok(result) => {
-                        println!("📊 {}: Next prediction = {:.2}", name, result.forecasts[0]);
-                    }
-                    Err(e) => {
-                        println!("❌ {} forecast failed: {}", name, e);
-                    }
+            Ok(trained_model) => match trained_model.forecast(&time_series, 1) {
+                Ok(result) => {
+                    println!("📊 {}: Next prediction = {:.2}", name, result.forecasts[0]);
                 }
-            }
+                Err(e) => {
+                    println!("❌ {} forecast failed: {}", name, e);
+                }
+            },
             Err(e) => {
                 println!("❌ {} training failed: {}", name, e);
             }
@@ -177,4 +181,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✨ All OxiDiviner advanced variants are now fully implemented!");
 
     Ok(())
-} 
+}

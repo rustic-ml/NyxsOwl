@@ -661,7 +661,7 @@ mod tests {
         let base_time = Utc.with_ymd_and_hms(2023, 1, 1, 9, 30, 0).unwrap();
 
         let base_price = 100.0;
-        
+
         // Generate a very clear and obvious Head & Shoulders pattern
         for i in 0..80 {
             let price = match i {
@@ -695,9 +695,8 @@ mod tests {
             custom_data.push(ohlcv);
         }
 
-        let pattern_strategy =
-            ChartPatternStrategy::new(60, 3, 0.1, "head_and_shoulders").unwrap(); // Very lenient parameters
-            
+        let pattern_strategy = ChartPatternStrategy::new(60, 3, 0.1, "head_and_shoulders").unwrap(); // Very lenient parameters
+
         // Test the pattern detection at different points after the neckline break
         let mut pattern_detected = false;
         for i in 50..custom_data.len() {

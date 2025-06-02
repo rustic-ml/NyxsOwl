@@ -286,19 +286,31 @@ mod tests {
 
         // Test below threshold (contracted) - should be contracted when width < threshold
         let contracted = strategy.is_contracted(0.3); // 0.3% < 0.5%, so contracted
-        assert!(contracted, "Width 0.3% should be contracted (< 0.5% threshold)");
+        assert!(
+            contracted,
+            "Width 0.3% should be contracted (< 0.5% threshold)"
+        );
 
-        // Test above threshold (not contracted) - should not be contracted when width > threshold  
+        // Test above threshold (not contracted) - should not be contracted when width > threshold
         let contracted = strategy.is_contracted(0.8); // 0.8% > 0.5%, so not contracted
-        assert!(!contracted, "Width 0.8% should not be contracted (> 0.5% threshold)");
+        assert!(
+            !contracted,
+            "Width 0.8% should not be contracted (> 0.5% threshold)"
+        );
 
         // Test at threshold - should not be contracted (needs to be strictly less than)
         let contracted = strategy.is_contracted(0.5); // 0.5% == 0.5%, so not contracted
-        assert!(!contracted, "Width 0.5% should not be contracted (== 0.5% threshold)");
-        
+        assert!(
+            !contracted,
+            "Width 0.5% should not be contracted (== 0.5% threshold)"
+        );
+
         // Test edge case: very small width should be contracted
         let contracted = strategy.is_contracted(0.1);
-        assert!(contracted, "Width 0.1% should be contracted (< 0.5% threshold)");
+        assert!(
+            contracted,
+            "Width 0.1% should be contracted (< 0.5% threshold)"
+        );
     }
 
     #[test]
@@ -306,11 +318,11 @@ mod tests {
         // Create test data with controlled values to avoid overflow issues
         let mut data = Vec::new();
         let base_time = chrono::Utc::now();
-        
+
         // Generate enough data points for the strategy (need at least bollinger_period + 1)
         for i in 0..120 {
             let price = 100.0 + (i as f64 * 0.1); // Gradually increasing price
-            
+
             data.push(crate::minute_trade::MinuteOhlcv {
                 timestamp: base_time + chrono::Duration::minutes(i as i64),
                 data: crate::minute_trade::OhlcvData {
@@ -322,7 +334,7 @@ mod tests {
                 },
             });
         }
-        
+
         let strategy = BollingerBandContractionStrategy::new(20, 2.0, 0.5).unwrap(); // Use valid threshold
 
         let signals = strategy.generate_signals(&data).unwrap();
@@ -332,9 +344,14 @@ mod tests {
 
         // Check that the first 'bollinger_period' signals are Hold
         for i in 0..strategy.bollinger_period() {
-            assert_eq!(signals[i], Signal::Hold, "Signal at index {} should be Hold", i);
+            assert_eq!(
+                signals[i],
+                Signal::Hold,
+                "Signal at index {} should be Hold",
+                i
+            );
         }
-        
+
         // Verify that no panics occurred during generation
         println!("Successfully generated {} signals", signals.len());
     }

@@ -131,7 +131,7 @@ mod time_of_day_strategy {
 
             for candle in data {
                 let (hour, minute) = self.get_hour_minute(candle.timestamp);
-                
+
                 let signal = if !position_entered && self.is_entry_time(hour, minute) {
                     position_entered = true;
                     if self.go_long {
@@ -339,7 +339,7 @@ mod session_transition_strategy {
             // Validate that start time is before end time
             let start_minutes = regular_session_start_hour * 60 + regular_session_start_minute;
             let end_minutes = regular_session_end_hour * 60 + regular_session_end_minute;
-            
+
             if start_minutes >= end_minutes {
                 return Err("Regular session start time must be before end time".to_string());
             }
@@ -353,9 +353,12 @@ mod session_transition_strategy {
                 volume_multiplier,
                 name: format!(
                     "Session Transition ({}:{:02}-{}:{:02}, {}% vol, {}x volume)",
-                    regular_session_start_hour, regular_session_start_minute,
-                    regular_session_end_hour, regular_session_end_minute,
-                    volatility_threshold, volume_multiplier
+                    regular_session_start_hour,
+                    regular_session_start_minute,
+                    regular_session_end_hour,
+                    regular_session_end_minute,
+                    volatility_threshold,
+                    volume_multiplier
                 ),
             })
         }
@@ -395,8 +398,9 @@ mod session_transition_strategy {
             let hour = timestamp.hour();
             let minute = timestamp.minute();
             let current_minutes = hour * 60 + minute;
-            
-            let start_minutes = self.regular_session_start_hour * 60 + self.regular_session_start_minute;
+
+            let start_minutes =
+                self.regular_session_start_hour * 60 + self.regular_session_start_minute;
             let end_minutes = self.regular_session_end_hour * 60 + self.regular_session_end_minute;
 
             if current_minutes < start_minutes {
@@ -409,11 +413,15 @@ mod session_transition_strategy {
         }
 
         /// Check if we're at a session transition point
-        fn is_session_transition(&self, current_session: MarketSession, previous_session: MarketSession) -> bool {
+        fn is_session_transition(
+            &self,
+            current_session: MarketSession,
+            previous_session: MarketSession,
+        ) -> bool {
             matches!(
                 (previous_session, current_session),
-                (MarketSession::PreMarket, MarketSession::Regular) |
-                (MarketSession::Regular, MarketSession::AfterHours)
+                (MarketSession::PreMarket, MarketSession::Regular)
+                    | (MarketSession::Regular, MarketSession::AfterHours)
             )
         }
 
@@ -426,7 +434,12 @@ mod session_transition_strategy {
         }
 
         /// Calculate average volume over recent periods
-        fn calculate_average_volume(&self, data: &[MinuteOhlcv], end_index: usize, periods: usize) -> Option<f64> {
+        fn calculate_average_volume(
+            &self,
+            data: &[MinuteOhlcv],
+            end_index: usize,
+            periods: usize,
+        ) -> Option<f64> {
             if end_index < periods {
                 return None;
             }
@@ -454,7 +467,7 @@ mod session_transition_strategy {
 
             let volatility = self.calculate_volatility(current_candle);
             let current_volume = current_candle.data.volume;
-            
+
             // Check volatility condition
             if volatility < self.volatility_threshold {
                 return Signal::Hold;
@@ -470,7 +483,7 @@ mod session_transition_strategy {
 
             // Determine signal direction based on price movement
             let price_change = current_candle.data.close - previous_candle.data.close;
-            
+
             if price_change > 0.0 {
                 // Price increasing with high volatility and volume at transition - buy
                 Signal::Buy
@@ -498,7 +511,7 @@ mod session_transition_strategy {
         fn generate_signals(&self, data: &[MinuteOhlcv]) -> Result<Vec<Signal>, TradeError> {
             if data.len() < 2 {
                 return Err(TradeError::InsufficientData(
-                    "Need at least 2 data points for Session Transition strategy".to_string()
+                    "Need at least 2 data points for Session Transition strategy".to_string(),
                 ));
             }
 
@@ -516,9 +529,9 @@ mod session_transition_strategy {
                 let current_candle = &data[i];
                 let previous_candle = &data[i - 1];
                 let current_session = self.get_market_session(current_candle.timestamp);
-                
+
                 let is_transition = self.is_session_transition(current_session, previous_session);
-                
+
                 // Calculate average volume over the last 10 periods (if available)
                 let avg_volume = self.calculate_average_volume(data, i, 10.min(i));
 
@@ -547,10 +560,11 @@ mod session_transition_strategy {
                 } else {
                     // In position - look for exit conditions
                     let volatility = self.calculate_volatility(current_candle);
-                    
+
                     // Exit if volatility drops significantly or at session transition
-                    let should_exit = volatility < (self.volatility_threshold * 0.5) || is_transition;
-                    
+                    let should_exit =
+                        volatility < (self.volatility_threshold * 0.5) || is_transition;
+
                     if should_exit {
                         in_position = false;
                         if position_is_long {
@@ -616,7 +630,10 @@ mod session_transition_strategy {
 
             // Pre-market time
             let pre_market = Utc.with_ymd_and_hms(2021, 1, 1, 8, 0, 0).unwrap();
-            assert_eq!(strategy.get_market_session(pre_market), MarketSession::PreMarket);
+            assert_eq!(
+                strategy.get_market_session(pre_market),
+                MarketSession::PreMarket
+            );
 
             // Regular session time
             let regular = Utc.with_ymd_and_hms(2021, 1, 1, 12, 0, 0).unwrap();
@@ -624,7 +641,10 @@ mod session_transition_strategy {
 
             // After-hours time
             let after_hours = Utc.with_ymd_and_hms(2021, 1, 1, 18, 0, 0).unwrap();
-            assert_eq!(strategy.get_market_session(after_hours), MarketSession::AfterHours);
+            assert_eq!(
+                strategy.get_market_session(after_hours),
+                MarketSession::AfterHours
+            );
         }
 
         #[test]
@@ -632,10 +652,14 @@ mod session_transition_strategy {
             let strategy = SessionTransitionStrategy::new(9, 30, 16, 0, 1.0, 1.5).unwrap();
 
             // Pre-market to regular session transition
-            assert!(strategy.is_session_transition(MarketSession::Regular, MarketSession::PreMarket));
+            assert!(
+                strategy.is_session_transition(MarketSession::Regular, MarketSession::PreMarket)
+            );
 
             // Regular to after-hours transition
-            assert!(strategy.is_session_transition(MarketSession::AfterHours, MarketSession::Regular));
+            assert!(
+                strategy.is_session_transition(MarketSession::AfterHours, MarketSession::Regular)
+            );
 
             // No transition (same session)
             assert!(!strategy.is_session_transition(MarketSession::Regular, MarketSession::Regular));
@@ -644,7 +668,7 @@ mod session_transition_strategy {
         #[test]
         fn test_volatility_calculation() {
             let strategy = SessionTransitionStrategy::new(9, 30, 16, 0, 1.0, 1.5).unwrap();
-            
+
             let timestamp = Utc.with_ymd_and_hms(2021, 1, 1, 12, 0, 0).unwrap();
             let candle = MinuteOhlcv {
                 timestamp,

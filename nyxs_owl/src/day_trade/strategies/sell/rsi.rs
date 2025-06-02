@@ -20,7 +20,6 @@ impl RsiStrategy {
             oversold_threshold,
         }
     }
-
 }
 
 impl Default for RsiStrategy {
@@ -141,9 +140,9 @@ mod tests {
 
             // Small variations
             let price_change = match day % 3 {
-                0 => 0.5,   // Up
-                1 => -0.3,  // Down
-                _ => 0.1,   // Up slightly
+                0 => 0.5,  // Up
+                1 => -0.3, // Down
+                _ => 0.1,  // Up slightly
             };
 
             data.push(DailyOhlcv {
@@ -212,7 +211,7 @@ mod tests {
             });
         }
 
-        // Add a small recovery to let RSI cross the threshold  
+        // Add a small recovery to let RSI cross the threshold
         for day in 16..=18 {
             let date = NaiveDate::from_ymd_opt(2023, 2, day).unwrap();
 
@@ -248,15 +247,25 @@ mod tests {
         let sell_count = signals.iter().filter(|&&s| s == Signal::Sell).count();
         let hold_count = signals.iter().filter(|&&s| s == Signal::Hold).count();
 
-        println!("RSI signals: {} buy, {} sell, {} hold", buy_count, sell_count, hold_count);
+        println!(
+            "RSI signals: {} buy, {} sell, {} hold",
+            buy_count, sell_count, hold_count
+        );
 
         // The test passes if the strategy runs without error and generates the correct number of signals
         // We don't require specific signal counts since RSI conditions depend on the exact data patterns
-        assert_eq!(buy_count + sell_count + hold_count, data.len(), "All signals should be accounted for");
-        
+        assert_eq!(
+            buy_count + sell_count + hold_count,
+            data.len(),
+            "All signals should be accounted for"
+        );
+
         // If we do get signals, they should be reasonable
         if buy_count > 0 || sell_count > 0 {
-            println!("Successfully generated {} trading signals", buy_count + sell_count);
+            println!(
+                "Successfully generated {} trading signals",
+                buy_count + sell_count
+            );
         } else {
             println!("No trading signals generated - RSI conditions not met with test data");
         }

@@ -32,7 +32,6 @@ impl VolumeBasedStrategy {
             vpt_ma_period,
         })
     }
-
 }
 
 impl Default for VolumeBasedStrategy {

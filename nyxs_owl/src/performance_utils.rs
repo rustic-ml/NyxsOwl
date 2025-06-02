@@ -246,8 +246,14 @@ pub fn calculate_detailed_minute_performance(
             0.0
         },
         volatility,
-        start_date: data.first().map(|d| d.timestamp).unwrap_or_else(|| Utc::now()),
-        end_date: data.last().map(|d| d.timestamp).unwrap_or_else(|| Utc::now()),
+        start_date: data
+            .first()
+            .map(|d| d.timestamp)
+            .unwrap_or_else(|| Utc::now()),
+        end_date: data
+            .last()
+            .map(|d| d.timestamp)
+            .unwrap_or_else(|| Utc::now()),
     })
 }
 
@@ -346,7 +352,12 @@ mod tests {
     #[test]
     fn test_daily_performance_calculation() {
         let data = create_test_daily_data();
-        let signals = vec![DaySignal::Buy, DaySignal::Hold, DaySignal::Sell, DaySignal::Hold];
+        let signals = vec![
+            DaySignal::Buy,
+            DaySignal::Hold,
+            DaySignal::Sell,
+            DaySignal::Hold,
+        ];
 
         let performance = calculate_daily_performance(&data, &signals, 10000.0, 0.1).unwrap();
         assert!(performance.abs() < 100.0); // Reasonable performance range
@@ -355,7 +366,12 @@ mod tests {
     #[test]
     fn test_minute_performance_calculation() {
         let data = create_test_minute_data();
-        let signals = vec![MinuteSignal::Buy, MinuteSignal::Hold, MinuteSignal::Sell, MinuteSignal::Hold];
+        let signals = vec![
+            MinuteSignal::Buy,
+            MinuteSignal::Hold,
+            MinuteSignal::Sell,
+            MinuteSignal::Hold,
+        ];
 
         let performance = calculate_minute_performance(&data, &signals, 10000.0, 0.1).unwrap();
         assert!(performance.abs() < 100.0); // Reasonable performance range

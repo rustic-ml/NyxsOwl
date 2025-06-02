@@ -408,16 +408,16 @@ mod tests {
         // Create test data with clear support and resistance levels
         let mut data = Vec::new();
         let base_time = chrono::Utc::now();
-        
+
         // Generate data that bounces between clear support (99.0) and resistance (101.0) levels
         for i in 0..120 {
             let price = match i % 10 {
-                0..=2 => 99.0 + (i % 3) as f64 * 0.1,   // Around support level
-                3..=4 => 100.0,                         // Middle
+                0..=2 => 99.0 + (i % 3) as f64 * 0.1,  // Around support level
+                3..=4 => 100.0,                        // Middle
                 5..=7 => 101.0 - (i % 3) as f64 * 0.1, // Around resistance level
-                _ => 100.0,                             // Middle
+                _ => 100.0,                            // Middle
             };
-            
+
             data.push(crate::minute_trade::MinuteOhlcv {
                 timestamp: base_time + chrono::Duration::minutes(i as i64),
                 data: crate::minute_trade::OhlcvData {
@@ -429,7 +429,7 @@ mod tests {
                 },
             });
         }
-        
+
         // Use more appropriate parameters for detection
         let strategy = SupportResistanceStrategy::new(50, 2, 0.5, true).unwrap(); // Increased zone_pct to 0.5%
 
@@ -445,11 +445,13 @@ mod tests {
             levels.is_empty(),
             "Expected empty levels with insufficient data"
         );
-        
+
         // Print detected levels for debugging
         for (i, level) in levels.iter().enumerate().take(5) {
-            println!("Level {}: price={:.2}, strength={}, type={:?}", 
-                    i, level.price, level.strength, level.level_type);
+            println!(
+                "Level {}: price={:.2}, strength={}, type={:?}",
+                i, level.price, level.strength, level.level_type
+            );
         }
     }
 

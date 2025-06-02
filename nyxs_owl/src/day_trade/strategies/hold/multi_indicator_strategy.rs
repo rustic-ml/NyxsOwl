@@ -553,7 +553,8 @@ mod tests {
 
         // Create more extreme market conditions to trigger signals
         for day in 1..=100 {
-            let date = NaiveDate::from_ymd_opt(2023, 1 + (day - 1) / 31, ((day - 1) % 31) + 1).unwrap_or_else(|| NaiveDate::from_ymd_opt(2023, 12, 31).unwrap());
+            let date = NaiveDate::from_ymd_opt(2023, 1 + (day - 1) / 31, ((day - 1) % 31) + 1)
+                .unwrap_or_else(|| NaiveDate::from_ymd_opt(2023, 12, 31).unwrap());
 
             // Create more volatile price movements
             let price_change = match day {
@@ -561,16 +562,16 @@ mod tests {
                 1..=20 => (day as f64 * 0.3).sin() * 2.0 + 1.5, // Strong upward bias
                 // Consolidation period
                 21..=40 => (day as f64 * 0.2).sin() * 0.5,
-                // Strong downtrend to trigger RSI oversold + MACD bearish signals  
+                // Strong downtrend to trigger RSI oversold + MACD bearish signals
                 41..=60 => (day as f64 * 0.3).sin() * 2.0 - 1.5, // Strong downward bias
                 // Volatile period to trigger various signals
                 61..=80 => (day as f64 * 0.1).sin() * 3.0,
                 // Recovery trend
                 _ => (day as f64 * 0.2).sin() * 1.0 + 0.8,
             };
-            
+
             price += price_change;
-            
+
             // Ensure price doesn't go negative
             price = price.max(10.0);
 
@@ -578,7 +579,7 @@ mod tests {
                 date,
                 data: OhlcvData {
                     open: price - 0.1,
-                    high: price + 0.8,  // Larger ranges
+                    high: price + 0.8, // Larger ranges
                     low: price - 0.8,
                     close: price,
                     volume: (1000.0 + (day % 10) as f64 * 200.0) as u64, // More volume variation
