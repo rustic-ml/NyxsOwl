@@ -9,6 +9,8 @@
 
 NyxsOwl provides institutional-grade tools for quantitative finance, technical analysis, and algorithmic trading. Built for performance, reliability, and ease of use.
 
+> *Named after **Nyx** (Greek goddess of night, strategic advantage) and **Bubo** (wise owl, wisdom in darkness) - embodying the essence of strategic financial analysis through wisdom, patience, and precision.*
+
 ## Quick Start
 
 Add to your `Cargo.toml`:
@@ -25,8 +27,8 @@ Production-ready indicators with comprehensive test coverage
 ```rust
 use nyxs_owl::trade_math::*;
 
-let mut rsi = RelativeStrengthIndex::new(14)?;
-let mut bb = BollingerBands::new(20, 2.0)?;
+let mut rsi = oscillators::RelativeStrengthIndex::new(14)?;
+let mut bb = volatility::BollingerBands::new(20, 2.0)?;
 
 for price in prices {
     rsi.update(price)?;
@@ -48,12 +50,14 @@ High-performance backtesting engine
 ```rust
 use nyxs_owl::strategy_lib::backtest::*;
 
-let config = BacktestConfig::builder()
-    .initial_capital(100_000.0)
-    .commission(0.001)
-    .build();
+let config = BacktestConfig {
+    initial_capital: 100_000.0,
+    commission: 0.001,
+    slippage: 0.0005,
+    position_size: 1.0,
+};
 
-let results = run_backtest(data, signals, config)?;
+let results = run_backtest(&data, &signals, &config)?;
 println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
 ```
 
@@ -81,7 +85,7 @@ println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
 
 ### Basic Technical Analysis
 ```rust
-use nyxs_owl::trade_math::*;
+use nyxs_owl::trade_math::{moving_averages::*, oscillators::*};
 
 fn analyze_stock(prices: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
     let mut sma = SimpleMovingAverage::new(20)?;
@@ -106,7 +110,7 @@ fn analyze_stock(prices: &[f64]) -> Result<(), Box<dyn std::error::Error>> {
 
 ### Advanced Forecasting
 ```rust
-use nyxs_owl::forecast_trade::*;
+use nyxs_owl::forecast_trade::easy::*;
 use chrono::{DateTime, Utc, Duration};
 
 fn forecast_prices() -> Result<(), Box<dyn std::error::Error>> {
@@ -120,16 +124,19 @@ fn forecast_prices() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
     
     // Auto-select best model and forecast
-    let (forecast, model_name) = easy::auto_forecast(timestamps, prices, 5)?;
+    let (forecast, model_name) = auto_forecast(timestamps, prices, 5)?;
     
     println!("Selected model: {}", model_name);
     println!("5-day forecast: {:?}", forecast);
     
     // Compare multiple models
-    let comparison = easy::compare_models(&timestamps, &prices, 7)?;
-    for (model, avg_forecast) in comparison {
-        println!("{}: ${:.2}", model, avg_forecast);
-    }
+    let ma_forecast = forecast_moving_average(&prices, 5, 5)?;
+    let es_forecast = forecast_exponential_smoothing(&prices, 0.3, 5)?;
+    let arima_forecast = forecast_arima(&prices, (1, 1, 1), 5)?;
+    
+    println!("Moving Average: {:?}", ma_forecast);
+    println!("Exp Smoothing: {:?}", es_forecast);  
+    println!("ARIMA: {:?}", arima_forecast);
     
     Ok(())
 }
@@ -137,7 +144,7 @@ fn forecast_prices() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Strategy Backtesting
 ```rust
-use nyxs_owl::strategy_lib::{backtest::*, strategy::*};
+use nyxs_owl::strategy_lib::backtest::*;
 use polars::prelude::*;
 
 fn backtest_strategy() -> Result<(), Box<dyn std::error::Error>> {
