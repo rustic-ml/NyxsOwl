@@ -5,6 +5,10 @@
 [![Documentation](https://docs.rs/nyxs_owl/badge.svg)](https://docs.rs/nyxs_owl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/rustic-ml/NyxsOwl/main/IMG_2167_250px.jpg" alt="NyxsOwl Project Image" width="250"/>
+</div>
+
 **Production-ready financial analysis library for Rust**
 
 NyxsOwl provides institutional-grade tools for quantitative finance, technical analysis, and algorithmic trading. Built for performance, reliability, and ease of use.
