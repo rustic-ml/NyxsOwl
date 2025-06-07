@@ -80,7 +80,12 @@ rand = "0.8"
 
 # Async support for better integration
 async-trait = "0.1"
-tokio = { version = "1.0", features = ["rt", "rt-multi-thread"], optional = true }
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"], optional = true }
+
+# Parallel processing
+rayon = "1.8"
+futures = "0.3"
+num_cpus = "1.16"
 
 # Math and statistics
 num-traits = "0.2"
@@ -191,7 +196,7 @@ required-features = ["forecasting"]
 # Optional features that can be enabled by users
 [features]
 # Smart defaults for most users - includes essential technical analysis and backtesting
-default = ["trading-math", "backtesting", "forecasting"]
+default = ["trading-math", "backtesting", "forecasting", "async-support"]
 
 # Core feature sets
 trading-math = []          # Essential technical indicators (SMA, EMA, RSI, Bollinger Bands, etc.)
@@ -222,5 +227,19 @@ timeout = "300"
 name = "quick_start"
 path = "../examples/quick_start.rs"
 required-features = ["forecasting"]
+
+[[example]]
+name = "simd_performance_demo"
+path = "../examples/simd_performance_demo.rs"
+
+[[example]]
+name = "memory_optimization_demo"
+path = "../examples/memory_optimization_demo.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "async_parallel_demo"
+path = "../examples/async_parallel_demo.rs"
+required-features = ["forecasting", "async-support"]
 
 # Removed debug_timeseries example 

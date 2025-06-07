@@ -169,6 +169,9 @@ pub mod simple_types {
 
 // Export main modules
 pub mod trade_math; // Core module for technical indicator calculations
+pub mod performance_utils; // High-performance SIMD-accelerated operations
+pub mod memory_optimized; // Cache-conscious data structures and memory optimization
+pub mod async_parallel; // Async/parallel processing for concurrent forecasting
 
 #[cfg(feature = "forecasting")] // Keep forecasting feature-gated if it's substantial
 pub mod forecasting;
