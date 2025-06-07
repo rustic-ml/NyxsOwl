@@ -73,11 +73,12 @@ println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
 - **Oscillators**: RSI, MACD, Stochastic
 - **Volume**: OBV, Volume Profile, VROC
 
-### Forecasting Models
-- **ARIMA**: Autoregressive integrated moving average
-- **Exponential Smoothing**: Simple and double exponential
-- **Moving Average**: Various window forecasting
-- **Auto Selection**: Automatic best model selection
+### Forecasting Models *(Enhanced in v1.2.0)*
+- **Enhanced ARIMA**: Autoregressive models with adaptive order selection and regime detection
+- **Adaptive Ensemble**: Dynamic model weighting with performance-based adaptation
+- **Exponential Smoothing**: Simple and double exponential with adaptive parameters
+- **Moving Average**: Various window forecasting with outlier detection
+- **Auto Selection**: Intelligent model selection with quality monitoring
 
 ### Strategy Framework
 - **Signal Generation**: Buy/Sell/Hold signal framework

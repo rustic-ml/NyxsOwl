@@ -88,13 +88,14 @@ statrs = "0.16"
 rand_distr = "0.4"
 
 # Data processing
-polars = { version = "0.47.1", features = ["lazy", "strings", "temporal", "rolling_window", "parquet", "dtype-categorical", "dtype-struct", "dtype-full", "csv"] }
+polars = { version = "0.47.0", features = ["lazy", "strings", "temporal", "rolling_window", "parquet", "dtype-categorical", "dtype-struct", "dtype-full", "csv", "ewma"] }
 
 # Technical analysis
-ta-lib-in-rust = "1.0.8"
+# ta-lib-in-rust = "1.0.8"
+# ta-lib-sys = "0.1.2"
 
-# Forecasting - Using published version
-oxidiviner = "0.4.3"
+# Forecasting - Updated to 1.2.0 for adaptive features
+oxidiviner = "1.2.0"
 
 # Logging and error handling for production
 log = "0.4"
@@ -127,38 +128,70 @@ tokio-test = "0.4"
 
 # Working examples demonstrating NyxsOwl trade_math functionality
 [[example]]
-name = "trade_math_demo"
-path = "examples/trade_math_demo.rs"
+name = "arima_strategy_example"
+path = "../examples/arima_strategy_example.rs"
+required-features = ["forecasting"]
 
 [[example]]
-name = "comprehensive_trading_analysis"
-path = "examples/comprehensive_trading_analysis.rs"
+name = "basic_forecasting_demo"
+path = "../examples/basic_forecasting_demo.rs"
+required-features = ["forecasting"]
 
 [[example]]
-name = "performance_monitoring"
-path = "examples/performance_monitoring.rs"
+name = "copula_strategy_example"
+path = "../examples/copula_strategy_example.rs"
+required-features = ["forecasting"]
 
 [[example]]
-name = "forecasting_example"
-path = "examples/forecasting_example.rs"
+name = "ensemble_strategy_example"
+path = "../examples/ensemble_strategy_example.rs"
+required-features = ["forecasting"]
 
 [[example]]
-name = "lib_check"
-path = "examples/lib_check.rs"
+name = "exponential_smoothing_strategy_example"
+path = "../examples/exponential_smoothing_strategy_example.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "forecasting_progress_demo"
+path = "../examples/forecasting_progress_demo.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "garch_strategy_example"
+path = "../examples/garch_strategy_example.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "kalman_strategy_example"
+path = "../examples/kalman_strategy_example.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "regime_switching_example"
+path = "../examples/regime_switching_example.rs"
+required-features = ["forecasting"]
+
+[[example]]
+name = "oxidiviner_1_2_0_adaptive_example"
+path = "../examples/oxidiviner_1_2_0_adaptive_example.rs"
+required-features = ["forecasting"]
 
 # Benchmarks for performance testing
-[[bench]]
-name = "trade_math_bench"
-harness = false
+# Commenting out the missing trade_math_bench as well
+# [[bench]]
+# name = "trade_math_bench"
+# harness = false
 
-[[bench]]
-name = "forecast_bench"
-harness = false
+# Commenting out the missing benchmark
+# [[bench]]
+# name = "forecast_bench"
+# harness = false
 
 # Optional features that can be enabled by users
 [features]
 # Smart defaults for most users - includes essential technical analysis and backtesting
-default = ["trading-math", "backtesting"]
+default = ["trading-math", "backtesting", "forecasting"]
 
 # Core feature sets
 trading-math = []          # Essential technical indicators (SMA, EMA, RSI, Bollinger Bands, etc.)
@@ -186,11 +219,8 @@ exclude-files = [
 timeout = "300"
 
 [[example]]
-name = "backtest_integration_demo"
-path = "examples/backtest_integration_demo.rs"
-
-[[example]]
 name = "quick_start"
-path = "examples/quick_start.rs"
+path = "../examples/quick_start.rs"
+required-features = ["forecasting"]
 
 # Removed debug_timeseries example 
