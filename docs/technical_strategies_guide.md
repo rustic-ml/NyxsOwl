@@ -57,7 +57,9 @@ Moving averages smooth out price data to help identify trend direction. They are
         - *Bullish Crossover*: A shorter-period EMA crosses above a longer-period EMA. This indicates increasing bullish momentum (e.g., 12-EMA crossing above 26-EMA is a common MACD component).
         - *Bearish Crossover*: A shorter-period EMA crosses below a longer-period EMA. This indicates increasing bearish momentum.
         - **Confirmation with Other Indicators**: EMAs are often used in conjunction with other indicators like RSI or MACD to confirm signals and filter out false positives.
-- **Considerations**: While its responsiveness is an advantage for earlier signals, it can also lead to more false signals in volatile or non-trending markets compared to SMAs. The choice of EMA period (e.g., 9, 12, 20, 26, 50, 100, 200) depends heavily on the trader's strategy and the market's characteristics (e.g., shorter periods for day trading, longer for swing or position trading).
+- **Considerations**: 
+    - While its responsiveness is an advantage for earlier signals, it can also lead to more false signals in volatile or non-trending markets compared to SMAs. 
+    - The choice of EMA period (e.g., 9, 12, 20, 26, 50, 100, 200) depends heavily on the trader's strategy and the market's characteristics (e.g., shorter periods for day trading, longer for swing or position trading).
 
 ### Weighted Moving Average (WMA)
 - **Calculation Function**: `calculate_wma`
@@ -72,7 +74,10 @@ Moving averages smooth out price data to help identify trend direction. They are
         - *Bullish Signal*: The shorter-term WMA crosses above the longer-term WMA. This can indicate a stronger uptrend.
         - *Bearish Signal*: The shorter-term WMA crosses below the longer-term WMA. This can indicate a stronger downtrend.
         - **Confirmation with Other Indicators**: WMAs are often used in conjunction with other technical analysis tools for confirmation.
-- **Considerations**: WMA provides a balance between the SMA's smoothness and the EMA's responsiveness. However, like all moving averages, it's a lagging indicator. Its sensitivity to recent prices means it can be prone to whipsaws in choppy or sideways markets, though often less so than an EMA of the same period. The choice of period is crucial and depends on the trading style and asset.
+- **Considerations**: 
+    - WMA provides a balance between the SMA's smoothness and the EMA's responsiveness. However, like all moving averages, it's a lagging indicator. 
+    - Its sensitivity to recent prices means it can be prone to whipsaws in choppy or sideways markets, though often less so than an EMA of the same period. 
+    - The choice of period is crucial and depends on the trading style and asset.
 
 ### Volume Weighted Average Price (VWAP)
 - **Calculation Function**: `calculate_vwap`
@@ -89,7 +94,7 @@ Moving averages smooth out price data to help identify trend direction. They are
     - VWAP is a lagging indicator as it's based on past price and volume data.
     - Its usefulness is primarily for intraday timeframes; it's not typically used for longer-term analysis because it resets daily.
     - In low-liquidity stocks, VWAP might be less reliable due to erratic volume.
-    - Some traders use VWAP bands (similar to Bollinger Bands, plotted at standard deviations above and below the VWAP line) to identify overbought or oversold conditions relative to the VWAP.
+    - Some traders use VWAP bands (similar to Bollinger Bands®, plotted at standard deviations above and below the VWAP line) to identify overbought or oversold conditions relative to the VWAP.
 
 ## Momentum Indicators
 
@@ -115,7 +120,7 @@ Momentum indicators help traders assess the speed or rate of price changes in an
     - **Trendline Analysis on RSI**: Trendlines can be drawn on the RSI chart itself. A break of an RSI trendline can often precede a break of a trendline on the price chart, providing an early signal.
 - **Considerations**:
     - **Period**: The most common period for RSI is 14. Shorter periods make it more sensitive, while longer periods make it smoother.
-    - **Strong Trends**: In a strong uptrend, RSI can remain in the overbought territory for extended periods, and vice-versa in strong downtrends. Therefore, overbought/oversold signals alone are not always reliable for reversals in strong trends; they might just indicate strength.
+    - **Strong Trends**: In a strong uptrend, RSI can remain in the overbought territory for extended periods, and vice versa in strong downtrends. Therefore, overbought/oversold signals alone are not always reliable for reversals in strong trends; they might just indicate strength.
     - **Confirmation**: It's generally recommended to use RSI signals in conjunction with other indicators (e.g., price action, trendlines, moving averages) for confirmation.
 
 ### Moving Average Convergence Divergence (MACD)
@@ -140,9 +145,9 @@ Momentum indicators help traders assess the speed or rate of price changes in an
     - **Rapid Rises or Falls**: A sharp increase or decrease in the MACD line, pulling away from the signal line, can indicate that the security is overbought or oversold in the short term and might be due for a correction.
 - **Considerations**:
     - Standard MACD parameters are 12, 26, and 9, but traders may adjust these to suit different assets or timeframes.
-    - MACD is a lagging indicator, so it confirms trends rather than predicts them. This can lead to late entries or exits.
-    - It can produce false signals in sideways or choppy markets. Combining MACD with other indicators (like RSI, moving averages, or trend-identifying tools like ADX) and price action analysis is often recommended.
-    - The interpretation of MACD can be subjective, especially regarding divergences.
+    - **Lagging Indicator**: MACD is a lagging indicator, so it confirms trends rather than predicts them. This can lead to late entries or exits.
+    - **False Signals**: It can produce false signals in sideways or choppy markets. Combining MACD with other indicators (like RSI, moving averages, or trend-identifying tools like ADX) and price action analysis is often recommended.
+    - **Subjective Interpretation**: The interpretation of MACD can be subjective, especially regarding divergences.
 
 ### Rate of Change (ROC)
 - **Calculation Function**: `calculate_roc`
@@ -469,34 +474,7 @@ Trend indicators are designed to identify the direction and strength of a market
     - **Complexity**: Ichimoku provides a lot of information, which can be overwhelming for new users. It's important to understand each component and how they interact.
     - **Lagging Elements**: While Senkou Spans are plotted ahead, the Tenkan-sen, Kijun-sen, and Chikou Span are based on past data, introducing some lag.
     - **Best for Trending Markets**: Like many trend indicators, Ichimoku tends to perform best in trending markets and can give ambiguous signals in choppy, sideways conditions.
-    - **Trading Strategies & Interpretation**:
-        The Ichimoku system provides a multi-faceted view of the market. Strongest signals often occur when multiple components of the system align and confirm each other (e.g., price action relative to the Kumo, Kumo direction, Tenkan/Kijun cross, and Chikou Span position).
-        - **Trend Identification (Price vs. Kumo)**:
-            - *Bullish Trend*: Price is trading above the Kumo. The Kumo acts as dynamic support.
-            - *Bearish Trend*: Price is trading below the Kumo. The Kumo acts as dynamic resistance.
-            - *Sideways/Neutral*: Price is trading inside the Kumo. The Kumo boundaries can offer support/resistance.
-    - **Kumo Color & Thickness**:
-        - *Bullish Kumo*: Senkou Span A is above Senkou Span B.
-        - *Bearish Kumo*: Senkou Span B is above Senkou Span A.
-        - A thicker Kumo suggests stronger support/resistance.
-    - **Tenkan-sen / Kijun-sen Crossovers**:
-        - *Bullish Signal (Strong)*: Tenkan-sen crosses above Kijun-sen, and the crossover occurs above the Kumo.
-        - *Bullish Signal (Medium)*: Tenkan-sen crosses above Kijun-sen, and the crossover occurs inside the Kumo.
-        - *Bullish Signal (Weak)*: Tenkan-sen crosses above Kijun-sen, and the crossover occurs below the Kumo.
-        - *Bearish Signals*: Vice-versa for Tenkan-sen crossing below Kijun-sen.
-    - **Chikou Span (Lagging Span) Confirmation**:
-        - *Bullish Confirmation*: Chikou Span is above the price action from 26 periods ago.
-        - *Bearish Confirmation*: Chikou Span is below the price action from 26 periods ago.
-        - Chikou Span breaking through the Kumo can also be a signal.
-    - **Kumo Breakouts**:
-        - *Bullish*: Price breaks out above the Kumo.
-        - *Bearish*: Price breaks out below the Kumo.
-    - **Senkou Span Crossovers (Kumo Twist)**: When Senkou Span A and Senkou Span B cross, it indicates a potential future trend change.
-- **Considerations**:
-    - **Default Periods**: The standard Ichimoku periods are 9, 26, and 52. These were based on historical Japanese trading weeks and months. Some traders adjust these for different markets or timeframes, but many traditionalists stick to the defaults.
-    - **Complexity**: Ichimoku provides a lot of information, which can be overwhelming for new users. It's important to understand each component and how they interact.
-    - **Lagging Elements**: While Senkou Spans are plotted ahead, the Tenkan-sen, Kijun-sen, and Chikou Span are based on past data, introducing some lag.
-    - **Best for Trending Markets**: Like many trend indicators, Ichimoku tends to perform best in trending markets and can give ambiguous signals in choppy, sideways conditions.
+    - **Multi-Component Confirmation**: The Ichimoku system provides a multi-faceted view of the market. Strongest signals often occur when multiple components of the system align and confirm each other (e.g., price action relative to the Kumo, Kumo direction, Tenkan/Kijun cross, and Chikou Span position).
 
 ### Parabolic SAR (PSAR)
 - **Calculation Function**: `calculate_psar`
@@ -886,7 +864,7 @@ Implied Volatility (IV) is a crucial concept in options trading, representing th
             - *Regime Shift Anticipation*: Strategies could be employed that anticipate a shift from one regime to another (e.g., positioning for an IV crush after an earnings event that caused a temporary high IV regime).
         - **Considerations**: Clear thresholds for defining regimes are needed. IV can remain high or low for extended periods (mean reversion is not a precise timing tool). Regime signals should ideally be combined with other market analysis.
         - **Current Status**: Placeholder. Detailed strategies and interpretations will be provided upon their full implementation.
-      - **Current Status**: All these functions are currently placeholders. Detailed strategies and interpretations will be provided upon their full implementation.
+- **Current Status**: All these functions are currently placeholders. Detailed strategies and interpretations will be provided upon their full implementation.
 
 ## Day Trading Indicators (Future Implementation)
 

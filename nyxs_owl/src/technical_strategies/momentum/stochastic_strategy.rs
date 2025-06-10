@@ -3,8 +3,8 @@
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::momentum::calculate_stochastic;
-use polars::prelude::{DataFrame, Series, NamedFrom, PolarsResult, DataType, Float64Type};
 use polars::chunked_array::ChunkedArray;
+use polars::prelude::{DataFrame, DataType, Float64Type, NamedFrom, PolarsResult, Series};
 
 /// Generates trading signals based on Stochastic Oscillator.
 ///
@@ -36,19 +36,19 @@ pub fn stochastic_signals(
     // Validate parameters
     if k_period == 0 || d_period == 0 {
         return Err(NyxsOwlError::InvalidParameter(
-            "Stochastic periods must be greater than 0".to_string()
+            "Stochastic periods must be greater than 0".to_string(),
         ));
     }
 
     if oversold_threshold >= overbought_threshold {
         return Err(NyxsOwlError::InvalidParameter(
-            "Oversold threshold must be less than overbought threshold".to_string()
+            "Oversold threshold must be less than overbought threshold".to_string(),
         ));
     }
 
     if oversold_threshold < 0.0 || overbought_threshold > 100.0 {
         return Err(NyxsOwlError::InvalidParameter(
-            "Stochastic thresholds must be between 0 and 100".to_string()
+            "Stochastic thresholds must be between 0 and 100".to_string(),
         ));
     }
 
@@ -69,36 +69,59 @@ pub fn stochastic_signals(
     if high_series.len() < min_data_len {
         return Err(NyxsOwlError::MissingData(format!(
             "Insufficient data: {} rows, need at least {} for Stochastic strategy",
-            high_series.len(), min_data_len
+            high_series.len(),
+            min_data_len
         )));
     }
 
     // Convert Columns to Series for calculation
-    let high_series_clone = high_series.clone().as_series();
-    let low_series_clone = low_series.clone().as_series();
-    let close_series_clone = close_series.clone().as_series();
-    
+    let high_column_clone = high_series.clone();
+    let high_series_clone = high_column_clone.as_series().ok_or_else(|| {
+        NyxsOwlError::DataError("Failed to convert high Column to Series".to_string())
+    })?;
+    let low_column_clone = low_series.clone();
+    let low_series_clone = low_column_clone.as_series().ok_or_else(|| {
+        NyxsOwlError::DataError("Failed to convert low Column to Series".to_string())
+    })?;
+    let close_column_clone = close_series.clone();
+    let close_series_clone = close_column_clone.as_series().ok_or_else(|| {
+        NyxsOwlError::DataError("Failed to convert close Column to Series".to_string())
+    })?;
+
     // Calculate Stochastic indicators
-    let (k_line, d_line) = calculate_stochastic(&high_series_clone, &low_series_clone, &close_series_clone, k_period, d_period)
-        .map_err(|e| NyxsOwlError::IndicatorError(format!("Stochastic calculation failed: {}", e)))?;
+    let (k_line, d_line) = calculate_stochastic(
+        &high_series_clone,
+        &low_series_clone,
+        &close_series_clone,
+        k_period,
+        d_period,
+    )
+    .map_err(|e| NyxsOwlError::IndicatorError(format!("Stochastic calculation failed: {}", e)))?;
 
     // Extract values for signal generation
-    let k_values: Vec<Option<f64>> = k_line.f64()
+    let k_values: Vec<Option<f64>> = k_line
+        .f64()
         .map_err(|e| NyxsOwlError::DataError(format!("Failed to extract %K values: {}", e)))?
-        .into_iter().collect();
+        .into_iter()
+        .collect();
 
-    let d_values: Vec<Option<f64>> = d_line.f64()
+    let d_values: Vec<Option<f64>> = d_line
+        .f64()
         .map_err(|e| NyxsOwlError::DataError(format!("Failed to extract %D values: {}", e)))?
-        .into_iter().collect();
+        .into_iter()
+        .collect();
 
     // Generate trading signals
     let mut signals = vec![Signal::Hold; k_values.len()];
-    let mut previous_k_above_d = None;
+    let mut previous_k_above_d: Option<bool> = None;
 
     for i in 1..k_values.len() {
-        if let (Some(current_k), Some(current_d), Some(prev_k), Some(prev_d)) = 
-           (k_values[i], d_values[i], k_values.get(i-1).and_then(|&x| x), d_values.get(i-1).and_then(|&x| x)) {
-            
+        if let (Some(current_k), Some(current_d), Some(prev_k), Some(prev_d)) = (
+            k_values[i],
+            d_values[i],
+            k_values.get(i - 1).and_then(|&x| x),
+            d_values.get(i - 1).and_then(|&x| x),
+        ) {
             let current_k_above = current_k > current_d;
             let prev_k_above = prev_k > prev_d;
 
@@ -134,7 +157,7 @@ mod tests {
         for i in 0..len {
             let base = base_price + (i as f64 * 0.1);
             let oscillation = 5.0 * (i as f64 * 0.2).sin();
-            
+
             let close = base + oscillation;
             let high = close + 1.0 + (i as f64 * 0.05).cos().abs();
             let low = close - 1.0 - (i as f64 * 0.05).sin().abs();
@@ -156,10 +179,10 @@ mod tests {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
         let result = stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 80.0);
         assert!(result.is_ok());
-        
+
         let signals = result.unwrap();
         assert_eq!(signals.len(), 50);
-        
+
         // Should have some hold signals initially
         assert!(signals.iter().take(17).all(|&s| s == Signal::Hold));
     }
@@ -167,20 +190,35 @@ mod tests {
     #[test]
     fn test_stochastic_strategy_invalid_periods() {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
-        
+
         // Zero periods
-        assert!(matches!(stochastic_signals(&df, "high", "low", "close", 0, 3, 20.0, 80.0), Err(NyxsOwlError::InvalidParameter(_))));
-        assert!(matches!(stochastic_signals(&df, "high", "low", "close", 14, 0, 20.0, 80.0), Err(NyxsOwlError::InvalidParameter(_))));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "close", 0, 3, 20.0, 80.0),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "close", 14, 0, 20.0, 80.0),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
     }
 
     #[test]
     fn test_stochastic_strategy_invalid_thresholds() {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
-        
+
         // Invalid threshold ranges
-        assert!(matches!(stochastic_signals(&df, "high", "low", "close", 14, 3, 80.0, 20.0), Err(NyxsOwlError::InvalidParameter(_))));
-        assert!(matches!(stochastic_signals(&df, "high", "low", "close", 14, 3, -10.0, 80.0), Err(NyxsOwlError::InvalidParameter(_))));
-        assert!(matches!(stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 110.0), Err(NyxsOwlError::InvalidParameter(_))));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "close", 14, 3, 80.0, 20.0),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "close", 14, 3, -10.0, 80.0),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 110.0),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
     }
 
     #[test]
@@ -190,41 +228,74 @@ mod tests {
         let required_len = k_period + d_period;
 
         let df_too_short = create_test_df_for_stochastic_strategy(required_len - 1).unwrap();
-        assert!(matches!(stochastic_signals(&df_too_short, "high", "low", "close", k_period, d_period, 20.0, 80.0), Err(NyxsOwlError::MissingData(_))));
+        assert!(matches!(
+            stochastic_signals(
+                &df_too_short,
+                "high",
+                "low",
+                "close",
+                k_period,
+                d_period,
+                20.0,
+                80.0
+            ),
+            Err(NyxsOwlError::MissingData(_))
+        ));
 
         let df_just_enough = create_test_df_for_stochastic_strategy(required_len).unwrap();
-        let result = stochastic_signals(&df_just_enough, "high", "low", "close", k_period, d_period, 20.0, 80.0);
+        let result = stochastic_signals(
+            &df_just_enough,
+            "high",
+            "low",
+            "close",
+            k_period,
+            d_period,
+            20.0,
+            80.0,
+        );
         assert!(result.is_ok());
     }
-    
+
     #[test]
     fn test_stochastic_strategy_column_not_found() {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
-        
-        assert!(matches!(stochastic_signals(&df, "non_existent", "low", "close", 14, 3, 20.0, 80.0), Err(NyxsOwlError::DataError(_))));
-        assert!(matches!(stochastic_signals(&df, "high", "non_existent", "close", 14, 3, 20.0, 80.0), Err(NyxsOwlError::DataError(_))));
-        assert!(matches!(stochastic_signals(&df, "high", "low", "non_existent", 14, 3, 20.0, 80.0), Err(NyxsOwlError::DataError(_))));
+
+        assert!(matches!(
+            stochastic_signals(&df, "non_existent", "low", "close", 14, 3, 20.0, 80.0),
+            Err(NyxsOwlError::DataError(_))
+        ));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "non_existent", "close", 14, 3, 20.0, 80.0),
+            Err(NyxsOwlError::DataError(_))
+        ));
+        assert!(matches!(
+            stochastic_signals(&df, "high", "low", "non_existent", 14, 3, 20.0, 80.0),
+            Err(NyxsOwlError::DataError(_))
+        ));
     }
 
     #[test]
     fn test_stochastic_strategy_signals_generation() {
-        let df = create_test_df_for_stochastic_strategy(100).unwrap(); 
+        let df = create_test_df_for_stochastic_strategy(100).unwrap();
         let result = stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 80.0);
         assert!(result.is_ok());
-        
+
         let signals = result.unwrap();
         assert_eq!(signals.len(), df.height());
-        
+
         // Should have some hold signals
         let hold_count = signals.iter().filter(|&&s| s == Signal::Hold).count();
         assert!(hold_count > 0);
-        
+
         // Count signal types
         let buy_count = signals.iter().filter(|&&s| s == Signal::Buy).count();
         let sell_count = signals.iter().filter(|&&s| s == Signal::Sell).count();
-        
+
         // With oscillating price data, might have some trading signals
         // Note: Stochastic signals are more specific (only in extreme zones), so might have fewer signals
-        println!("Buy signals: {}, Sell signals: {}, Hold signals: {}", buy_count, sell_count, hold_count);
+        println!(
+            "Buy signals: {}, Sell signals: {}, Hold signals: {}",
+            buy_count, sell_count, hold_count
+        );
     }
-} 
+}

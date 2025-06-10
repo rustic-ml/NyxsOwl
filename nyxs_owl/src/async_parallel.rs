@@ -1,6 +1,6 @@
 use crate::memory_optimized::{CacheOptimizedTimeSeries, MemoryPool};
 use crate::performance_utils::SimdMath;
-use crate::simple_types::Price;
+use crate::simple_types::{NyxsOwlError, Result};
 use futures::future::join_all;
 use rayon::prelude::*;
 use std::sync::Arc;

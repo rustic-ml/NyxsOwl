@@ -2,6 +2,7 @@
 //! Strategies based on oscillator indicators.
 
 pub mod rsi_strategy;
+pub mod williams_r_strategy;
 
-// Re-export key strategy functions if desired, e.g.:
-// pub use rsi_strategy::rsi_signals; 
+// Re-export key strategy types
+pub use williams_r_strategy::{WilliamsRConfig, WilliamsRStrategy};

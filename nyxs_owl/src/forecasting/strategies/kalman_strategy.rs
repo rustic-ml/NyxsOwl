@@ -498,7 +498,7 @@ impl KalmanStrategy {
         let trend_strength = current_trend.abs();
 
         // Strong upward trend with high confidence and favorable price positioning
-        if current_trend > dynamic_threshold && 
+        if current_trend > dynamic_threshold &&
            trend_confidence > 0.6 &&
            price_divergence < 0.0 && // Price below filtered (discounted)
            trend_strength > self.config.signal_threshold * 0.5
@@ -507,7 +507,7 @@ impl KalmanStrategy {
         }
 
         // Strong downward trend with high confidence and favorable price positioning
-        if current_trend < -dynamic_threshold && 
+        if current_trend < -dynamic_threshold &&
            trend_confidence > 0.6 &&
            price_divergence > 0.0 && // Price above filtered (overvalued)
            trend_strength > self.config.signal_threshold * 0.5

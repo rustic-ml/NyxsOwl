@@ -41,16 +41,14 @@ use std::collections::HashMap;
 
 // Import common types from forecasting module for consistency
 pub use crate::forecasting::{ConfigValue, Strategy, StrategyConfig};
-use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
+use crate::simple_types::{Result as NyxsOwlResult, Signal};
 
 // Declare strategy category modules
-// pub mod moving_averages;
-// pub mod oscillators;
-// pub mod momentum;
-// pub mod volatility;
-// pub mod trend;
+pub mod momentum;
 pub mod multi_factor;
+pub mod oscillators;
 pub mod pattern_recognition;
+pub mod volatility;
 pub mod volume;
 
 // Backtesting and utilities
@@ -282,7 +280,7 @@ pub mod prelude {
         CombinationMethod, ConfigValue, PerformanceMetrics, SignalFilter, Strategy, StrategyConfig,
         TechnicalSignal, TechnicalStrategy,
     };
-    pub use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
+    pub use crate::simple_types::{Result as NyxsOwlResult, Signal};
 
     // Re-export available strategies
     pub use super::multi_factor::MultiFactorStrategy;
