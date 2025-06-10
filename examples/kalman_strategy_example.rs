@@ -34,16 +34,14 @@ fn demo_basic_kalman(df: &DataFrame) -> std::result::Result<(), Box<dyn std::err
         initial_uncertainty: 1.0,
         signal_threshold: 0.02,
         use_trend_detection: true,
-        min_observations: 10,
-        forecast_horizon: 5,
+        min_data_points: 10,
+        trend_lookback: 5,
+        innovation_threshold: 0.01,
     };
 
-    let mut strategy = KalmanStrategy::new(config);
+    let strategy = KalmanStrategy::new(config);
 
-    // Extract prices for signal generation
-    let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
-
-    let signals = strategy.generate_signals(&prices, &df, "close")?;
+    let signals = strategy.generate_signals(df, "close", "timestamp")?;
 
     // Analyze signals
     let long_count = signals.iter().filter(|s| matches!(s, Signal::Buy)).count();
@@ -68,15 +66,17 @@ fn demo_backtest(df: &DataFrame) -> std::result::Result<(), Box<dyn std::error::
         initial_uncertainty: 0.5,
         signal_threshold: 0.015,
         use_trend_detection: true,
-        min_observations: 15,
-        forecast_horizon: 10,
+        min_data_points: 15,
+        trend_lookback: 10,
+        innovation_threshold: 0.005,
     };
 
-    let mut strategy = KalmanStrategy::new(config);
+    let strategy = KalmanStrategy::new(config);
 
+    let signals = strategy.generate_signals(df, "close", "timestamp")?;
+
+    // Extract prices for backtest
     let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
-
-    let signals = strategy.generate_signals(&prices, &df, "close")?;
 
     // Create backtester
     let backtest_config = BacktestConfig {
@@ -114,7 +114,7 @@ fn create_sample_data() -> PolarsResult<DataFrame> {
 
     for i in 0..n {
         // Add trend and noise
-        let trend = (i as f64 * 0.001);
+        let trend = i as f64 * 0.001;
         let noise = (i as f64 * 0.1).sin() * 1.5 + (i as f64 * 0.03).cos() * 0.8;
         price += trend + noise;
 

@@ -269,7 +269,7 @@ pub fn calculate_stochastic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::assert_relative_eq;
+    
 
     fn create_test_series() -> Series {
         Series::new(
@@ -298,7 +298,7 @@ mod tests {
         // Verify RSI is between 0 and 100
         for i in 14..rsi_values.len() {
             if let Some(rsi_val) = rsi_values[i] {
-                assert!(rsi_val >= 0.0 && rsi_val <= 100.0);
+                assert!((0.0..=100.0).contains(&rsi_val));
             }
         }
     }

@@ -36,6 +36,12 @@ pub struct CacheOptimizedTimeSeries {
     volatility: Vec<f32>,  // Rolling volatility cache
 }
 
+impl Default for CacheOptimizedTimeSeries {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CacheOptimizedTimeSeries {
     /// Create a new time series with default capacity
     pub fn new() -> Self {
@@ -132,27 +138,43 @@ impl CacheOptimizedTimeSeries {
     pub fn closes(&self) -> &[f32] {
         &self.closes[..self.len]
     }
+
+    /// Get opening prices as a slice for bulk operations
     pub fn opens(&self) -> &[f32] {
         &self.opens[..self.len]
     }
+
+    /// Get high prices as a slice for bulk operations
     pub fn highs(&self) -> &[f32] {
         &self.highs[..self.len]
     }
+
+    /// Get low prices as a slice for bulk operations
     pub fn lows(&self) -> &[f32] {
         &self.lows[..self.len]
     }
+
+    /// Get trading volumes as a slice for bulk operations
     pub fn volumes(&self) -> &[u32] {
         &self.volumes[..self.len]
     }
+
+    /// Get pre-calculated returns as a slice for bulk operations
     pub fn returns(&self) -> &[f32] {
         &self.returns[..self.len]
     }
+
+    /// Get pre-calculated log returns as a slice for bulk operations
     pub fn log_returns(&self) -> &[f32] {
         &self.log_returns[..self.len]
     }
+
+    /// Get pre-calculated volatility values as a slice for bulk operations
     pub fn volatility(&self) -> &[f32] {
         &self.volatility[..self.len]
     }
+
+    /// Get timestamps as a slice for bulk operations
     pub fn timestamps(&self) -> &[u64] {
         &self.timestamps[..self.len]
     }
@@ -201,6 +223,10 @@ impl CacheOptimizedTimeSeries {
         &self.closes[start..self.len]
     }
 
+    /// Get the last N return values for analysis
+    ///
+    /// This method provides efficient access to recent return data without
+    /// copying the entire array, enabling fast calculations on recent periods.
     pub fn tail_returns(&self, n: usize) -> &[f32] {
         let start = if n >= self.len { 0 } else { self.len - n };
         &self.returns[start..self.len]
@@ -248,14 +274,23 @@ impl CacheOptimizedTimeSeries {
 /// Individual time point for when Structure-of-Arrays access isn't optimal
 #[derive(Debug, Clone)]
 pub struct TimePoint {
+    /// Unix timestamp for this data point
     pub timestamp: u64,
+    /// Opening price
     pub open: f64,
+    /// High price for the period
     pub high: f64,
+    /// Low price for the period
     pub low: f64,
+    /// Closing price
     pub close: f64,
+    /// Trading volume
     pub volume: u64,
+    /// Calculated return value
     pub return_val: f64,
+    /// Calculated logarithmic return
     pub log_return: f64,
+    /// Volatility measure for this period
     pub volatility: f64,
 }
 

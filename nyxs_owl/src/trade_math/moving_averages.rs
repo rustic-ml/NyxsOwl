@@ -251,7 +251,7 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
     let vwap_values: Vec<Option<f64>> = cumulative_tp_volume
         .f64()?
         .into_iter()
-        .zip(cumulative_volume.f64()?.into_iter())
+        .zip(cumulative_volume.f64()?)
         .map(|(ctpv_opt, cv_opt)| match (ctpv_opt, cv_opt) {
             (Some(ctpv), Some(cv)) if cv != 0.0 => Some(ctpv / cv),
             _ => None, // If cumulative volume is 0 or any component is None

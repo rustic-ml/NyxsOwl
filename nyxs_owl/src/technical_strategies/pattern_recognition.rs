@@ -4,7 +4,7 @@
 //! including candlestick patterns, geometric patterns, and trend patterns.
 
 use crate::forecasting::{Strategy, StrategyConfig};
-use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
+use crate::simple_types::{Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ impl TechnicalStrategy for CandlestickPatternStrategy {
                 // Need at least 3 candles for pattern recognition
                 TechnicalSignal::new(Signal::Hold)
             } else {
-                self.detect_pattern(&open, &high, &low, &close, i)?
+                self.detect_pattern(open, high, low, close, i)?
             };
 
             signals.push(signal);

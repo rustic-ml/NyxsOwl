@@ -79,7 +79,7 @@ fn main() -> NyxsOwlResult<()> {
     let indicators = vwap_strategy.get_indicator_values(&sample_data)?;
 
     if let Some(vwap_series) = indicators.get("vwap") {
-        let vwap_values: Vec<f64> = vwap_series.f64()?.into_iter().filter_map(|x| x).collect();
+        let vwap_values: Vec<f64> = vwap_series.f64()?.into_iter().flatten().collect();
 
         if !vwap_values.is_empty() {
             println!("VWAP Values:");
@@ -100,7 +100,7 @@ fn main() -> NyxsOwlResult<()> {
     }
 
     if let Some(obv_series) = indicators.get("obv") {
-        let obv_values: Vec<f64> = obv_series.f64()?.into_iter().filter_map(|x| x).collect();
+        let obv_values: Vec<f64> = obv_series.f64()?.into_iter().flatten().collect();
 
         if !obv_values.is_empty() {
             println!("\nOBV (On-Balance Volume) Values:");

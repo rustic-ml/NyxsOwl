@@ -105,7 +105,7 @@ impl TechnicalStrategy for VWAPStrategy {
             let strength = (price_deviation.abs() / threshold).min(1.0);
             let confidence = (volume_ratio / min_volume_ratio).min(1.0);
 
-            let mut tech_signal = TechnicalSignal::new(signal)
+            let tech_signal = TechnicalSignal::new(signal)
                 .with_strength(strength)
                 .with_confidence(confidence)
                 .with_metadata("vwap", vwap_val)
@@ -131,11 +131,109 @@ impl TechnicalStrategy for VWAPStrategy {
 
     fn get_performance_metrics(
         &self,
-        _data: &DataFrame,
-        _signals: &[TechnicalSignal],
+        data: &DataFrame,
+        signals: &[TechnicalSignal],
     ) -> NyxsOwlResult<PerformanceMetrics> {
-        // Placeholder implementation
-        Ok(PerformanceMetrics::default())
+        let close_prices = data.column("close")?.f64()?;
+        let mut total_return = 0.0;
+        let mut returns = Vec::new();
+        let mut winning_trades = 0;
+        let mut total_trades = 0;
+        let mut equity_curve = Vec::new();
+        let mut current_equity = 1.0; // Start with 1.0 (100%)
+
+        // Track equity curve for max drawdown calculation
+        equity_curve.push(current_equity);
+
+        for i in 1..signals.len() {
+            if signals[i - 1].signal != Signal::Hold {
+                let prev_close = close_prices.get(i - 1).unwrap_or(0.0);
+                let curr_close = close_prices.get(i).unwrap_or(0.0);
+
+                if prev_close > 0.0 && curr_close > 0.0 {
+                    let return_pct = match signals[i - 1].signal {
+                        Signal::Buy => (curr_close - prev_close) / prev_close,
+                        Signal::Sell => (prev_close - curr_close) / prev_close,
+                        Signal::Hold => 0.0,
+                    };
+
+                    total_return += return_pct;
+                    returns.push(return_pct);
+                    total_trades += 1;
+
+                    // Update equity curve
+                    current_equity *= 1.0 + return_pct;
+                    equity_curve.push(current_equity);
+
+                    if return_pct > 0.0 {
+                        winning_trades += 1;
+                    }
+                } else {
+                    equity_curve.push(current_equity);
+                }
+            } else {
+                equity_curve.push(current_equity);
+            }
+        }
+
+        // Calculate maximum drawdown
+        let max_drawdown = {
+            if equity_curve.len() < 2 {
+                0.0
+            } else {
+                let mut max_dd = 0.0;
+                let mut peak = equity_curve[0];
+
+                for &equity in equity_curve.iter().skip(1) {
+                    if equity > peak {
+                        peak = equity;
+                    } else {
+                        let drawdown = (peak - equity) / peak;
+                        if drawdown > max_dd {
+                            max_dd = drawdown;
+                        }
+                    }
+                }
+                max_dd
+            }
+        };
+
+        let win_rate = if total_trades > 0 {
+            winning_trades as f64 / total_trades as f64
+        } else {
+            0.0
+        };
+
+        let avg_return = if !returns.is_empty() {
+            returns.iter().sum::<f64>() / returns.len() as f64
+        } else {
+            0.0
+        };
+
+        let volatility = if returns.len() > 1 {
+            let mean = avg_return;
+            let variance = returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>()
+                / (returns.len() - 1) as f64;
+            variance.sqrt()
+        } else {
+            0.0
+        };
+
+        let sharpe_ratio = if volatility > 0.0 {
+            avg_return / volatility
+        } else {
+            0.0
+        };
+
+        Ok(PerformanceMetrics {
+            total_return,
+            sharpe_ratio,
+            max_drawdown,
+            win_rate,
+            total_trades,
+            avg_trade_return: avg_return,
+            volatility,
+        })
     }
 
     fn validate_parameters(&self) -> NyxsOwlResult<()> {

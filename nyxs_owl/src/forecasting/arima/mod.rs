@@ -285,7 +285,7 @@ impl ArimaStrategy {
         let data_values_options_vec: Vec<Option<f64>> = close_prices_ca.into_iter().collect();
 
         let timestamps_options_vec: Vec<Option<i64>> =
-            timestamps_ca.into_iter().map(|opt_ndt| opt_ndt).collect();
+            timestamps_ca.into_iter().collect();
 
         let series_len = data_values_options_vec.len();
         if series_len == 0 {
@@ -397,7 +397,7 @@ mod tests {
     use super::*;
     use chrono::NaiveDateTime;
     use polars::prelude::{
-        AnyValue, DataFrame, DataType, Float64Chunked, NamedFrom, Series, TimeUnit,
+        DataFrame, DataType, NamedFrom, Series, TimeUnit,
     };
 
     // Updated to include a timestamp column
@@ -464,7 +464,7 @@ mod tests {
         assert_eq!(strategy.threshold, 0.01);
         // Check strategy_type comparison if ArimaStrategyType derives PartialEq
         // assert_eq!(strategy.strategy_type, ArimaStrategyType::TrendFollowing);
-        assert_eq!(strategy.min_data_points(), (5 + 1 + 0 + 20).max(60));
+        assert_eq!(strategy.min_data_points(), 60);
         assert!(strategy.required_columns().contains(&"timestamp")); // Check timestamp IS required
         assert!(strategy.required_columns().contains(&"close"));
     }
@@ -500,7 +500,7 @@ mod tests {
                     .i32()
                     .unwrap()
                     .into_iter()
-                    .all(|s_opt| s_opt.map_or(false, |s| s == Signal::Hold.to_int()));
+                    .all(|s_opt| s_opt.is_some_and(|s| s == Signal::Hold.to_int()));
                 assert!(
                     all_hold,
                     "Expected all Hold signals for data too short ({}) for walk-forward (min_points: {}). Signals: {:?}", 
@@ -531,7 +531,7 @@ mod tests {
                     .i32()
                     .unwrap()
                     .into_iter()
-                    .all(|s_opt| s_opt.map_or(false, |s| s == Signal::Hold.to_int()));
+                    .all(|s_opt| s_opt.is_some_and(|s| s == Signal::Hold.to_int()));
                 assert!(all_hold, "Expected all Hold signals when data length ({}) equals min_data_points ({}). Forecast loop doesn't run. Signals: {:?}", data_just_enough.height(), min_points, signals);
             }
             Err(e) => panic!(

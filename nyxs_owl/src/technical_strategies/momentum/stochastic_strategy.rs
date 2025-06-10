@@ -3,8 +3,9 @@
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::momentum::calculate_stochastic;
-use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, DataType, Float64Type, NamedFrom, PolarsResult, Series};
+use polars::prelude::DataFrame;
+use polars::error::PolarsResult;
+use polars::prelude::*;
 
 /// Generates trading signals based on Stochastic Oscillator.
 ///
@@ -90,9 +91,9 @@ pub fn stochastic_signals(
 
     // Calculate Stochastic indicators
     let (k_line, d_line) = calculate_stochastic(
-        &high_series_clone,
-        &low_series_clone,
-        &close_series_clone,
+        high_series_clone,
+        low_series_clone,
+        close_series_clone,
         k_period,
         d_period,
     )
@@ -146,7 +147,8 @@ pub fn stochastic_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, PolarsError};
+    use polars::error::PolarsResult;
+    use polars::prelude::*;
 
     fn create_test_df_for_stochastic_strategy(len: usize) -> PolarsResult<DataFrame> {
         let base_price = 50.0;

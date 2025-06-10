@@ -49,7 +49,7 @@ fn periods_since_extremum(
         let end_idx = i;
 
         for window_idx in start_idx..=end_idx {
-            let j = window_idx.checked_sub(start_idx).unwrap_or(0);
+            let j = window_idx.saturating_sub(start_idx);
             if let Some(val) = prices_ca.get(window_idx) {
                 match extremum_val_opt {
                     Some(current_extremum) => {
@@ -328,22 +328,22 @@ mod aroon_tests {
 
         // Values should be in the range [-100, 100] and not NaN
         assert!(
-            !val_2.is_nan() && val_2 >= -100.0 && val_2 <= 100.0,
+            !val_2.is_nan() && (-100.0..=100.0).contains(&val_2),
             "Index 2 oscillator out of range: {}",
             val_2
         );
         assert!(
-            !val_3.is_nan() && val_3 >= -100.0 && val_3 <= 100.0,
+            !val_3.is_nan() && (-100.0..=100.0).contains(&val_3),
             "Index 3 oscillator out of range: {}",
             val_3
         );
         assert!(
-            !val_4.is_nan() && val_4 >= -100.0 && val_4 <= 100.0,
+            !val_4.is_nan() && (-100.0..=100.0).contains(&val_4),
             "Index 4 oscillator out of range: {}",
             val_4
         );
         assert!(
-            !val_5.is_nan() && val_5 >= -100.0 && val_5 <= 100.0,
+            !val_5.is_nan() && (-100.0..=100.0).contains(&val_5),
             "Index 5 oscillator out of range: {}",
             val_5
         );
@@ -370,6 +370,17 @@ mod aroon_tests {
 }
 
 // ADX and DI related functions
+/// Calculate Wilder's smoothing (Modified Moving Average)
+/// 
+/// This is a variation of exponential moving average that uses a different smoothing factor.
+/// It's commonly used in technical indicators like RSI and ATR.
+/// 
+/// # Arguments
+/// * `series` - Input price series
+/// * `period` - Number of periods for smoothing
+/// 
+/// # Returns
+/// A Series with Wilder's smoothed values
 pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series> {
     if period == 0 {
         return Err(PolarsError::ComputeError(
@@ -418,6 +429,20 @@ pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series>
     Ok(Float64Chunked::new(series.name().clone(), &ewm_values).into_series())
 }
 
+/// Calculate True Range for volatility measurement
+/// 
+/// True Range is the greatest of:
+/// - Current High - Current Low
+/// - Absolute value of Current High - Previous Close
+/// - Absolute value of Current Low - Previous Close
+/// 
+/// # Arguments
+/// * `high` - High price series
+/// * `low` - Low price series  
+/// * `close` - Close price series
+/// 
+/// # Returns
+/// A Series with True Range values
 pub fn calculate_true_range(high: &Series, low: &Series, close: &Series) -> PolarsResult<Series> {
     if ![high.dtype(), low.dtype(), close.dtype()]
         .iter()
@@ -488,7 +513,7 @@ pub fn calculate_true_range(high: &Series, low: &Series, close: &Series) -> Pola
 
     // tr_series_opt is already a Series, not a Result
     let mut tr_series = tr_series_opt;
-    if tr_series.len() > 0 {
+    if !tr_series.is_empty() {
         // Create a new series with the first value corrected
         let tr_ca = tr_series.f64()?;
         let mut tr_values: Vec<Option<f64>> = tr_ca.to_vec();
@@ -544,7 +569,7 @@ pub fn calculate_directional_movement_components(
     let mut minus_dm_values: Vec<Option<f64>> = vec![None; high.len()];
 
     // First element is typically 0 or undefined for DM
-    if high.len() > 0 {
+    if !high.is_empty() {
         plus_dm_values[0] = Some(0.0);
         minus_dm_values[0] = Some(0.0);
     }
@@ -571,6 +596,19 @@ pub fn calculate_directional_movement_components(
     Ok((plus_dm, minus_dm))
 }
 
+/// Calculate ADX (Average Directional Index) and Directional Indicators
+///
+/// ADX measures the strength of a trend regardless of direction.
+/// +DI and -DI measure positive and negative directional movement.
+///
+/// # Arguments
+/// * `high` - High prices series
+/// * `low` - Low prices series
+/// * `close` - Close prices series
+/// * `period` - Period for ADX calculation
+///
+/// # Returns
+/// * `PolarsResult<(Series, Series, Series)>` - (+DI, -DI, ADX) or error if calculation fails
 pub fn calculate_adx_di(
     high: &Series,
     low: &Series,
@@ -997,548 +1035,18 @@ fn calculate_hl_avg(
     Ok(result)
 }
 
-pub fn calculate_ichimoku_cloud(
-    high_prices: &Series,
-    low_prices: &Series,
-    close_prices: &Series,
-    tenkan_period: usize,        // 9
-    kijun_period: usize,         // 26
-    senkou_span_b_period: usize, // 52
-    chikou_lag: usize,           // 26 (same as kijun for plotting offset)
-    senkou_lead: usize,          // 26 (same as kijun for plotting offset)
-) -> PolarsResult<(Series, Series, Series, Series, Series)> {
-    if tenkan_period == 0 || kijun_period == 0 || senkou_span_b_period == 0 {
-        return Err(PolarsError::ComputeError(
-            "Ichimoku periods must be greater than 0.".into(),
-        ));
-    }
-
-    // 1. Tenkan-sen (Conversion Line)
-    let mut tenkan_sen = calculate_hl_avg(high_prices, low_prices, tenkan_period)?;
-    tenkan_sen.rename("tenkan_sen".into());
-
-    // 2. Kijun-sen (Base Line)
-    let mut kijun_sen = calculate_hl_avg(high_prices, low_prices, kijun_period)?;
-    kijun_sen.rename("kijun_sen".into());
-
-    // 3. Senkou Span A (Leading Span A)
-    let sum_spans = (&tenkan_sen + &kijun_sen)?;
-    let mut senkou_span_a = &sum_spans / 2.0f64;
-    senkou_span_a.rename("senkou_span_a".into());
-    let senkou_span_a = senkou_span_a.shift(senkou_lead as i64); // Plot 26 periods ahead
-
-    // 4. Senkou Span B (Leading Span B)
-    let mut senkou_span_b = calculate_hl_avg(high_prices, low_prices, senkou_span_b_period)?;
-    senkou_span_b.rename("senkou_span_b".into());
-    let senkou_span_b = senkou_span_b.shift(senkou_lead as i64); // Plot 26 periods ahead
-
-    // 5. Chikou Span (Lagging Span)
-    let mut chikou_span = close_prices.clone();
-    chikou_span.rename("chikou_span".into());
-    let chikou_span = chikou_span.shift(-(chikou_lag as i64)); // Plot 26 periods behind
-
-    Ok((
-        tenkan_sen,
-        kijun_sen,
-        senkou_span_a,
-        senkou_span_b,
-        chikou_span,
-    ))
-}
-
-#[cfg(test)]
-mod ichimoku_tests {
-    use super::*;
-    use polars::prelude::AnyValue;
-
-    fn create_test_data_ichimoku(len: usize) -> (Series, Series, Series) {
-        let mut highs: Vec<f64> = Vec::with_capacity(len);
-        let mut lows: Vec<f64> = Vec::with_capacity(len);
-        let mut closes: Vec<f64> = Vec::with_capacity(len);
-        for i in 0..len {
-            let base = 100.0 + (i as f64 * 0.2) + (i as f64 * 0.5).sin() * 5.0;
-            highs.push(base + 2.0 + (i % 3) as f64 * 0.5);
-            lows.push(base - 2.0 - (i % 3) as f64 * 0.5);
-            closes.push(base + ((i % 5) as i32 - 2) as f64 * 0.3);
-        }
-        (
-            Series::new("high".into(), highs),
-            Series::new("low".into(), lows),
-            Series::new("close".into(), closes),
-        )
-    }
-
-    #[test]
-    fn test_hl_avg_basic() -> PolarsResult<()> {
-        let highs = Series::new(
-            "h".into(),
-            vec![Some(10.0), Some(12.0), Some(11.0), Some(13.0), Some(15.0)],
-        );
-        let lows = Series::new(
-            "l".into(),
-            vec![Some(8.0), Some(9.0), Some(10.0), Some(10.0), Some(12.0)],
-        );
-        let period = 3;
-        let avg = calculate_hl_avg(&highs, &lows, period)?;
-        assert_eq!(avg.get(0).unwrap(), AnyValue::Null);
-        assert_eq!(avg.get(1).unwrap(), AnyValue::Null);
-        assert_eq!(avg.get(2).unwrap().try_extract::<f64>().unwrap(), 10.0);
-        assert_eq!(avg.get(3).unwrap().try_extract::<f64>().unwrap(), 11.0);
-        assert_eq!(avg.get(4).unwrap().try_extract::<f64>().unwrap(), 12.5);
-        Ok(())
-    }
-
-    #[test]
-    fn test_ichimoku_cloud_calculation_runs() -> PolarsResult<()> {
-        let (highs, lows, closes) = create_test_data_ichimoku(100);
-        let tenkan_p = 9;
-        let kijun_p = 26;
-        let senkou_b_p = 52;
-        let lag_p = 26;
-        let lead_p = 26;
-
-        let result = calculate_ichimoku_cloud(
-            &highs, &lows, &closes, tenkan_p, kijun_p, senkou_b_p, lag_p, lead_p,
-        );
-        assert!(result.is_ok());
-        let (tenkan, kijun, span_a, span_b, chikou) = result.unwrap();
-
-        assert_eq!(tenkan.len(), highs.len());
-        assert_eq!(kijun.len(), highs.len());
-        assert_eq!(span_a.len(), highs.len());
-        assert_eq!(span_b.len(), highs.len());
-        assert_eq!(chikou.len(), highs.len());
-
-        assert_eq!(tenkan.name(), "tenkan_sen");
-        assert_eq!(kijun.name(), "kijun_sen");
-        assert_eq!(span_a.name(), "senkou_span_a");
-        assert_eq!(span_b.name(), "senkou_span_b");
-        assert_eq!(chikou.name(), "chikou_span");
-
-        let min_lead_nulls = lead_p;
-        let mut non_null_span_a = false;
-        for i in min_lead_nulls..span_a.len() {
-            if !span_a.get(i).unwrap().is_null() {
-                non_null_span_a = true;
-                break;
-            }
-        }
-        assert!(
-            non_null_span_a,
-            "Senkou Span A should have non-null values after lead period"
-        );
-
-        let mut non_null_chikou = false;
-        for i in 0..(chikou.len() - lag_p) {
-            if !chikou.get(i).unwrap().is_null() {
-                non_null_chikou = true;
-                break;
-            }
-        }
-        assert!(
-            non_null_chikou,
-            "Chikou Span should have non-null values before lag period ends"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_ichimoku_invalid_periods() {
-        let (h, l, c) = create_test_data_ichimoku(5);
-        assert!(calculate_ichimoku_cloud(&h, &l, &c, 0, 26, 52, 26, 26).is_err()); // tenkan_period = 0
-        assert!(calculate_ichimoku_cloud(&h, &l, &c, 9, 0, 52, 26, 26).is_err()); // kijun_period = 0
-        assert!(calculate_ichimoku_cloud(&h, &l, &c, 9, 26, 0, 26, 26).is_err());
-        // senkou_b_period = 0
-    }
-}
-
-/// Calculates Parabolic SAR (Stop and Reverse).
+/// Calculates Ichimoku Cloud indicator components
 ///
-/// # Arguments
-/// * `high_prices` - A Series of high price data.
-/// * `low_prices` - A Series of low price data.
-/// * `initial_af` - The initial acceleration factor (step), e.g., 0.02.
-/// * `max_af` - The maximum acceleration factor, e.g., 0.20.
+/// The Ichimoku Cloud is a comprehensive trend-following indicator that provides
+/// support/resistance levels, trend direction, and momentum information.
 ///
-/// # Returns
-/// A `PolarsResult<Series>` containing the Parabolic SAR values.
-pub fn calculate_psar(
-    high_prices: &Series,
-    low_prices: &Series,
-    initial_af: f64,
-    max_af: f64,
-) -> PolarsResult<Series> {
-    if initial_af <= 0.0 || max_af <= 0.0 || initial_af > max_af {
-        return Err(PolarsError::ComputeError(
-            "PSAR acceleration factors are invalid: initial_af and max_af must be > 0 and initial_af <= max_af.".into()
-        ));
-    }
-    if high_prices.len() != low_prices.len() {
-        return Err(PolarsError::ComputeError(
-            "High and Low price series must have the same length for PSAR.".into(),
-        ));
-    }
-    if high_prices.dtype() != &DataType::Float64 || low_prices.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError(
-            "High/Low series for PSAR must be Float64.".into(),
-        ));
-    }
-
-    let len = high_prices.len();
-    if len < 2 {
-        // Need at least two points to determine initial trend and calculate first SAR
-        return Ok(Series::new_null(high_prices.name().clone(), len));
-    }
-
-    let high_ca = high_prices.f64()?;
-    let low_ca = low_prices.f64()?;
-    let mut sar_values: Vec<Option<f64>> = vec![None; len];
-
-    // Initial values - cannot determine SAR for the very first point
-    let mut current_sar: f64;
-    let mut extreme_point: f64; // Extreme point (highest high in uptrend, lowest low in downtrend)
-    let mut af = initial_af;
-    let mut is_rising_trend: bool;
-
-    // Determine initial trend from the first two available points
-    // This is a common way, though some implementations might require more data or use a specific start logic.
-    if let (Some(h1), Some(l1), Some(h2), Some(l2)) =
-        (high_ca.get(0), low_ca.get(0), high_ca.get(1), low_ca.get(1))
-    {
-        if h2 > h1 {
-            // Tentative rising trend if second high is higher
-            is_rising_trend = true;
-            current_sar = l1; // Initial SAR is often the first low in a new uptrend
-            extreme_point = h1.max(h2); // Start with the highest high so far
-        } else if l2 < l1 {
-            // Tentative falling trend
-            is_rising_trend = false;
-            current_sar = h1; // Initial SAR is often the first high in a new downtrend
-            extreme_point = l1.min(l2); // Start with the lowest low so far
-        } else {
-            // Indecisive or equal, default to using the first low as SAR, assume uptrend for a start
-            is_rising_trend = true;
-            current_sar = l1;
-            extreme_point = h1;
-        }
-        sar_values[0] = Some(current_sar); // Some sources place first SAR at prev low/high
-                                           // Wilder used prior period's EP. First SAR can be subjective.
-                                           // For simplicity and testability, we put a value at index 0.
-                                           // Practical use often starts SAR from index 1 or after a clear trend is established.
-    } else {
-        return Ok(Series::new_null(high_prices.name().clone(), len)); // Not enough data if first points are null
-    }
-
-    // For simplicity, let's assume SAR for index 0 is the initial low/high and start calculation from index 1.
-    // A more common approach might be to have sar_values[0] = None, and sar_values[1] be the first calculated SAR.
-    // Let's adjust so sar_values[0] is None and the first SAR value is calculated for sar_values[1]
-
-    sar_values[0] = None; // No SAR for the very first bar
-
-    // Setup for the first calculable SAR at index 1
-    // This logic for the first actual SAR point (index 1) is crucial.
-    // Using the logic similar to TA-Lib: first SAR is previous low (uptrend) or high (downtrend).
-    if let (Some(h0), Some(l0)) = (high_ca.get(0), low_ca.get(0)) {
-        if high_ca.get(1).is_none() || low_ca.get(1).is_none() {
-            return Ok(Series::new_null(high_prices.name().clone(), len)); // If second point is null, can't proceed
-        }
-        let h1 = high_ca.get(1).unwrap();
-        let l1 = low_ca.get(1).unwrap();
-
-        if h1 > h0 && l1 > l0 {
-            // Initial trend assumed up if 2nd bar is higher high and higher low
-            is_rising_trend = true;
-            current_sar = l0;
-            extreme_point = h1;
-        } else if l1 < l0 && h1 < h0 {
-            // Initial trend assumed down
-            is_rising_trend = false;
-            current_sar = h0;
-            extreme_point = l1;
-        } else {
-            // Mixed or inside bar, default to prior low, assume uptrend
-            is_rising_trend = true;
-            current_sar = l0;
-            extreme_point = h1;
-        }
-        sar_values[1] = Some(current_sar);
-        af = initial_af;
-    } else {
-        return Ok(Series::new_null(high_prices.name().clone(), len)); // If first high/low is null
-    }
-
-    for i in 2..len {
-        if high_ca.get(i).is_none() || low_ca.get(i).is_none() {
-            sar_values[i] = None; // Propagate None if current H/L is None
-                                  // Resetting EP/AF or maintaining state on None is debatable. For now, just output None.
-                                  // A more robust solution might skip this point or reset after too many Nones.
-            continue;
-        }
-        let current_high = high_ca.get(i).unwrap();
-        let current_low = low_ca.get(i).unwrap();
-
-        let prev_sar = current_sar; // Store SAR before it's potentially updated for next iteration
-
-        if is_rising_trend {
-            current_sar = prev_sar + af * (extreme_point - prev_sar);
-            // Ensure SAR does not move above the prior two periods' lows
-            if let Some(l_prev1) = low_ca.get(i - 1) {
-                current_sar = current_sar.max(l_prev1);
-            }
-            if let Some(l_prev2) = low_ca.get(i - 2) {
-                current_sar = current_sar.max(l_prev2);
-            }
-
-            if current_low < current_sar {
-                // Trend reverses to falling
-                is_rising_trend = false;
-                current_sar = extreme_point; // SAR becomes the prior EP (highest high of uptrend)
-                extreme_point = current_low; // New EP is the current low
-                af = initial_af;
-            } else {
-                // Trend continues up
-                if current_high > extreme_point {
-                    extreme_point = current_high;
-                    af = (af + initial_af).min(max_af);
-                }
-            }
-        } else {
-            // Falling trend
-            current_sar = prev_sar - af * (prev_sar - extreme_point);
-            // Ensure SAR does not move below the prior two periods' highs
-            if let Some(h_prev1) = high_ca.get(i - 1) {
-                current_sar = current_sar.min(h_prev1);
-            }
-            if let Some(h_prev2) = high_ca.get(i - 2) {
-                current_sar = current_sar.min(h_prev2);
-            }
-
-            if current_high > current_sar {
-                // Trend reverses to rising
-                is_rising_trend = true;
-                current_sar = extreme_point; // SAR becomes the prior EP (lowest low of downtrend)
-                extreme_point = current_high; // New EP is the current high
-                af = initial_af;
-            } else {
-                // Trend continues down
-                if current_low < extreme_point {
-                    extreme_point = current_low;
-                    af = (af + initial_af).min(max_af);
-                }
-            }
-        }
-        sar_values[i] = Some(current_sar);
-    }
-
-    let mut series = Series::new("PSAR".into(), sar_values);
-    series.rename(format!("PSAR({},{})", initial_af, max_af).into());
-    Ok(series)
-}
-
-#[cfg(test)]
-mod psar_tests {
-    use super::*;
-    use polars::prelude::AnyValue;
-
-    fn create_test_series_psar(name: &str, data: Vec<Option<f64>>) -> Series {
-        Series::new(name.into(), data)
-    }
-
-    #[test]
-    fn test_psar_basic_rising_trend() -> PolarsResult<()> {
-        let highs = create_test_series_psar(
-            "high",
-            vec![Some(10.0), Some(11.0), Some(12.0), Some(13.0), Some(14.0)],
-        );
-        let lows = create_test_series_psar(
-            "low",
-            vec![Some(9.0), Some(10.0), Some(11.0), Some(12.0), Some(13.0)],
-        );
-        let initial_af = 0.02;
-        let max_af = 0.20;
-
-        let psar = calculate_psar(&highs, &lows, initial_af, max_af)?;
-        assert_eq!(psar.name(), "PSAR(0.02,0.2)");
-        assert_eq!(psar.len(), 5);
-
-        // Expected (manual trace, simplified, may differ slightly from TA-Lib due to exact tie-breaking/initialization):
-        // i=0: H=10, L=9. SAR=None
-        // i=1: H=11, L=10. Initial: Trend=Up (11>10, 10>9). sar=L0=9.0. EP=H1=11. AF=0.02. PSAR[1]=9.0
-        // i=2: H=12, L=11. Rising.
-        //      Prospective SAR = 9.0 + 0.02 * (11 - 9.0) = 9.0 + 0.02*2 = 9.04.
-        //      Max(L1,L0) = Max(10,9) = 10. SAR rule: sar=max(sar, L_prev1, L_prev2). SAR = Max(9.04, 10) = 10. (If L0 is used for i-2)
-        //      Let's recheck Wilder: SAR cannot be in or above prior two lows.
-        //      Simplified: sar = max(sar, low[i-1], low[i-2]) if available.
-        //      Here, L[i-1]=low[1]=10. SAR=max(9.04, 10) = 10.
-        //      L[i]=11 > SAR=10 (No reversal).
-        //      H[i]=12 > EP=11. New EP=12. AF = 0.02+0.02 = 0.04. PSAR[2]=10.0.
-        // i=3: H=13, L=12. Rising. SAR_prev=10.0, EP_prev=12, AF_prev=0.04
-        //      Prospective SAR = 10.0 + 0.04 * (12 - 10.0) = 10.0 + 0.04*2 = 10.08.
-        //      Max(L2,L1) = Max(11,10) = 11. SAR = Max(10.08, 11) = 11.
-        //      L[i]=12 > SAR=11 (No reversal).
-        //      H[i]=13 > EP=12. New EP=13. AF = 0.04+0.02 = 0.06. PSAR[3]=11.0.
-        // i=4: H=14, L=13. Rising. SAR_prev=11.0, EP_prev=13, AF_prev=0.06
-        //      Prospective SAR = 11.0 + 0.06 * (13 - 11.0) = 11.0 + 0.06*2 = 11.12.
-        //      Max(L3,L2) = Max(12,11) = 12. SAR = Max(11.12, 12) = 12.
-        //      L[i]=13 > SAR=12 (No reversal).
-        //      H[i]=14 > EP=13. New EP=14. AF = 0.06+0.02 = 0.08. PSAR[4]=12.0.
-
-        assert_eq!(psar.get(0).unwrap(), AnyValue::Null);
-        assert_eq!(psar.get(1).unwrap().try_extract::<f64>().unwrap(), 9.0);
-        assert_eq!(psar.get(2).unwrap().try_extract::<f64>().unwrap(), 10.0);
-        assert_eq!(psar.get(3).unwrap().try_extract::<f64>().unwrap(), 11.0);
-        assert_eq!(psar.get(4).unwrap().try_extract::<f64>().unwrap(), 12.0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_psar_basic_falling_trend() -> PolarsResult<()> {
-        let highs = create_test_series_psar(
-            "high",
-            vec![Some(14.0), Some(13.0), Some(12.0), Some(11.0), Some(10.0)],
-        );
-        let lows = create_test_series_psar(
-            "low",
-            vec![Some(13.0), Some(12.0), Some(11.0), Some(10.0), Some(9.0)],
-        );
-        let initial_af = 0.02;
-        let max_af = 0.20;
-        let psar = calculate_psar(&highs, &lows, initial_af, max_af)?;
-
-        // i=0: H=14, L=13. SAR=None
-        // i=1: H=13, L=12. Initial: Trend=Down (13<14, 12<13). sar=H0=14.0. EP=L1=12. AF=0.02. PSAR[1]=14.0
-        // i=2: H=12, L=11. Falling. SAR_prev=14.0, EP_prev=12, AF_prev=0.02
-        //      Prospective SAR = 14.0 - 0.02 * (14.0 - 12) = 14.0 - 0.02*2 = 13.96.
-        //      Min(H1,H0) = Min(13,14) = 13. SAR = Min(13.96, 13) = 13.
-        //      H[i]=12 < SAR=13 (No reversal).
-        //      L[i]=11 < EP=12. New EP=11. AF = 0.02+0.02 = 0.04. PSAR[2]=13.0.
-        // i=3: H=11, L=10. Falling. SAR_prev=13.0, EP_prev=11, AF_prev=0.04
-        //      Prospective SAR = 13.0 - 0.04 * (13.0 - 11) = 13.0 - 0.04*2 = 12.92.
-        //      Min(H2,H1) = Min(12,13) = 12. SAR = Min(12.92, 12) = 12.
-        //      H[i]=11 < SAR=12 (No reversal).
-        //      L[i]=10 < EP=11. New EP=10. AF = 0.04+0.02 = 0.06. PSAR[3]=12.0.
-        // i=4: H=10, L=9. Falling. SAR_prev=12.0, EP_prev=10, AF_prev=0.06
-        //      Prospective SAR = 12.0 - 0.06 * (12.0 - 10) = 12.0 - 0.06*2 = 11.88.
-        //      Min(H3,H2) = Min(11,12) = 11. SAR = Min(11.88, 11) = 11.
-        //      H[i]=10 < SAR=11 (No reversal).
-        //      L[i]=9 < EP=10. New EP=9. AF = 0.06+0.02 = 0.08. PSAR[4]=11.0.
-
-        assert_eq!(psar.get(0).unwrap(), AnyValue::Null);
-        assert_eq!(psar.get(1).unwrap().try_extract::<f64>().unwrap(), 14.0);
-        assert_eq!(psar.get(2).unwrap().try_extract::<f64>().unwrap(), 13.0);
-        assert_eq!(psar.get(3).unwrap().try_extract::<f64>().unwrap(), 12.0);
-        assert_eq!(psar.get(4).unwrap().try_extract::<f64>().unwrap(), 11.0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_psar_reversal() -> PolarsResult<()> {
-        let highs = create_test_series_psar(
-            "high",
-            vec![Some(10.0), Some(11.0), Some(10.5), Some(9.0), Some(8.0)],
-        );
-        let lows = create_test_series_psar(
-            "low",
-            vec![Some(9.5), Some(10.2), Some(9.0), Some(8.5), Some(7.0)],
-        );
-        let initial_af = 0.02;
-        let max_af = 0.20;
-
-        let psar = calculate_psar(&highs, &lows, initial_af, max_af)?;
-
-        // i=0: H=10.0, L=9.5. SAR=None
-        // i=1: H=11.0, L=10.2. Initial: Up. sar=L0=9.5. EP=H1=11.0. AF=0.02. PSAR[1]=9.5
-        // i=2: H=10.5, L=9.0. Rising. SAR_prev=9.5, EP_prev=11.0, AF_prev=0.02
-        //      Prospective SAR = 9.5 + 0.02 * (11.0 - 9.5) = 9.5 + 0.02*1.5 = 9.53.
-        //      Max(L1,L0) = Max(10.2, 9.5) = 10.2. SAR = Max(9.53, 10.2)=10.2.
-        //      L[i]=9.0 < SAR=10.2 (REVERSAL!)
-        //      Trend becomes Falling. SAR = EP_prev(high)=11.0. New EP = L[i]=9.0. AF=0.02. PSAR[2]=11.0
-        // i=3: H=9.0, L=8.5. Falling. SAR_prev=11.0, EP_prev=9.0, AF_prev=0.02
-        //      Prospective SAR = 11.0 - 0.02 * (11.0 - 9.0) = 11.0 - 0.02*2 = 10.96.
-        //      Min(H2,H1) = Min(10.5,11.0) = 10.5. SAR = Min(10.96, 10.5) = 10.5.
-        //      H[i]=9.0 < SAR=10.5 (No reversal).
-        //      L[i]=8.5 < EP=9.0. New EP=8.5. AF = 0.02+0.02 = 0.04. PSAR[3]=10.5.
-        // i=4: H=8.0, L=7.0. Falling. SAR_prev=10.5, EP_prev=8.5, AF_prev=0.06
-        //      Prospective SAR = 10.5 - 0.06 * (10.5 - 8.5) = 10.5 - 0.06*2 = 10.42.
-        //      Min(H3,H2) = Min(9.0,10.5) = 9.0. SAR = Min(10.42, 9.0) = 9.0.
-        //      H[i]=8.0 < SAR=9.0 (No reversal).
-        //      L[i]=7.0 < EP=8.5. New EP=7.0. AF = 0.06+0.02 = 0.08. PSAR[4]=9.0.
-
-        assert_eq!(psar.get(0).unwrap(), AnyValue::Null);
-        assert_eq!(
-            psar.get(1).unwrap().try_extract::<f64>().unwrap(),
-            9.5,
-            "PSAR[1]"
-        );
-        assert_eq!(
-            psar.get(2).unwrap().try_extract::<f64>().unwrap(),
-            11.0,
-            "PSAR[2] Reversal"
-        );
-        assert_eq!(
-            psar.get(3).unwrap().try_extract::<f64>().unwrap(),
-            10.5,
-            "PSAR[3]"
-        );
-        assert_eq!(
-            psar.get(4).unwrap().try_extract::<f64>().unwrap(),
-            9.0,
-            "PSAR[4]"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_psar_invalid_af_inputs() {
-        let highs = create_test_series_psar("high", vec![Some(10.0), Some(11.0)]);
-        let lows = create_test_series_psar("low", vec![Some(9.0), Some(10.0)]);
-        assert!(calculate_psar(&highs, &lows, 0.0, 0.2).is_err());
-        assert!(calculate_psar(&highs, &lows, 0.02, 0.0).is_err());
-        assert!(calculate_psar(&highs, &lows, 0.2, 0.02).is_err()); // initial_af > max_af
-    }
-
-    #[test]
-    fn test_psar_insufficient_data() -> PolarsResult<()> {
-        let highs = create_test_series_psar("high", vec![Some(10.0)]);
-        let lows = create_test_series_psar("low", vec![Some(9.0)]);
-        let psar = calculate_psar(&highs, &lows, 0.02, 0.2)?;
-        assert_eq!(psar.len(), 1);
-        assert!(psar.is_null().all());
-
-        let highs_empty = create_test_series_psar("high_empty", Vec::<Option<f64>>::new());
-        let lows_empty = create_test_series_psar("low_empty", Vec::<Option<f64>>::new());
-        let psar_empty = calculate_psar(&highs_empty, &lows_empty, 0.02, 0.2)?;
-        assert_eq!(psar_empty.len(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_psar_with_nones_in_data() -> PolarsResult<()> {
-        let highs = create_test_series_psar(
-            "high",
-            vec![Some(10.0), Some(11.0), None, Some(13.0), Some(14.0)],
-        );
-        let lows = create_test_series_psar(
-            "low",
-            vec![Some(9.0), Some(10.0), Some(11.0), Some(12.0), Some(13.0)],
-        );
-        let psar = calculate_psar(&highs, &lows, 0.02, 0.2)?;
-
-        assert_eq!(psar.get(0).unwrap(), AnyValue::Null);
-        assert!(psar.get(1).unwrap().try_extract::<f64>().is_ok()); // Should be calculable
-        assert_eq!(psar.get(2).unwrap(), AnyValue::Null); // high is None
-        assert!(psar.get(3).unwrap().try_extract::<f64>().is_ok()); // Should resume if state is maintained or reset properly
-                                                                    // My current impl will produce Some if prev state was valid.
-        Ok(())
-    }
-}
-
-/// Calculates the Vortex Indicator (VI+ and VI-).
-///
-/// # Arguments
+/// # Arguments  
+/// * `high_prices` - High prices series
+/// * `low_prices` - Low prices series
+/// * `close_prices` - Close prices series
+/// * `tenkan_period` - Tenkan-sen (Conversion Line) period (typically 9)
+/// * `kijun_period` - Kijun-sen (Base Line) period (typically 26)
+/// * `senkou_span_b_period` - Senkou Span B period (typically 52)
 /// * `high_prices` - A Series of high price data.
 /// * `low_prices` - A Series of low price data.
 /// * `close_prices` - A Series of close price data (needed for True Range).

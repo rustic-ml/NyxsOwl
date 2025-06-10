@@ -1,8 +1,11 @@
-//! # NyxsOwl
+//! NyxsOwl: A comprehensive financial analysis library for Rust
 //!
-//! A comprehensive Rust library for trading, forecasting, and financial analysis
-//! Named after Nyx (Greek goddess of night, symbolizing strategic advantage) and
-//! Bubo (wise owl, representing wisdom and strategy).
+//! NyxsOwl provides production-ready quantitative finance tools including:
+//! - Technical indicators (40+ indicators with SIMD optimization)
+//! - Advanced forecasting strategies (7 models with adaptive features)
+//! - High-performance backtesting framework
+//! - Real-time market data processing
+//! - Institutional-grade risk management
 //!
 //! ## Quick Start
 //!
@@ -68,22 +71,31 @@ pub mod simple_types {
     /// Position type for trading signals
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum PositionType {
+        /// Long position
         Long,
+        /// Short position
         Short,
+        /// Hold position
         Hold,
     }
 
     /// Enhanced trading signal with additional metadata (for examples)
     #[derive(Debug, Clone, PartialEq)]
     pub struct SignalData {
+        /// The trading signal
         pub signal: Signal,
+        /// The position type
         pub position_type: PositionType,
+        /// Optional timestamp of the signal
         pub timestamp: Option<chrono::DateTime<chrono::Utc>>,
+        /// Confidence level of the signal (0.0 to 1.0)
         pub confidence: f64,
+        /// Optional metadata with additional signal information
         pub metadata: Option<std::collections::HashMap<String, f64>>,
     }
 
     impl SignalData {
+        /// Create a new SignalData with default values
         pub fn new(signal: Signal) -> Self {
             let position_type = match signal {
                 Signal::Buy => PositionType::Long,
@@ -100,16 +112,19 @@ pub mod simple_types {
             }
         }
 
+        /// Set the confidence level of the signal
         pub fn with_confidence(mut self, confidence: f64) -> Self {
             self.confidence = confidence;
             self
         }
 
+        /// Set the timestamp of the signal
         pub fn with_timestamp(mut self, timestamp: chrono::DateTime<chrono::Utc>) -> Self {
             self.timestamp = Some(timestamp);
             self
         }
 
+        /// Set the metadata of the signal
         pub fn with_metadata(mut self, metadata: std::collections::HashMap<String, f64>) -> Self {
             self.metadata = Some(metadata);
             self
@@ -168,15 +183,21 @@ pub mod simple_types {
 }
 
 // Export main modules
+/// Async and parallel processing capabilities for concurrent forecasting
 pub mod async_parallel;
+/// Memory optimization utilities and cache-conscious data structures
 pub mod memory_optimized; // Cache-conscious data structures and memory optimization
+/// High-performance SIMD-accelerated operations and utilities
 pub mod performance_utils; // High-performance SIMD-accelerated operations
+/// Core module for technical indicator calculations and trading math
 pub mod trade_math; // Core module for technical indicator calculations // Async/parallel processing for concurrent forecasting
 
 #[cfg(feature = "forecasting")] // Keep forecasting feature-gated if it's substantial
+/// Advanced forecasting models and strategies
 pub mod forecasting;
 
 // Enable technical strategies module
+/// Technical analysis strategies and implementations
 pub mod technical_strategies;
 
 // Remove old/unused module declarations and re-exports

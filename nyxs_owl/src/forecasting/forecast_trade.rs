@@ -130,7 +130,7 @@ pub fn forecast_arima(
     let final_data = if use_cleaned { &cleaned_data } else { &data };
 
     // Data stability check
-    if let Err(stability_error) = validate_data_stability(&final_data) {
+    if let Err(stability_error) = validate_data_stability(final_data) {
         warn!(
             "forecast_arima: Data stability check failed: {}",
             stability_error
@@ -280,7 +280,7 @@ fn validate_data_stability(data: &[f64]) -> Result<(), String> {
 
     if var1 > 0.0 && var2 > 0.0 {
         let variance_ratio = var2 / var1;
-        if variance_ratio > 4.0 || variance_ratio < 0.25 {
+        if !(0.25..=4.0).contains(&variance_ratio) {
             return Err(format!(
                 "Significant variance change detected (ratio: {:.3})",
                 variance_ratio

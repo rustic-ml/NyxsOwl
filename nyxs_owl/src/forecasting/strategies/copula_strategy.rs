@@ -96,7 +96,7 @@ impl CopulaStrategyConfig {
             ));
         }
 
-        if correlation_threshold < 0.0 || correlation_threshold > 1.0 {
+        if !(0.0..=1.0).contains(&correlation_threshold) {
             return Err(NyxsOwlError::InvalidParameter(
                 "Correlation threshold must be between 0 and 1".to_string(),
             ));
@@ -797,7 +797,7 @@ impl CopulaStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_dataframe(prices1: Vec<f64>, prices2: Vec<f64>) -> DataFrame {
         assert_eq!(prices1.len(), prices2.len());

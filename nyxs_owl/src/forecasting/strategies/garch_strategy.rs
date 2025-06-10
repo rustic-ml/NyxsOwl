@@ -724,7 +724,7 @@ impl GarchStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_dataframe(prices: Vec<f64>) -> DataFrame {
         let timestamps: Vec<String> = (0..prices.len())

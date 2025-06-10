@@ -165,7 +165,7 @@ impl RegimeSwitchingConfig {
         volatility_threshold: f64,
         return_threshold: f64,
     ) -> Result<Self> {
-        if num_regimes < 2 || num_regimes > 6 {
+        if !(2..=6).contains(&num_regimes) {
             return Err(NyxsOwlError::InvalidParameter(
                 "Number of regimes must be between 2 and 6".to_string(),
             ));
@@ -505,7 +505,7 @@ impl RegimeSwitchingStrategy {
             let mut probs = vec![0.1; self.config.num_regimes];
             match current_regime {
                 MarketRegime::Bull => {
-                    if probs.len() > 0 {
+                    if !probs.is_empty() {
                         probs[0] = 0.8;
                     }
                 }
@@ -520,7 +520,7 @@ impl RegimeSwitchingStrategy {
                     }
                 }
                 _ => {
-                    if probs.len() > 0 {
+                    if !probs.is_empty() {
                         probs[0] = 0.4;
                     }
                 } // Default distribution
@@ -961,7 +961,7 @@ impl RegimeSwitchingStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_dataframe(prices: Vec<f64>) -> DataFrame {
         let timestamps: Vec<String> = (0..prices.len())

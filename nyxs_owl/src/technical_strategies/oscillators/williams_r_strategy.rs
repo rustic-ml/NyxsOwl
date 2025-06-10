@@ -11,7 +11,7 @@
 use crate::forecasting::{Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{
-    PerformanceMetrics, SignalFilter, TechnicalSignal, TechnicalStrategy,
+    PerformanceMetrics, TechnicalSignal, TechnicalStrategy,
 };
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -49,15 +49,15 @@ pub struct WilliamsRStrategy {
 }
 
 impl WilliamsRStrategy {
-    /// Create a new Williams %R strategy
+    /// Create a new Williams %R strategy with custom configuration
     pub fn new(config: WilliamsRConfig) -> Self {
         Self {
             config,
-            strategy_config: StrategyConfig::default(),
+            strategy_config: StrategyConfig::new(),
         }
     }
 
-    /// Create strategy with custom StrategyConfig
+    /// Create a new Williams %R strategy with both configs
     pub fn with_strategy_config(config: WilliamsRConfig, strategy_config: StrategyConfig) -> Self {
         Self {
             config,
@@ -89,7 +89,7 @@ impl WilliamsRStrategy {
             for j in start_idx..end_idx {
                 let high = high_prices.get(j).unwrap_or(0.0);
                 let low = low_prices.get(j).unwrap_or(0.0);
-                
+
                 if high > 0.0 && low > 0.0 {
                     highest_high = highest_high.max(high);
                     lowest_low = lowest_low.min(low);
@@ -98,9 +98,10 @@ impl WilliamsRStrategy {
 
             // Calculate Williams %R
             let close = close_prices.get(i).unwrap_or(0.0);
-            
+
             if close > 0.0 && highest_high != lowest_low && highest_high > 0.0 && lowest_low > 0.0 {
-                let williams_r_value = ((highest_high - close) / (highest_high - lowest_low)) * -100.0;
+                let williams_r_value =
+                    ((highest_high - close) / (highest_high - lowest_low)) * -100.0;
                 williams_r.push(williams_r_value);
             } else {
                 williams_r.push(-50.0); // Neutral value when range is zero
@@ -157,6 +158,29 @@ impl WilliamsRStrategy {
 
         signals
     }
+
+    /// Calculate maximum drawdown from equity curve
+    fn calculate_max_drawdown(equity_curve: &[f64]) -> f64 {
+        if equity_curve.len() < 2 {
+            return 0.0;
+        }
+
+        let mut max_drawdown = 0.0;
+        let mut peak = equity_curve[0];
+
+        for &equity in equity_curve.iter().skip(1) {
+            if equity > peak {
+                peak = equity;
+            } else {
+                let drawdown = (peak - equity) / peak;
+                if drawdown > max_drawdown {
+                    max_drawdown = drawdown;
+                }
+            }
+        }
+
+        max_drawdown
+    }
 }
 
 impl TechnicalStrategy for WilliamsRStrategy {
@@ -183,16 +207,20 @@ impl TechnicalStrategy for WilliamsRStrategy {
     ) -> NyxsOwlResult<PerformanceMetrics> {
         let close_prices = data.column("close")?.f64()?;
         let mut total_return = 0.0;
-        let mut total_trades = 0;
-        let mut winning_trades = 0;
         let mut returns = Vec::new();
+        let mut winning_trades = 0;
+        let mut total_trades = 0;
+        let mut equity_curve = Vec::new();
+        let mut current_equity = 1.0; // Start with 1.0 (100%)
 
-        // Simple performance calculation
-        for i in 1..signals.len().min(close_prices.len()) {
+        // Track equity curve for max drawdown calculation
+        equity_curve.push(current_equity);
+
+        for i in 1..signals.len() {
             if signals[i - 1].signal != Signal::Hold {
                 let prev_close = close_prices.get(i - 1).unwrap_or(0.0);
                 let curr_close = close_prices.get(i).unwrap_or(0.0);
-                
+
                 if prev_close > 0.0 && curr_close > 0.0 {
                     let return_pct = match signals[i - 1].signal {
                         Signal::Buy => (curr_close - prev_close) / prev_close,
@@ -204,12 +232,23 @@ impl TechnicalStrategy for WilliamsRStrategy {
                     returns.push(return_pct);
                     total_trades += 1;
 
+                    // Update equity curve
+                    current_equity *= 1.0 + return_pct;
+                    equity_curve.push(current_equity);
+
                     if return_pct > 0.0 {
                         winning_trades += 1;
                     }
+                } else {
+                    equity_curve.push(current_equity);
                 }
+            } else {
+                equity_curve.push(current_equity);
             }
         }
+
+        // Calculate maximum drawdown
+        let max_drawdown = Self::calculate_max_drawdown(&equity_curve);
 
         let win_rate = if total_trades > 0 {
             winning_trades as f64 / total_trades as f64
@@ -241,7 +280,7 @@ impl TechnicalStrategy for WilliamsRStrategy {
         Ok(PerformanceMetrics {
             total_return,
             sharpe_ratio,
-            max_drawdown: 0.0, // TODO: Implement proper max drawdown calculation
+            max_drawdown,
             win_rate,
             total_trades,
             avg_trade_return: avg_return,
@@ -304,13 +343,24 @@ impl Strategy for WilliamsRStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_data() -> DataFrame {
-        let dates = (0..50).map(|i| format!("2024-01-{:02}", i + 1)).collect::<Vec<_>>();
-        let highs: Vec<f64> = (0..50).map(|i| 100.0 + (i as f64 * 0.5) + ((i % 7) as f64)).collect();
-        let lows: Vec<f64> = highs.iter().map(|&h| h - 2.0 - ((h as usize % 3) as f64)).collect();
-        let closes: Vec<f64> = highs.iter().zip(lows.iter()).map(|(&h, &l)| l + (h - l) * 0.6).collect();
+        let dates = (0..50)
+            .map(|i| format!("2024-01-{:02}", i + 1))
+            .collect::<Vec<_>>();
+        let highs: Vec<f64> = (0..50)
+            .map(|i| 100.0 + (i as f64 * 0.5) + ((i % 7) as f64))
+            .collect();
+        let lows: Vec<f64> = highs
+            .iter()
+            .map(|&h| h - 2.0 - ((h as usize % 3) as f64))
+            .collect();
+        let closes: Vec<f64> = highs
+            .iter()
+            .zip(lows.iter())
+            .map(|(&h, &l)| l + (h - l) * 0.6)
+            .collect();
         let volumes: Vec<f64> = (0..50).map(|_| 10000.0).collect();
 
         df! {
@@ -319,7 +369,8 @@ mod tests {
             "low" => lows,
             "close" => closes,
             "volume" => volumes,
-        }.unwrap()
+        }
+        .unwrap()
     }
 
     #[test]

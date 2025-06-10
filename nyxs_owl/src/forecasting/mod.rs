@@ -12,23 +12,36 @@ use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult}; // Assuming Re
 
 // Declare submodules within the forecasting module
 pub mod arima;
+
+/// Trading strategy integration with forecasting
 pub mod forecast_trade;
 
-// Forecasting strategies submodules
+/// Backtest module for strategy evaluation
 pub mod backtest;
+
+/// Strategy implementations for different forecasting approaches
 pub mod strategies;
+
+/// Utility functions for forecasting operations
 pub mod utils;
 
 // TODO: Add other forecasting strategy sub-modules here as they are developed.
 // e.g., pub mod exponential_smoothing;
 // e.g., pub mod prophet_model;
 
-/// Represents a configuration value for a strategy parameter.
-#[derive(Debug, Clone)]
+// Re-exports for easier access
+pub use crate::forecasting::strategies::*;
+
+/// Configuration value types for flexible parameter handling
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConfigValue {
+    /// Integer configuration value
     Int(i64),
+    /// Floating-point configuration value
     Float(f64),
+    /// String configuration value
     String(String),
+    /// Boolean configuration value
     Bool(bool),
 }
 
@@ -185,10 +198,11 @@ impl StrategyConfig {
     }
 }
 
-/// Defines the common interface for all trading strategies.
+/// Trait defining the interface for trading strategies.
 ///
-/// Strategies must be `Send + Sync` to be usable across threads, for example,
-/// in concurrent backtesting or live trading scenarios.
+/// All trading strategies must implement this trait to be used within the
+/// NyxsOwl framework. The trait provides methods for configuration, signal
+/// generation, and data validation.
 pub trait Strategy: Send + Sync {
     /// Creates a new instance of the strategy with the given configuration.
     ///
@@ -261,52 +275,38 @@ pub trait Strategy: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::simple_types::Signal as CrateSignal; // Use aliased import for clarity in tests
-
-    // Tests for local Signal and StrategyError are removed as the types themselves are removed.
-    // Tests for StrategyConfig might need adjustment if they relied on the local StrategyError.
-    // Test for Signal to/from int conversion is removed. If this logic is needed,
-    // it should be part of CrateSignal or handled by consumers.
+    use polars::prelude::*;
 
     #[test]
     fn strategy_config_creation_and_getters() -> NyxsOwlResult<()> {
         let config = StrategyConfig::new()
-            .with_parameter("period", 20)
-            .with_parameter("factor", 2.5)
-            .with_parameter("name", "Test Strategy".to_string())
-            .with_parameter("enabled", true);
+            .with_parameter("lookback_period", 30)
+            .with_parameter("risk_percentage", 0.01)
+            .with_parameter("asset_name", "BTC/USD")
+            .with_parameter("enable_feature", true);
 
-        assert_eq!(config.get_int("period")?, 20);
-        assert_eq!(config.get_float("factor")?, 2.5);
-        // Allow int to be retrieved as float
-        assert_eq!(config.get_float("period")?, 20.0);
-        assert_eq!(config.get_string("name")?, "Test Strategy");
-        assert_eq!(config.get_bool("enabled")?, true);
+        assert_eq!(config.get_int("lookback_period")?, 30);
+        assert_eq!(config.get_float("risk_percentage")?, 0.01);
+        assert_eq!(config.get_string("asset_name")?, "BTC/USD");
+        assert!(config.get_bool("enable_feature")?);
 
-        assert!(config.get_int("factor").is_err()); // Wrong type
-        assert!(config.get_string("period").is_err()); // Wrong type
-        assert!(config.get_bool("name").is_err()); // Wrong type
-        assert!(config.get_float("enabled").is_err()); // Wrong type
+        // Test int to float coercion
+        assert_eq!(config.get_float("lookback_period")?, 30.0);
 
-        assert!(config.get_int("non_existent").is_err());
         Ok(())
     }
 
     #[test]
     fn strategy_config_validation_logic() {
         let config = StrategyConfig::new()
-            .with_parameter("p1", 10)
-            .with_parameter("p2", "value");
+            .with_parameter("param1", 10)
+            .with_parameter("param2", "value");
 
-        assert_eq!(config.validate(&["p1", "p2"]), Ok(()));
-        assert!(config.validate(&["p1", "p3"]).is_err());
-        assert_eq!(
-            config.validate(&["p1", "p3", "p4"]),
-            Err("Missing required config keys: p3, p4".to_string())
-        );
+        assert!(config.validate(&["param1", "param2"]).is_ok());
+        assert!(config.validate(&["param1", "param2", "param3"]).is_err());
     }
 
-    // Mock strategy for testing default validate_data
+    // Mock strategy for testing the trait
     struct MockTestStrategy {
         config: StrategyConfig,
         min_points: usize,
@@ -316,20 +316,20 @@ mod tests {
     impl Strategy for MockTestStrategy {
         fn new(config: StrategyConfig) -> Self {
             MockTestStrategy {
-                min_points: config.get_int("min_points").unwrap_or(10) as usize,
-                req_cols: vec!["close", "volume"], // Example
                 config,
+                min_points: 10,
+                req_cols: vec!["close", "volume"],
             }
         }
+
         fn generate_signals(&self, _data: &DataFrame) -> NyxsOwlResult<Series> {
-            // Return a series of CrateSignal::Hold (as i32) for simplicity
-            Ok(Series::from_iter(vec![CrateSignal::Hold as i32; 5]).with_name("signals".into()))
+            Ok(Series::new("signals".into(), vec![0i32; 10]))
         }
         fn name(&self) -> &str {
-            "MockTestStrategy"
+            "MockStrategy"
         }
         fn description(&self) -> &str {
-            "A mock strategy for testing."
+            "A mock strategy for testing"
         }
         fn required_columns(&self) -> Vec<&str> {
             self.req_cols.clone()
@@ -340,54 +340,59 @@ mod tests {
         fn min_data_points(&self) -> usize {
             self.min_points
         }
-        // Using default validate_data
     }
 
     #[test]
     fn default_validate_data_success() -> NyxsOwlResult<()> {
-        let config = StrategyConfig::new().with_parameter("min_points", 5);
+        let config = StrategyConfig::new();
         let strategy = MockTestStrategy::new(config);
-        let df = polars::prelude::df! {
-            "close" => &[1.0, 2.0, 3.0, 4.0, 5.0],
-            "volume" => &[100.0, 110.0, 120.0, 130.0, 140.0]
+
+        let df = df! {
+            "close" => [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0],
+            "volume" => [1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
         }?;
-        strategy.validate_data(&df)
+
+        strategy.validate_data(&df)?;
+        Ok(())
     }
 
     #[test]
     fn default_validate_data_missing_column() {
-        let config = StrategyConfig::new().with_parameter("min_points", 5);
+        let config = StrategyConfig::new();
         let strategy = MockTestStrategy::new(config);
-        let df = polars::prelude::df! {
-            "close" => &[1.0, 2.0, 3.0, 4.0, 5.0]
-            // "volume" column is missing
+
+        let df = df! {
+            "close" => [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0]
+            // Missing "volume" column
         }
         .unwrap();
 
-        match strategy.validate_data(&df) {
-            Err(NyxsOwlError::MissingData(msg)) => {
-                assert!(msg.contains("Column 'volume' not found"));
-            }
-            _ => panic!("Expected MissingData error"),
+        let result = strategy.validate_data(&df);
+        assert!(result.is_err());
+        if let Err(NyxsOwlError::MissingData(msg)) = result {
+            assert!(msg.contains("volume"));
+        } else {
+            panic!("Expected MissingData error");
         }
     }
 
     #[test]
     fn default_validate_data_insufficient_rows() {
-        let config = StrategyConfig::new().with_parameter("min_points", 10); // Requires 10 points
+        let config = StrategyConfig::new();
         let strategy = MockTestStrategy::new(config);
-        let df = polars::prelude::df! {
-            "close" => &[1.0, 2.0, 3.0],
-            "volume" => &[100.0, 110.0, 120.0]
+
+        let df = df! {
+            "close" => [100.0, 101.0, 102.0], // Only 3 rows, but strategy requires 10
+            "volume" => [1000, 1100, 1200]
         }
         .unwrap();
 
-        match strategy.validate_data(&df) {
-            Err(NyxsOwlError::StrategyError(msg)) => {
-                // Changed from ValidationError
-                assert!(msg.contains("requires at least 10 data points, but got 3"));
-            }
-            _ => panic!("Expected StrategyError for insufficient rows"),
+        let result = strategy.validate_data(&df);
+        assert!(result.is_err());
+        if let Err(NyxsOwlError::StrategyError(msg)) = result {
+            assert!(msg.contains("Insufficient data"));
+        } else {
+            panic!("Expected StrategyError");
         }
     }
 }

@@ -80,7 +80,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
     fn validate_parameters(&self) -> NyxsOwlResult<()> {
         // Validate signal strength parameter
         if let Ok(min_strength) = self.config.get_float("min_signal_strength") {
-            if min_strength < 0.0 || min_strength > 1.0 {
+            if !(0.0..=1.0).contains(&min_strength) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_signal_strength must be between 0.0 and 1.0".to_string(),
                 ));
@@ -89,7 +89,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
 
         // Validate confidence parameter
         if let Ok(min_confidence) = self.config.get_float("min_confidence") {
-            if min_confidence < 0.0 || min_confidence > 1.0 {
+            if !(0.0..=1.0).contains(&min_confidence) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_confidence must be between 0.0 and 1.0".to_string(),
                 ));
@@ -150,7 +150,7 @@ mod tests {
         let data = create_test_data();
 
         let signals = strategy.generate_enhanced_signals(&data).unwrap();
-        assert!(signals.len() > 0);
+        assert!(!signals.is_empty());
 
         // Check that some signals have metadata from multiple sources
         let non_hold_signals: Vec<_> = signals
@@ -160,7 +160,7 @@ mod tests {
 
         if !non_hold_signals.is_empty() {
             // Should have combined metadata from different signal sources
-            assert!(non_hold_signals[0].metadata.len() >= 1);
+            assert!(!non_hold_signals[0].metadata.is_empty());
         }
     }
 

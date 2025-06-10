@@ -497,8 +497,8 @@ mod tests {
 
     #[test]
     fn test_batch_processing() {
-        let series1 = vec![1.0, 2.0, 3.0, 4.0];
-        let series2 = vec![2.0, 4.0, 6.0, 8.0];
+        let series1 = [1.0, 2.0, 3.0, 4.0];
+        let series2 = [2.0, 4.0, 6.0, 8.0];
         let series_data = vec![&series1[..], &series2[..]];
 
         let means = SimdBatch::batch_means(&series_data);

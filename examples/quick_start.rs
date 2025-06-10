@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         // Extract values to Vec for display
         let sma_values: Vec<Option<f64>> = sma_series.f64().unwrap().into_iter().collect();
         println!("SMA(3): {:?}", sma_values);
-        if let Some(latest_sma) = sma_values.iter().filter_map(|&x| x).last() {
+        if let Some(latest_sma) = sma_values.iter().filter_map(|&x| x).next_back() {
             println!("Latest SMA: {:.2}", latest_sma);
         }
     }
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     if let Ok(ema_series) = calculate_ema(&prices, 3, 2.0) {
         let ema_values: Vec<Option<f64>> = ema_series.f64().unwrap().into_iter().collect();
         println!("EMA(3): {:?}", ema_values);
-        if let Some(latest_ema) = ema_values.iter().filter_map(|&x| x).last() {
+        if let Some(latest_ema) = ema_values.iter().filter_map(|&x| x).next_back() {
             println!("Latest EMA: {:.2}", latest_ema);
         }
     }
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     if let Ok(rsi_series) = calculate_rsi(&prices, 5) {
         let rsi_values: Vec<Option<f64>> = rsi_series.f64().unwrap().into_iter().collect();
         println!("RSI(5): {:?}", rsi_values);
-        if let Some(latest_rsi) = rsi_values.iter().filter_map(|&x| x).last() {
+        if let Some(latest_rsi) = rsi_values.iter().filter_map(|&x| x).next_back() {
             println!("Latest RSI: {:.2}", latest_rsi);
 
             // Simple trading signal based on RSI
@@ -70,9 +70,9 @@ fn main() -> Result<()> {
         let lower_values: Vec<Option<f64>> = lower_band.f64().unwrap().into_iter().collect();
 
         if let (Some(upper), Some(middle), Some(lower)) = (
-            upper_values.iter().filter_map(|&x| x).last(),
-            middle_values.iter().filter_map(|&x| x).last(),
-            lower_values.iter().filter_map(|&x| x).last(),
+            upper_values.iter().filter_map(|&x| x).next_back(),
+            middle_values.iter().filter_map(|&x| x).next_back(),
+            lower_values.iter().filter_map(|&x| x).next_back(),
         ) {
             println!("\n📊 Bollinger Bands (5, 2.0):");
             println!("Upper Band:  {:.2}", upper);

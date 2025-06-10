@@ -521,7 +521,7 @@ impl AdaptiveEnsembleStrategy {
             let performance_vec = self
                 .performance_history
                 .entry(forecast.model_name.clone())
-                .or_insert_with(Vec::new);
+                .or_default();
 
             performance_vec.push(accuracy);
 
@@ -611,7 +611,7 @@ impl AdaptiveEnsembleStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_data(len: usize) -> PolarsResult<DataFrame> {
         let timestamps: Vec<String> = (0..len).map(|i| format!("2023-01-{:02}", i + 1)).collect();

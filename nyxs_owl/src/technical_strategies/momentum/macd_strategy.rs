@@ -3,8 +3,7 @@
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::momentum::calculate_macd;
-use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, DataType, Float64Type, NamedFrom, PolarsResult, Series};
+use polars::prelude::*;
 
 /// Generates trading signals based on MACD line and Signal line crossovers.
 ///
@@ -56,13 +55,13 @@ pub fn macd_signals(
 
     // Convert Column to Series for calculation
     let prices_column_clone = prices_series.clone();
-    let prices_series_clone = prices_column_clone.as_series().ok_or_else(|| {
-        NyxsOwlError::DataError("Failed to convert Column to Series".to_string())
-    })?;
+    let prices_series_clone = prices_column_clone
+        .as_series()
+        .ok_or_else(|| NyxsOwlError::DataError("Failed to convert Column to Series".to_string()))?;
 
     // Calculate MACD indicators
     let (macd_line, signal_line, _histogram) = calculate_macd(
-        &prices_series_clone,
+        prices_series_clone,
         fast_period,
         slow_period,
         signal_period,
@@ -117,7 +116,7 @@ pub fn macd_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, PolarsError};
+    use polars::prelude::df;
 
     fn create_test_df_for_macd_strategy(len: usize) -> PolarsResult<DataFrame> {
         let prices: Vec<f64> = (0..len)
@@ -223,12 +222,15 @@ mod tests {
         let buy_count = signals.iter().filter(|&&s| s == Signal::Buy).count();
         let sell_count = signals.iter().filter(|&&s| s == Signal::Sell).count();
 
-        println!("MACD test - Buy: {}, Sell: {}, Hold: {}", buy_count, sell_count, hold_count);
+        println!(
+            "MACD test - Buy: {}, Sell: {}, Hold: {}",
+            buy_count, sell_count, hold_count
+        );
 
         // The test should not panic and should return proper signal structure
         // MACD crossovers may not always occur with all data patterns, so we don't require signals
         assert!(signals.len() == df.height());
-        
+
         // All signals should be valid enum values
         for signal in &signals {
             assert!(matches!(signal, Signal::Buy | Signal::Sell | Signal::Hold));

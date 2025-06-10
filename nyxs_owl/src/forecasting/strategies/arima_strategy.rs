@@ -1,6 +1,4 @@
-use crate::async_parallel::{
-    AsyncParallelProcessor, ForecastTask, ParallelConfig, ParallelForecastResult,
-};
+use crate::async_parallel::{AsyncParallelProcessor, ForecastTask, ParallelConfig};
 use crate::memory_optimized::{CacheOptimizedCircularBuffer, CacheOptimizedTimeSeries, MemoryPool};
 use crate::performance_utils::SimdMath;
 use crate::simple_types::{NyxsOwlError, Result, Signal};
@@ -1268,10 +1266,10 @@ impl ArimaStrategy {
     /// Calculate task priority based on position and market volatility
     fn calculate_task_priority(&self, index: usize, total_length: usize) -> u8 {
         // Recent data points get higher priority (lower number)
-        let recency_factor = ((total_length - index) as f64 / total_length as f64 * 255.0) as u8;
+        
 
         // Ensure we don't exceed priority bounds
-        recency_factor.min(255)
+        ((total_length - index) as f64 / total_length as f64 * 255.0) as u8
     }
 
     /// Generate fallback signal when parallel processing fails
@@ -1418,7 +1416,7 @@ impl ArimaStrategy {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    use polars::prelude::*;
+    
 
     fn create_test_data(len: usize) -> PolarsResult<DataFrame> {
         // Create synthetic test data with trend and noise

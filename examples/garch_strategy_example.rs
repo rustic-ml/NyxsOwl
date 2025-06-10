@@ -91,32 +91,41 @@ fn load_ohlcv_data(_file_path: &str) -> Result<DataFrame> {
 }
 
 fn test_garch_model(name: &str, garch_type: GarchType, df: &DataFrame) -> Result<()> {
-    println!("\n📈 {} Model:", name);
+    println!("\n🎯 Testing {} GARCH Model", name);
+    println!("=========================");
 
     let config = GarchStrategyConfig {
         model_type: garch_type,
-        garch_order: 1,
         arch_order: 1,
-        volatility_threshold: 1.5,
-        signal_threshold: 0.015,
-        min_data_points: 120,
-        volatility_window: 30,
+        garch_order: 1,
+        signal_threshold: 0.02,         // 2% threshold
+        volatility_threshold: 1.5,      // 1.5x average volatility
+        min_data_points: 50,
         use_volatility_targeting: true,
-        target_volatility: 0.20,
-        risk_adjustment: 1.0,
+        target_volatility: 0.15,        // 15% annualized
+        risk_adjustment: 1.2,
+        max_position_size: 0.3,         // 30% max position
+        min_volatility: 0.005,          // 0.5% minimum daily vol
+        lookback_window: 30,
+        use_regime_detection: true,
+        regime_threshold: 0.02,
+        enable_dynamic_hedging: false,
     };
 
-    explain_garch_type(&config.model_type);
+    explain_garch_type(&garch_type);
 
-    let strategy = GarchStrategy::new(config.clone());
+    let strategy = GarchStrategy::new(config);
     let signals = strategy.generate_signals(df, "close", "timestamp")?;
 
     analyze_signals(&signals, name);
 
+    // Extract prices for backtesting
+    let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
+
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&signals, df, None)?;
+    let performance = backtester.backtest(&prices, &signals, None)?;
 
     println!("  📊 Performance Metrics:");
     println!("    Total Return: {:.2}%", performance.total_return * 100.0);
@@ -165,10 +174,13 @@ fn test_preset_configuration(
 
     analyze_signals(&signals, name);
 
+    // Extract prices for backtesting
+    let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
+
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&signals, df, None)?;
+    let performance = backtester.backtest(&prices, &signals, None)?;
 
     println!("  📊 Performance Metrics:");
     println!("    Total Return: {:.2}%", performance.total_return * 100.0);
@@ -477,45 +489,47 @@ fn analyze_comprehensive_volatility(
 }
 
 fn analyze_volatility_clustering(volatilities: &[f64], avg_vol: f64) {
-    println!("\n  📊 Volatility Clustering Analysis:");
+    println!("    🔄 Volatility Clustering Analysis:");
 
     let high_vol_threshold = avg_vol * 1.5;
-    let mut high_vol_clusters = 0;
+    let mut cluster_count = 0;
     let mut current_cluster_length = 0;
-    let mut max_cluster_length = 0;
     let mut total_cluster_length = 0;
+    let mut in_cluster = false;
 
     for &vol in volatilities {
         if vol > high_vol_threshold {
-            if current_cluster_length == 0 {
-                high_vol_clusters += 1;
+            if !in_cluster {
+                in_cluster = true;
+                cluster_count += 1;
+                current_cluster_length = 1;
+            } else {
+                current_cluster_length += 1;
             }
-            current_cluster_length += 1;
-            max_cluster_length = max_cluster_length.max(current_cluster_length);
-        } else {
-            if current_cluster_length > 0 {
-                total_cluster_length += current_cluster_length;
-                current_cluster_length = 0;
-            }
+        } else if current_cluster_length > 0 {
+            total_cluster_length += current_cluster_length;
+            current_cluster_length = 0;
+            in_cluster = false;
         }
     }
 
-    if high_vol_clusters > 0 {
-        let avg_cluster_length = total_cluster_length as f64 / high_vol_clusters as f64;
-        println!("    High Volatility Clusters: {}", high_vol_clusters);
-        println!(
-            "    Average Cluster Length: {:.1} periods",
-            avg_cluster_length
-        );
-        println!("    Maximum Cluster Length: {} periods", max_cluster_length);
+    // Handle case where we end in a cluster
+    if current_cluster_length > 0 {
+        total_cluster_length += current_cluster_length;
+    }
 
-        if avg_cluster_length > 5.0 {
-            println!("    ✅ Strong volatility persistence - Good for GARCH modeling");
-        } else if avg_cluster_length > 2.0 {
-            println!("    ✅ Moderate volatility persistence - GARCH applicable");
+    if cluster_count > 0 {
+        let avg_cluster_length = total_cluster_length as f64 / cluster_count as f64;
+        println!("      High Volatility Clusters: {}", cluster_count);
+        println!("      Average Cluster Length: {:.1} periods", avg_cluster_length);
+
+        if avg_cluster_length > 3.0 {
+            println!("      📈 Strong volatility persistence detected");
         } else {
-            println!("    ⚠️ Weak volatility persistence - GARCH may be less effective");
+            println!("      📊 Moderate volatility clustering");
         }
+    } else {
+        println!("      📉 No significant volatility clustering");
     }
 }
 
@@ -524,114 +538,39 @@ fn analyze_strategy_performance(
     prices: &[f64],
     config: &GarchStrategyConfig,
 ) -> Result<()> {
-    println!("\n📈 Strategy Performance Analysis:");
+    println!("    📈 Strategy Performance Analysis:");
 
-    // Signal distribution over time
-    let signal_windows = signals.chunks(30); // Monthly windows
-    let mut window_activities = Vec::new();
-
-    for window in signal_windows {
-        let activity =
-            window.iter().filter(|&&s| s != Signal::Hold).count() as f64 / window.len() as f64;
-        window_activities.push(activity);
-    }
-
-    if !window_activities.is_empty() {
-        let avg_activity = window_activities.iter().sum::<f64>() / window_activities.len() as f64;
-        println!("  Average Monthly Activity: {:.1}%", avg_activity * 100.0);
-
-        let activity_variance = {
-            let variance = window_activities
-                .iter()
-                .map(|&a| (a - avg_activity).powi(2))
-                .sum::<f64>()
-                / window_activities.len() as f64;
-            variance.sqrt()
-        };
-
-        println!(
-            "  Activity Consistency: {:.3} (lower = more consistent)",
-            activity_variance
-        );
-    }
-
-    // Risk-return profile
-    analyze_risk_return_profile(signals, prices);
-
-    Ok(())
-}
-
-fn analyze_risk_return_profile(signals: &[Signal], prices: &[f64]) {
-    println!("\n  💼 Risk-Return Profile:");
-
+    // Calculate simple returns
     let returns: Vec<f64> = prices.windows(2).map(|w| (w[1] - w[0]) / w[0]).collect();
 
-    let mut strategy_returns = Vec::new();
-    let mut position = 0.0; // 0 = no position, 1 = long, -1 = short
-
-    for (i, &signal) in signals.iter().enumerate() {
-        match signal {
-            Signal::Buy => position = 1.0,
-            Signal::Sell => position = -1.0,
-            Signal::Hold => {} // Keep current position
-        }
-
-        if i > 0 && i <= returns.len() {
-            let strategy_return = position * returns[i - 1];
-            strategy_returns.push(strategy_return);
-        }
-    }
-
-    if !strategy_returns.is_empty() {
-        let avg_strategy_return =
-            strategy_returns.iter().sum::<f64>() / strategy_returns.len() as f64;
-        let strategy_volatility = {
-            let variance = strategy_returns
-                .iter()
-                .map(|&r| (r - avg_strategy_return).powi(2))
-                .sum::<f64>()
-                / strategy_returns.len() as f64;
-            variance.sqrt()
-        };
-
-        println!(
-            "    Strategy Return: {:.4}% daily ({:.1}% annualized)",
-            avg_strategy_return * 100.0,
-            avg_strategy_return * 252.0 * 100.0
-        );
-        println!(
-            "    Strategy Volatility: {:.3}% daily ({:.1}% annualized)",
-            strategy_volatility * 100.0,
-            strategy_volatility * (252.0_f64).sqrt() * 100.0
-        );
-
-        if strategy_volatility > 0.0 {
-            let strategy_sharpe = avg_strategy_return / strategy_volatility * (252.0_f64).sqrt();
-            println!("    Strategy Sharpe Ratio: {:.3}", strategy_sharpe);
-        }
-
-        // Downside analysis
-        let negative_returns: Vec<f64> = strategy_returns
+    // Basic statistics
+    let mean_return = returns.iter().sum::<f64>() / returns.len() as f64;
+    let volatility = {
+        let variance = returns
             .iter()
-            .filter(|&&r| r < 0.0)
-            .cloned()
-            .collect();
+            .map(|&r| (r - mean_return).powi(2))
+            .sum::<f64>()
+            / returns.len() as f64;
+        variance.sqrt()
+    };
 
-        if !negative_returns.is_empty() {
-            let downside_deviation = {
-                let variance = negative_returns.iter().map(|&r| r.powi(2)).sum::<f64>()
-                    / negative_returns.len() as f64;
-                variance.sqrt()
-            };
+    println!(
+        "      Average Daily Return: {:.3}% ({:.1}% annualized)",
+        mean_return * 100.0,
+        mean_return * 252.0 * 100.0
+    );
+    println!(
+        "      Daily Volatility: {:.3}% ({:.1}% annualized)",
+        volatility * 100.0,
+        volatility * (252.0_f64).sqrt() * 100.0
+    );
 
-            println!("    Downside Deviation: {:.3}%", downside_deviation * 100.0);
-
-            if downside_deviation > 0.0 {
-                let sortino_ratio = avg_strategy_return / downside_deviation * (252.0_f64).sqrt();
-                println!("    Sortino Ratio: {:.3}", sortino_ratio);
-            }
-        }
+    if volatility > 0.0 {
+        let sharpe_like = (mean_return / volatility) * (252.0_f64).sqrt();
+        println!("      Risk-Adjusted Return: {:.2}", sharpe_like);
     }
+
+    Ok(())
 }
 
 fn print_detailed_performance(performance: &nyxs_owl::forecasting::backtest::BacktestPerformance) {

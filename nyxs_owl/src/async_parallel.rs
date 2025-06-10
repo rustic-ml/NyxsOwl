@@ -1,33 +1,46 @@
 use crate::memory_optimized::{CacheOptimizedTimeSeries, MemoryPool};
 use crate::performance_utils::SimdMath;
-use crate::simple_types::{NyxsOwlError, Result};
 use futures::future::join_all;
 use rayon::prelude::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 
-/// Market data structure for processing
-#[derive(Debug, Clone)]
+/// Market data structure for real-time processing
+#[derive(Debug, Clone, PartialEq)]
 pub struct MarketData {
+    /// Symbol identifier
     pub symbol: String,
+    /// Opening price
     pub open: f64,
+    /// Highest price
     pub high: f64,
+    /// Lowest price  
     pub low: f64,
+    /// Closing price
     pub close: f64,
+    /// Trading volume
     pub volume: f64,
+    /// Timestamp of the data
     pub timestamp: std::time::SystemTime,
 }
 
-/// Forecast result from parallel processing
-#[derive(Debug, Clone)]
+/// Forecast result structure with comprehensive analysis
+#[derive(Debug, Clone, PartialEq)]
 pub struct ForecastResult {
+    /// Symbol identifier
     pub symbol: String,
+    /// Predicted price
     pub forecast_price: f64,
+    /// Confidence level (0.0 to 1.0)
     pub confidence: f64,
+    /// Predicted volatility
     pub volatility: f64,
+    /// Trend strength indicator
     pub trend_strength: f64,
+    /// Timestamp of the forecast
     pub timestamp: std::time::SystemTime,
+    /// Additional metadata as JSON string
     pub metadata: String,
 }
 
@@ -61,20 +74,30 @@ impl Default for ParallelConfig {
 /// Async forecasting task with priority and metadata
 #[derive(Debug, Clone)]
 pub struct ForecastTask {
+    /// Unique identifier for the forecasting task
     pub id: String,
+    /// Symbol or asset being forecasted
     pub symbol: String,
+    /// Time series data for forecasting
     pub data: Arc<CacheOptimizedTimeSeries>,
+    /// Priority level (0 = highest priority, higher numbers = lower priority)
     pub priority: u8, // 0 = highest priority
+    /// Timestamp when the task was created
     pub created_at: Instant,
 }
 
 /// Result of parallel forecasting operation
 #[derive(Debug, Clone)]
 pub struct ParallelForecastResult {
+    /// Unique identifier of the forecasting task
     pub task_id: String,
+    /// Symbol or asset that was forecasted
     pub symbol: String,
+    /// The actual forecast result containing predictions
     pub result: ForecastResult,
+    /// Time taken to process this forecast task
     pub processing_time: Duration,
+    /// ID of the worker thread that processed this task
     pub worker_id: usize,
 }
 
@@ -272,7 +295,7 @@ impl AsyncParallelProcessor {
             .flat_map(|chunk| {
                 chunk
                     .par_iter()
-                    .map(|data| ProcessedMarketData::from_market_data(data))
+                    .map(ProcessedMarketData::from_market_data)
                     .collect::<Vec<_>>()
             })
             .collect()
@@ -292,11 +315,17 @@ impl AsyncParallelProcessor {
 /// Processed market data with enhanced metrics
 #[derive(Debug, Clone)]
 pub struct ProcessedMarketData {
+    /// Symbol or ticker of the asset
     pub symbol: String,
+    /// Current price of the asset
     pub price: f64,
+    /// Trading volume for the period
     pub volume: f64,
+    /// Calculated volatility measure
     pub volatility: f64,
+    /// Momentum indicator value
     pub momentum: f64,
+    /// Timestamp when processing was completed
     pub processed_at: Instant,
 }
 
@@ -317,12 +346,16 @@ impl ProcessedMarketData {
     }
 }
 
-/// Processing statistics
+/// Processing statistics for monitoring system performance
 #[derive(Debug)]
 pub struct ProcessingStats {
+    /// Number of available permits in the semaphore
     pub available_permits: usize,
+    /// Maximum number of concurrent tasks allowed
     pub max_concurrent: usize,
+    /// Total number of tasks processed since startup
     pub total_tasks_processed: usize,
+    /// Number of worker threads in the thread pool
     pub worker_threads: usize,
 }
 

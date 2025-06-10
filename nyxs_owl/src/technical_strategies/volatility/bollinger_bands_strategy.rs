@@ -4,7 +4,9 @@
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::volatility::calculate_bollinger_bands;
 use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, DataType, Float64Type, NamedFrom, PolarsResult, Series};
+use polars::prelude::{DataFrame, Float64Type};
+use polars::error::PolarsResult;
+use polars::prelude::*;
 
 /// Generates trading signals based on Bollinger Bands, typically for mean reversion.
 ///
@@ -43,9 +45,8 @@ pub fn bollinger_bands_signals(
     // Convert Column to Series for calculation - fix borrowing issue
     let close_prices_column_ref = close_prices_column.clone();
     let close_prices_series_opt = close_prices_column_ref.as_series();
-    let close_prices_series = close_prices_series_opt.ok_or_else(|| {
-        NyxsOwlError::DataError("Failed to convert Column to Series".to_string())
-    })?;
+    let close_prices_series = close_prices_series_opt
+        .ok_or_else(|| NyxsOwlError::DataError("Failed to convert Column to Series".to_string()))?;
 
     let data_len = df.height();
     if data_len < period + 1 {
@@ -57,7 +58,7 @@ pub fn bollinger_bands_signals(
     }
 
     let (upper_band_series, _middle_band_series, lower_band_series) =
-        calculate_bollinger_bands(&close_prices_series, period, std_dev).map_err(|e| {
+        calculate_bollinger_bands(close_prices_series, period, std_dev).map_err(|e| {
             NyxsOwlError::StrategyError(format!(
                 "Failed to calculate Bollinger Bands using trade_math: {}",
                 e
@@ -114,7 +115,8 @@ pub fn bollinger_bands_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, PolarsError};
+    use polars::error::PolarsResult;
+    use polars::prelude::*;
 
     fn create_bb_test_df(len: usize) -> PolarsResult<DataFrame> {
         let prices: Vec<f64> = (0..len)

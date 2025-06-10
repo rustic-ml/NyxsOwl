@@ -5,19 +5,30 @@
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use polars::prelude::*;
 
-/// Performance metrics for a trading strategy backtest
+/// Comprehensive backtest performance metrics
 #[derive(Debug, Clone)]
 pub struct BacktestPerformance {
+    /// Total return over the backtest period
     pub total_return: f64,
+    /// Sharpe ratio - risk-adjusted return measure
     pub sharpe_ratio: f64,
+    /// Sortino ratio - downside risk-adjusted return measure
     pub sortino_ratio: f64,
+    /// Maximum drawdown experienced
     pub max_drawdown: f64,
+    /// Percentage of winning trades
     pub win_rate: f64,
+    /// Total number of trades executed
     pub total_trades: usize,
+    /// Number of profitable trades
     pub winning_trades: usize,
+    /// Number of losing trades
     pub losing_trades: usize,
+    /// Average profit per winning trade
     pub avg_win: f64,
+    /// Average loss per losing trade
     pub avg_loss: f64,
+    /// Profit factor (gross profits / gross losses)
     pub profit_factor: f64,
 
     // Additional fields expected by examples
@@ -27,6 +38,25 @@ pub struct BacktestPerformance {
     pub calmar_ratio: f64,
     pub avg_trade_return: f64,
     pub best_trade: f64,
+    pub worst_trade: f64,
+}
+
+/// Extended performance metrics for detailed analysis
+#[derive(Debug, Clone)]
+pub struct ExtendedPerformance {
+    /// Annualized return
+    pub annualized_return: f64,
+    /// Benchmark return for comparison
+    pub benchmark_return: f64,
+    /// Strategy volatility
+    pub volatility: f64,
+    /// Calmar ratio (annual return / max drawdown)
+    pub calmar_ratio: f64,
+    /// Average return per trade
+    pub avg_trade_return: f64,
+    /// Best single trade return
+    pub best_trade: f64,
+    /// Worst single trade return
     pub worst_trade: f64,
 }
 
@@ -67,10 +97,15 @@ impl Default for BacktestPerformance {
 /// Configuration for backtesting
 #[derive(Debug, Clone)]
 pub struct BacktestConfig {
+    /// Initial capital for backtesting
     pub initial_capital: f64,
+    /// Transaction cost as percentage (e.g., 0.001 for 0.1%)
     pub transaction_cost: f64, // As percentage (e.g., 0.001 for 0.1%)
+    /// Slippage cost as percentage
     pub slippage: f64,         // As percentage
+    /// Annual risk-free rate for Sharpe ratio calculation
     pub risk_free_rate: f64,   // Annual risk-free rate for Sharpe ratio
+    /// Fraction of capital to use per trade
     pub position_size: f64,    // Fraction of capital to use per trade
 }
 
@@ -92,6 +127,7 @@ pub struct ForecastBacktester {
 }
 
 impl ForecastBacktester {
+    /// Create a new backtester with the given configuration
     pub fn new(config: BacktestConfig) -> Self {
         Self { config }
     }

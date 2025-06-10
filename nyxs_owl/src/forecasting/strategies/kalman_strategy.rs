@@ -705,7 +705,7 @@ fn calculate_mad(data: &[f64], median: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
+    
 
     fn create_test_dataframe(prices: Vec<f64>) -> DataFrame {
         let timestamps: Vec<String> = (0..prices.len())

@@ -143,6 +143,25 @@ impl Default for PerformanceMetrics {
     }
 }
 
+/// Technical strategy performance metrics
+#[derive(Debug, Clone)]
+pub struct TechnicalPerformance {
+    /// Total return percentage from the strategy
+    pub total_return: f64,
+    /// Sharpe ratio measuring risk-adjusted returns
+    pub sharpe_ratio: f64,
+    /// Maximum drawdown experienced
+    pub max_drawdown: f64,
+    /// Win rate as a percentage of profitable trades
+    pub win_rate: f64,
+    /// Total number of trades executed
+    pub total_trades: usize,
+    /// Average return per trade
+    pub avg_trade_return: f64,
+    /// Strategy volatility measure
+    pub volatility: f64,
+}
+
 /// Signal filtering and enhancement utilities
 pub struct SignalFilter;
 
@@ -331,15 +350,11 @@ mod tests {
 
     #[test]
     fn test_signal_combination() {
-        let signals1 = vec![
-            TechnicalSignal::new(Signal::Buy).with_strength(0.8),
-            TechnicalSignal::new(Signal::Hold).with_strength(0.5),
-        ];
+        let signals1 = [TechnicalSignal::new(Signal::Buy).with_strength(0.8),
+            TechnicalSignal::new(Signal::Hold).with_strength(0.5)];
 
-        let signals2 = vec![
-            TechnicalSignal::new(Signal::Buy).with_strength(0.9),
-            TechnicalSignal::new(Signal::Sell).with_strength(0.7),
-        ];
+        let signals2 = [TechnicalSignal::new(Signal::Buy).with_strength(0.9),
+            TechnicalSignal::new(Signal::Sell).with_strength(0.7)];
 
         let signal_sources = vec![(&signals1[..], 0.6), (&signals2[..], 0.4)];
         let combined =
