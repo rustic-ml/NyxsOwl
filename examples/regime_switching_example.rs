@@ -109,10 +109,17 @@ fn test_regime_model(name: &str, model_type: RegimeSwitchingType, df: &DataFrame
 
     analyze_signals(&signals, name);
 
+    // Extract prices for backtest
+    let prices: Vec<f64> = df
+        .column("close")?
+        .f64()?
+        .into_no_null_iter()
+        .collect();
+
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&signals, df, None)?;
+    let performance = backtester.backtest(&prices, &signals, None)?;
 
     println!("  📊 Performance Metrics:");
     println!("    Total Return: {:.2}%", performance.total_return * 100.0);
@@ -146,17 +153,24 @@ fn test_preset_configuration(
     // Analyze regime detection
     analyze_regime_detection(&config, df)?;
 
+    // Extract prices for backtest
+    let prices: Vec<f64> = df
+        .column("close")?
+        .f64()?
+        .into_no_null_iter()
+        .collect();
+
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&signals, df, None)?;
+    let performance = backtester.backtest(&prices, &signals, None)?;
 
     println!("  📊 Performance Metrics:");
     println!("    Total Return: {:.2}%", performance.total_return * 100.0);
     println!("    Sharpe Ratio: {:.3}", performance.sharpe_ratio);
     println!("    Max Drawdown: {:.2}%", performance.max_drawdown * 100.0);
     println!("    Win Rate: {:.1}%", performance.win_rate * 100.0);
-    println!("    Profit Factor: {:.2}", performance.profit_factor);
+    println!("    Total Trades: {}", performance.total_trades);
 
     Ok(())
 }
@@ -434,7 +448,7 @@ fn simulate_regime_detection(returns: &[f64], config: &RegimeSwitchingConfig) {
     let total_periods = regime_counts.values().sum::<i32>();
 
     for (regime, count) in regime_counts {
-        let percentage = *count as f64 / total_periods as f64 * 100.0;
+        let percentage = count as f64 / total_periods as f64 * 100.0;
         println!(
             "      {}: {:.1}% ({} periods)",
             regime.as_str(),
@@ -541,13 +555,14 @@ fn detailed_regime_analysis(df: &DataFrame) -> Result<()> {
     println!("\n📈 Comprehensive Backtesting:");
     let backtest_config = BacktestConfig {
         initial_capital: 100000.0,
-        transaction_cost_pct: 0.001, // 0.1%
-        slippage_pct: 0.0005,        // 0.05%
+        transaction_cost: 0.001, // 0.1%
+        slippage: 0.0005,        // 0.05%
         risk_free_rate: 0.02,        // 2%
+        position_size: 0.25,     // 25% of capital per trade
     };
 
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&signals, df, None)?;
+    let performance = backtester.backtest(&prices, &signals, None)?;
 
     print_detailed_performance(&performance);
 
