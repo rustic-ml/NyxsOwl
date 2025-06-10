@@ -1,20 +1,26 @@
-use polars::prelude::{PolarsResult, Series, NamedFrom, DataType, DataFrame, SeriesOpsTime, RollingOptionsFixedWindow};
-use polars::error::PolarsError;
 use crate::trade_math::moving_averages::calculate_sma;
+use polars::error::PolarsError;
+use polars::prelude::{
+    DataFrame, DataType, NamedFrom, PolarsResult, RollingOptionsFixedWindow, Series, SeriesOpsTime,
+};
 
 /// Calculates the standard deviation for a series over a rolling window.
 fn calculate_rolling_std_dev(series: &Series, period: usize) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("Rolling std dev period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "Rolling std dev period must be greater than 0".into(),
+        ));
     }
     if series.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError("Input series for rolling_std_dev must be of type Float64.".into()));
+        return Err(PolarsError::ComputeError(
+            "Input series for rolling_std_dev must be of type Float64.".into(),
+        ));
     }
-     if series.len() < period {
+    if series.len() < period {
         let nulls: Vec<Option<f64>> = vec![None; series.len()];
-        return Ok(Series::new(series.name().clone(), nulls)); 
+        return Ok(Series::new(series.name().clone(), nulls));
     }
-    
+
     // Use the Series rolling_std method with RollingOptionsFixedWindow
     let std_dev = series.rolling_std(RollingOptionsFixedWindow {
         window_size: period,
@@ -41,37 +47,40 @@ pub fn calculate_bollinger_bands(
     std_dev_mult: f64,
 ) -> PolarsResult<(Series, Series, Series)> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("Bollinger Bands period must be greater than 0.".into()));
+        return Err(PolarsError::ComputeError(
+            "Bollinger Bands period must be greater than 0.".into(),
+        ));
     }
     if std_dev_mult <= 0.0 {
-        return Err(PolarsError::ComputeError("Bollinger Bands standard deviation multiplier must be greater than 0.".into()));
+        return Err(PolarsError::ComputeError(
+            "Bollinger Bands standard deviation multiplier must be greater than 0.".into(),
+        ));
     }
     if prices.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError("Price series for Bollinger Bands must be of type Float64.".into()));
+        return Err(PolarsError::ComputeError(
+            "Price series for Bollinger Bands must be of type Float64.".into(),
+        ));
     }
-     if prices.len() < period {
+    if prices.len() < period {
         let s_name = prices.name().clone();
         let null_series = Series::new_null(s_name, prices.len());
         return Ok((null_series.clone(), null_series.clone(), null_series));
     }
 
-
     let middle_band_series = calculate_sma(prices, period)?;
-    
-    let rolling_std_series = calculate_rolling_std_dev(prices, period)?;
-    
-    let std_dev_scaled_series = &rolling_std_series * std_dev_mult;
 
+    let rolling_std_series = calculate_rolling_std_dev(prices, period)?;
+
+    let std_dev_scaled_series = &rolling_std_series * std_dev_mult;
 
     let mut upper_band = (&middle_band_series + &std_dev_scaled_series)?;
     upper_band.rename("upper_band".into());
 
     let mut lower_band = (&middle_band_series - &std_dev_scaled_series)?;
     lower_band.rename("lower_band".into());
-    
+
     let mut middle_band_named = middle_band_series.clone();
     middle_band_named.rename("middle_band".into());
-
 
     Ok((upper_band, middle_band_named, lower_band))
 }
@@ -93,7 +102,9 @@ pub fn calculate_bollinger_bands(
 /// A `PolarsResult<Series>` containing the ATR values.
 pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("ATR period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "ATR period must be greater than 0".into(),
+        ));
     }
 
     let high_ca = df.column("high")?.f64()?;
@@ -106,18 +117,21 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
     }
     // ATR needs at least `period` TR values for the initial SMA, and TR needs `PreviousClose`.
     // So, `period + 1` original data points are needed for the first ATR value.
-    if len <= period { 
+    if len <= period {
         let nulls: Vec<Option<f64>> = vec![None; len];
         return Ok(Series::new("atr".into(), nulls));
     }
 
     let mut prev_close_vec: Vec<Option<f64>> = vec![None];
     prev_close_vec.extend(close_ca.into_iter().take(len - 1));
-    let prev_close_ca = Series::new("prev_close".into(), prev_close_vec).f64()?.clone();
+    let prev_close_ca = Series::new("prev_close".into(), prev_close_vec)
+        .f64()?
+        .clone();
 
     let mut tr_values: Vec<Option<f64>> = vec![None; len]; // TR for index 0 is None
 
-    for i in 1..len { // Start from 1 because TR uses previous close
+    for i in 1..len {
+        // Start from 1 because TR uses previous close
         let h_opt = high_ca.get(i);
         let l_opt = low_ca.get(i);
         let pc_opt = prev_close_ca.get(i); // This corresponds to original close_ca.get(i-1)
@@ -131,7 +145,7 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
             tr_values[i] = None; // If any component is None, TR is None
         }
     }
-    
+
     let tr_series = Series::new("tr".into(), tr_values.clone()); // Keep tr_values for direct access if needed
 
     // Calculate ATR using Wilder's smoothing
@@ -140,16 +154,22 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
     // So, the first 'period' TRs are tr_values[1]...tr_values[period]
 
     let mut atr_result_values: Vec<Option<f64>> = vec![None; len];
-    
+
     // Calculate initial SMA of TR for the first ATR value
     // This first ATR value will be at index `period` of the final ATR series
-    let initial_tr_slice_for_sma: Vec<Option<f64>> = tr_values.iter().skip(1).take(period).cloned().collect();
-    if initial_tr_slice_for_sma.iter().any(|opt_v| opt_v.is_none()) || initial_tr_slice_for_sma.len() < period {
+    let initial_tr_slice_for_sma: Vec<Option<f64>> =
+        tr_values.iter().skip(1).take(period).cloned().collect();
+    if initial_tr_slice_for_sma.iter().any(|opt_v| opt_v.is_none())
+        || initial_tr_slice_for_sma.len() < period
+    {
         // Not enough valid TRs for initial SMA, ATR remains None for this and subsequent points unless re-seeded
         // This is already covered by len <= period for the entire output.
         // If there are Nones within the first `period` TRs, SMA will be None.
     } else {
-        let initial_sum_tr: f64 = initial_tr_slice_for_sma.iter().map(|opt_v| opt_v.unwrap_or(0.0)).sum();
+        let initial_sum_tr: f64 = initial_tr_slice_for_sma
+            .iter()
+            .map(|opt_v| opt_v.unwrap_or(0.0))
+            .sum();
         let mut current_atr = initial_sum_tr / period as f64;
         atr_result_values[period] = Some(current_atr);
 
@@ -164,11 +184,11 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
             } else {
                 // If current TR is None, ATR propagation stops or becomes None.
                 // For simplicity, if TR is None, current ATR becomes None.
-                atr_result_values[i] = None; 
+                atr_result_values[i] = None;
             }
         }
     }
-    
+
     Ok(Series::new("atr".into(), atr_result_values))
 }
 
@@ -193,15 +213,19 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
 /// # Returns
 /// A `PolarsResult<Series>` containing the Ease of Movement values.
 pub fn calculate_ease_of_movement(
-    df: &DataFrame, 
-    period: usize, 
-    scaling_factor: f64
+    df: &DataFrame,
+    period: usize,
+    scaling_factor: f64,
 ) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("EOM period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "EOM period must be greater than 0".into(),
+        ));
     }
     if scaling_factor == 0.0 {
-        return Err(PolarsError::ComputeError("EOM scaling_factor cannot be zero".into()));
+        return Err(PolarsError::ComputeError(
+            "EOM scaling_factor cannot be zero".into(),
+        ));
     }
 
     let high_ca = df.column("high")?.f64()?;
@@ -212,7 +236,8 @@ pub fn calculate_ease_of_movement(
     if len == 0 {
         return Ok(Series::new_empty("eom".into(), &DataType::Float64));
     }
-    if len < period + 1 { // Need 1 for midpoint move, then `period` for SMA
+    if len < period + 1 {
+        // Need 1 for midpoint move, then `period` for SMA
         let nulls: Vec<Option<f64>> = vec![None; len];
         return Ok(Series::new("eom".into(), nulls));
     }
@@ -222,17 +247,23 @@ pub fn calculate_ease_of_movement(
 
     let mut one_period_eom_values: Vec<Option<f64>> = vec![None; len]; // EOM[0] is None due to prev_midpoint
 
-    for i in 1..len { // Start from 1 for MidpointMove
+    for i in 1..len {
+        // Start from 1 for MidpointMove
         let current_high = high_ca.get(i);
         let current_low = low_ca.get(i);
         let current_volume = volume_ca.get(i);
         let current_midpoint = midpoint_ca.get(i);
         let prev_midpoint = midpoint_ca.get(i - 1);
 
-        if let (Some(ch), Some(cl), Some(vol), Some(cm), Some(pm)) = 
-            (current_high, current_low, current_volume, current_midpoint, prev_midpoint) {
-            
-            if ch == cl || vol == 0.0 { // If high equals low, or volume is zero, EOM is 0
+        if let (Some(ch), Some(cl), Some(vol), Some(cm), Some(pm)) = (
+            current_high,
+            current_low,
+            current_volume,
+            current_midpoint,
+            prev_midpoint,
+        ) {
+            if ch == cl || vol == 0.0 {
+                // If high equals low, or volume is zero, EOM is 0
                 one_period_eom_values[i] = Some(0.0);
                 continue;
             }
@@ -249,7 +280,7 @@ pub fn calculate_ease_of_movement(
                 // Stockcharts typically shows 0 if H=L or Vol=0, which we handle above.
                 // For extremely small volume that rounds to 0 after scaling, BoxRatio could be 0.
                 // Let's treat it as effectively zero movement or infinite resistance.
-                one_period_eom_values[i] = Some(0.0); 
+                one_period_eom_values[i] = Some(0.0);
             }
         } else {
             one_period_eom_values[i] = None; // If any required data is None
@@ -257,14 +288,15 @@ pub fn calculate_ease_of_movement(
     }
 
     let one_period_eom_series = Series::new("one_period_eom".into(), one_period_eom_values);
-    
+
     // Calculate SMA of OnePeriodEOM
     // Note: calculate_sma expects the series passed to it to have enough non-null values.
     // The first element of one_period_eom_series is None.
     // The sma needs `period` values. So the sma output will have Nones for first `period` (from its input perspective).
     // effectively, final EOM will have `period` Nones from one_period_eom_series perspective, and one_period_eom_series[0] is already None.
-    let eom_sma = crate::trade_math::moving_averages::calculate_sma(&one_period_eom_series, period)?;
-    
+    let eom_sma =
+        crate::trade_math::moving_averages::calculate_sma(&one_period_eom_series, period)?;
+
     Ok(eom_sma.with_name("eom".into()))
 }
 
@@ -298,12 +330,12 @@ pub fn calculate_volume_price_trend(df: &DataFrame) -> PolarsResult<Series> {
         // Alternatively, if we want the first calculated term: if close_ca.get(0) is Some and vol_ca.get(0) is Some, vpt_values[0] would be calculated.
         // But since it depends on prev_close, it would be None based on strict formula for index 0.
         // Starting with 0.0 for vpt_values[0] is a common approach.
-        
+
         // To strictly follow the formula where PVT_current uses Previous_PVT:
         // PVT[0] = Volume[0] * (Close[0] - Close[-1]) / Close[-1] -> undefined if Close[-1] doesn't exist.
         // So vpt_values[0] will remain None if we purely rely on formula with prev_close.
         // If we set vpt_values[0] = 0, then vpt_values[1] = vpt_values[0] + Vol[1]*( (C[1]-C[0])/C[0] )
-        
+
         let mut current_vpt = 0.0; // Initialize first PVT (previous PVT for the first calculation pass)
         vpt_values[0] = Some(0.0); // Set the first actual VPT value to 0.0.
 
@@ -312,7 +344,9 @@ pub fn calculate_volume_price_trend(df: &DataFrame) -> PolarsResult<Series> {
             let prev_close_opt = close_ca.get(i - 1);
             let current_volume_opt = volume_ca.get(i);
 
-            if let (Some(cc), Some(pc), Some(vol)) = (current_close_opt, prev_close_opt, current_volume_opt) {
+            if let (Some(cc), Some(pc), Some(vol)) =
+                (current_close_opt, prev_close_opt, current_volume_opt)
+            {
                 if pc != 0.0 {
                     let price_change_pct = (cc - pc) / pc;
                     current_vpt += vol * price_change_pct;
@@ -321,13 +355,13 @@ pub fn calculate_volume_price_trend(df: &DataFrame) -> PolarsResult<Series> {
                     // Price percentage change cannot be calculated if previous close is 0.
                     // Propagate None or carry forward previous VPT.
                     // Carrying forward might be misleading. Let's use None for this point.
-                    current_vpt = vpt_values[i-1].unwrap_or(0.0); // Reset/get last valid VPT.
-                    vpt_values[i] = None; 
+                    current_vpt = vpt_values[i - 1].unwrap_or(0.0); // Reset/get last valid VPT.
+                    vpt_values[i] = None;
                 }
             } else {
-                 // If data is missing, result for this point is None. Carry previous valid vpt for next calc if possible.
-                 current_vpt = vpt_values[i-1].unwrap_or(0.0);
-                 vpt_values[i] = None;
+                // If data is missing, result for this point is None. Carry previous valid vpt for next calc if possible.
+                current_vpt = vpt_values[i - 1].unwrap_or(0.0);
+                vpt_values[i] = None;
             }
         }
     }
@@ -366,13 +400,13 @@ pub fn calculate_obv(df: &DataFrame) -> PolarsResult<Series> {
         // If close_ca.get(0) or volume_ca.get(0) is None, obv_values[0] will be None.
         // Else it is 0.0. current_obv state tracks the numeric value for accumulation.
         if close_ca.get(0).is_some() && volume_ca.get(0).is_some() {
-            obv_values[0] = Some(0.0); 
+            obv_values[0] = Some(0.0);
             // current_obv is already 0.0, representing the OBV *before* considering day 0's volume.
             // So for day 0, Previous_OBV effectively is 0.
             // The actual OBV for day 0 is set to 0, and subsequent calculations use this.
         } else {
-             obv_values[0] = None;
-             // If day 0 data is incomplete, cannot start OBV. `current_obv` remains 0 for a potential valid start later.
+            obv_values[0] = None;
+            // If day 0 data is incomplete, cannot start OBV. `current_obv` remains 0 for a potential valid start later.
         }
 
         for i in 1..len {
@@ -381,10 +415,12 @@ pub fn calculate_obv(df: &DataFrame) -> PolarsResult<Series> {
             let current_volume_opt = volume_ca.get(i);
 
             // Carry forward previous OBV value if the current one cannot be calculated
-            let prev_obv_for_calc = obv_values[i-1].unwrap_or(current_obv); 
+            let prev_obv_for_calc = obv_values[i - 1].unwrap_or(current_obv);
             // If obv_values[i-1] was None, use the last known good current_obv state.
 
-            if let (Some(cc), Some(pc), Some(vol)) = (current_close_opt, prev_close_opt, current_volume_opt) {
+            if let (Some(cc), Some(pc), Some(vol)) =
+                (current_close_opt, prev_close_opt, current_volume_opt)
+            {
                 current_obv = if cc > pc {
                     prev_obv_for_calc + vol
                 } else if cc < pc {
@@ -413,14 +449,17 @@ mod tests {
     // We keep tests for calculate_bollinger_bands and calculate_rolling_std_dev here.
 
     fn create_test_series(name: &str, data: Vec<Option<f64>>) -> Series {
-        Series::new(name.into(), data) 
+        Series::new(name.into(), data)
     }
-    
+
     // Tests for calculate_rolling_std_dev can be added here if desired,
     // or kept minimal if it's considered a well-tested polars internal.
     #[test]
     fn test_rolling_std_dev_basic() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)]);
+        let s = create_test_series(
+            "price",
+            vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)],
+        );
         let std2 = calculate_rolling_std_dev(&s, 2)?;
         assert_eq!(std2.get(0).unwrap(), AnyValue::Null);
         // For [1,2], std is sqrt(((1-1.5)^2 + (2-1.5)^2)/2) without ddof, or /1 with ddof=1 (polars default for sample std)
@@ -432,10 +471,21 @@ mod tests {
 
     #[test]
     fn test_bollinger_bands_basic() -> PolarsResult<()> {
-        let prices = Series::new("close".into(), vec![ 
-            Some(10.0), Some(12.0), Some(11.0), Some(13.0), Some(15.0), 
-            Some(14.0), Some(16.0), Some(18.0), Some(17.0), Some(19.0),
-        ]);
+        let prices = Series::new(
+            "close".into(),
+            vec![
+                Some(10.0),
+                Some(12.0),
+                Some(11.0),
+                Some(13.0),
+                Some(15.0),
+                Some(14.0),
+                Some(16.0),
+                Some(18.0),
+                Some(17.0),
+                Some(19.0),
+            ],
+        );
         let period = 5;
         let std_dev_mult = 2.0;
 
@@ -445,17 +495,17 @@ mod tests {
         assert_eq!(middle.len(), prices.len());
         assert_eq!(lower.len(), prices.len());
 
-        assert_eq!(middle.get(3).unwrap(), AnyValue::Null); 
-        assert_eq!(middle.get(4).unwrap(), AnyValue::Float64(12.2)); 
+        assert_eq!(middle.get(3).unwrap(), AnyValue::Null);
+        assert_eq!(middle.get(4).unwrap(), AnyValue::Float64(12.2));
         assert_eq!(middle.get(5).unwrap(), AnyValue::Float64(13.0));
-        
+
         // Verify one set of band values (e.g. for index 4 where middle is 12.2)
         // prices for window: [10,12,11,13,15]. std_dev for this is approx 1.92353 (ddof=1)
         // upper = 12.2 + 2 * 1.92353 = 12.2 + 3.84706 = 16.04706
         // lower = 12.2 - 2 * 1.92353 = 12.2 - 3.84706 = 8.35294
         assert!((upper.get(4).unwrap().try_extract::<f64>().unwrap() - 16.04706).abs() < 0.0001);
         assert!((lower.get(4).unwrap().try_extract::<f64>().unwrap() - 8.35294).abs() < 0.0001);
-        
+
         assert_eq!(upper.name(), "upper_band");
         assert_eq!(middle.name(), "middle_band");
         assert_eq!(lower.name(), "lower_band");
@@ -465,19 +515,19 @@ mod tests {
 
     #[test]
     fn test_bollinger_bands_invalid_inputs() {
-        let prices = Series::new("close".into(), vec![Some(10.0), Some(12.0)]); 
-        assert!(calculate_bollinger_bands(&prices, 0, 2.0).is_err()); 
-        assert!(calculate_bollinger_bands(&prices, 5, 0.0).is_err()); 
-        assert!(calculate_bollinger_bands(&prices, 5, -1.0).is_err()); 
-        
-        let prices_short = Series::new("close".into(), vec![Some(10.0), Some(11.0)]); 
+        let prices = Series::new("close".into(), vec![Some(10.0), Some(12.0)]);
+        assert!(calculate_bollinger_bands(&prices, 0, 2.0).is_err());
+        assert!(calculate_bollinger_bands(&prices, 5, 0.0).is_err());
+        assert!(calculate_bollinger_bands(&prices, 5, -1.0).is_err());
+
+        let prices_short = Series::new("close".into(), vec![Some(10.0), Some(11.0)]);
         let (up, mid, low) = calculate_bollinger_bands(&prices_short, 3, 2.0).unwrap();
         assert!(up.is_null().all());
         assert!(mid.is_null().all());
         assert!(low.is_null().all());
 
-        let prices_int = Series::new("close".into(), vec![10i32, 12, 11, 13, 15]); 
-         assert!(calculate_bollinger_bands(&prices_int, 3, 2.0).is_err()); 
+        let prices_int = Series::new("close".into(), vec![10i32, 12, 11, 13, 15]);
+        assert!(calculate_bollinger_bands(&prices_int, 3, 2.0).is_err());
     }
 
     #[test]
@@ -500,8 +550,16 @@ mod tests {
         let high_vec = vec![Some(10.0); 10];
         let low_vec = vec![Some(2.0); 10];
         let close_data = vec![
-            Some(6.0), Some(7.0), Some(6.0), Some(7.0), Some(6.0), 
-            Some(7.0), Some(6.0), Some(7.0), Some(6.0), Some(7.0)
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
         ];
 
         let df = polars::prelude::df! {
@@ -528,25 +586,49 @@ mod tests {
         // So, for this data, ATR should be 8.0 after the initial period.
         // First ATR at index `period` (5).
         for i in 0..period {
-            assert_eq!(atr_series.get(i).unwrap(), AnyValue::Null, "ATR at index {} should be None", i);
+            assert_eq!(
+                atr_series.get(i).unwrap(),
+                AnyValue::Null,
+                "ATR at index {} should be None",
+                i
+            );
         }
-        
+
         for i in period..atr_series.len() {
             if let Ok(val) = atr_series.get(i).unwrap().try_extract::<f64>() {
-                 assert!((val - 8.0).abs() < 1e-6, "ATR at index {} expected 8.0, got {}", i, val);
+                assert!(
+                    (val - 8.0).abs() < 1e-6,
+                    "ATR at index {} expected 8.0, got {}",
+                    i,
+                    val
+                );
             } else {
                 panic!("ATR at index {} was unexpectedly None", i);
             }
         }
         Ok(())
     }
-    
+
     #[test]
     fn test_atr_with_nones() -> PolarsResult<()> {
-        let high_vec = vec![Some(10.0), Some(10.0), None, Some(10.0), Some(10.0), Some(10.0)];
-        let low_vec  = vec![Some(2.0), Some(2.0), Some(2.0), None, Some(2.0), Some(2.0)];
-        let close_vec= vec![Some(6.0), Some(7.0), Some(6.0), Some(7.0), Some(6.0), Some(7.0)];
-         let df = polars::prelude::df! {
+        let high_vec = vec![
+            Some(10.0),
+            Some(10.0),
+            None,
+            Some(10.0),
+            Some(10.0),
+            Some(10.0),
+        ];
+        let low_vec = vec![Some(2.0), Some(2.0), Some(2.0), None, Some(2.0), Some(2.0)];
+        let close_vec = vec![
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
+            Some(6.0),
+            Some(7.0),
+        ];
+        let df = polars::prelude::df! {
             "high" => high_vec, "low" => low_vec, "close" => close_vec
         }?;
         let period = 3;
@@ -563,9 +645,9 @@ mod tests {
 
     #[test]
     fn test_atr_insufficient_data() -> PolarsResult<()> {
-         let df = polars::prelude::df! {
-            "high" => &[Some(10.0), Some(10.0)], 
-            "low" => &[Some(2.0), Some(2.0)], 
+        let df = polars::prelude::df! {
+            "high" => &[Some(10.0), Some(10.0)],
+            "low" => &[Some(2.0), Some(2.0)],
             "close" => &[Some(6.0), Some(7.0)]
         }?;
         let atr_series = calculate_atr(&df, 3)?; // Needs period+1 = 4 rows for first ATR
@@ -573,7 +655,7 @@ mod tests {
         assert_eq!(atr_series.len(), 2);
         Ok(())
     }
-    
+
     #[test]
     fn test_atr_period_zero() {
         let df = polars::prelude::df!{"high" => &[Some(1.0)], "low" => &[Some(1.0)], "close" => &[Some(1.0)]}.unwrap();
@@ -591,19 +673,55 @@ mod tests {
         // Let's assume Vol is raw and use scaling_factor = 100_000.0 for test
 
         let high_vec = vec![
-            Some(43.50), Some(43.54), Some(43.82), Some(43.81), Some(44.10),
-            Some(43.85), Some(43.80), Some(43.80), Some(43.60), Some(43.95),
-            Some(44.00), Some(44.05), Some(44.20), Some(44.20), Some(44.15) // 15 days
+            Some(43.50),
+            Some(43.54),
+            Some(43.82),
+            Some(43.81),
+            Some(44.10),
+            Some(43.85),
+            Some(43.80),
+            Some(43.80),
+            Some(43.60),
+            Some(43.95),
+            Some(44.00),
+            Some(44.05),
+            Some(44.20),
+            Some(44.20),
+            Some(44.15), // 15 days
         ];
         let low_vec = vec![
-            Some(43.01), Some(43.08), Some(43.39), Some(43.45), Some(43.70),
-            Some(43.52), Some(43.51), Some(43.45), Some(43.30), Some(43.45),
-            Some(43.75), Some(43.80), Some(43.82), Some(43.90), Some(43.85)
+            Some(43.01),
+            Some(43.08),
+            Some(43.39),
+            Some(43.45),
+            Some(43.70),
+            Some(43.52),
+            Some(43.51),
+            Some(43.45),
+            Some(43.30),
+            Some(43.45),
+            Some(43.75),
+            Some(43.80),
+            Some(43.82),
+            Some(43.90),
+            Some(43.85),
         ];
         let volume_vec: Vec<Option<f64>> = vec![
-            Some(1236600.0), Some(1151500.0), Some(1748300.0), Some(1043800.0), Some(1140800.0),
-            Some(707000.0), Some(671400.0), Some(955400.0), Some(1070200.0), Some(1123200.0),
-            Some(800000.0), Some(750000.0), Some(920000.0), Some(600000.0), Some(750000.0) 
+            Some(1236600.0),
+            Some(1151500.0),
+            Some(1748300.0),
+            Some(1043800.0),
+            Some(1140800.0),
+            Some(707000.0),
+            Some(671400.0),
+            Some(955400.0),
+            Some(1070200.0),
+            Some(1123200.0),
+            Some(800000.0),
+            Some(750000.0),
+            Some(920000.0),
+            Some(600000.0),
+            Some(750000.0),
         ];
 
         let df = polars::prelude::df! {
@@ -631,8 +749,14 @@ mod tests {
         // And 1-EOM[0] is None. So final EOM[0]...EOM[4] are None.
         // EOM[5] is SMA(1-EOM[1]...1-EOM[5]).
 
-        for i in 0..period { // First period value from SMA are None, plus 1-day EOM[0] is None.
-            assert_eq!(eom_series.get(i).unwrap(), AnyValue::Null, "EOM at index {} should be None (initial)", i);
+        for i in 0..period {
+            // First period value from SMA are None, plus 1-day EOM[0] is None.
+            assert_eq!(
+                eom_series.get(i).unwrap(),
+                AnyValue::Null,
+                "EOM at index {} should be None (initial)",
+                i
+            );
         }
 
         // Test a specific calculated value if available from a trusted source, or check for non-null after initial period.
@@ -645,11 +769,14 @@ mod tests {
             }
         }
         if eom_series.len() > period {
-             assert!(!all_nulls_after_initial, "EOM series should have non-null values after initial period");
+            assert!(
+                !all_nulls_after_initial,
+                "EOM series should have non-null values after initial period"
+            );
         }
         Ok(())
     }
-    
+
     #[test]
     fn test_eom_high_equals_low() -> PolarsResult<()> {
         let df = polars::prelude::df! {
@@ -671,7 +798,7 @@ mod tests {
     fn test_eom_zero_volume() -> PolarsResult<()> {
         let df = polars::prelude::df! {
             "high" =>   &[Some(10.0), Some(11.0), Some(12.0)],
-            "low" =>    &[Some(9.0),  Some(10.0), Some(11.0)], 
+            "low" =>    &[Some(9.0),  Some(10.0), Some(11.0)],
             "volume" => &[Some(1000.0), Some(0.0), Some(1000.0)] // Zero vol at index 1
         }?;
         let eom = calculate_ease_of_movement(&df, 1, 10000.0)?;
@@ -683,13 +810,29 @@ mod tests {
 
     #[test]
     fn test_eom_invalid_inputs() -> PolarsResult<()> {
-        let df = polars::prelude::df!{"h" => &[1.0], "l" => &[1.0], "v" => &[1.0]}?;
-        assert!(calculate_ease_of_movement(&df.clone().lazy().rename(vec!["h","l","v"], vec!["high","low","volume"], true).collect()?, 0, 10000.0).is_err());
-        assert!(calculate_ease_of_movement(&df.clone().lazy().rename(vec!["h","l","v"], vec!["high","low","volume"], true).collect()?, 1, 0.0).is_err());
+        let df = polars::prelude::df! {"h" => &[1.0], "l" => &[1.0], "v" => &[1.0]}?;
+        assert!(calculate_ease_of_movement(
+            &df.clone()
+                .lazy()
+                .rename(vec!["h", "l", "v"], vec!["high", "low", "volume"], true)
+                .collect()?,
+            0,
+            10000.0
+        )
+        .is_err());
+        assert!(calculate_ease_of_movement(
+            &df.clone()
+                .lazy()
+                .rename(vec!["h", "l", "v"], vec!["high", "low", "volume"], true)
+                .collect()?,
+            1,
+            0.0
+        )
+        .is_err());
         Ok(())
     }
 
-     #[test]
+    #[test]
     fn test_eom_insufficient_data() -> PolarsResult<()> {
         let df = polars::prelude::df! {
             "high" => &[Some(10.0)], "low" => &[Some(9.0)], "volume" => &[Some(1000.0)]
@@ -707,8 +850,14 @@ mod tests {
         // Close:  10, 10.5, 10.2, 10.7, 11
         // Volume:100, 110,  90,   120,  130
         let close_vec = vec![Some(10.0), Some(10.5), Some(10.2), Some(10.7), Some(11.0)];
-        let volume_vec = vec![Some(100.0), Some(110.0), Some(90.0), Some(120.0), Some(130.0)];
-        let df = polars::prelude::df!{"close" => close_vec, "volume" => volume_vec}?; 
+        let volume_vec = vec![
+            Some(100.0),
+            Some(110.0),
+            Some(90.0),
+            Some(120.0),
+            Some(130.0),
+        ];
+        let df = polars::prelude::df! {"close" => close_vec, "volume" => volume_vec}?;
 
         let vpt = calculate_volume_price_trend(&df)?;
         assert_eq!(vpt.len(), 5);
@@ -730,7 +879,7 @@ mod tests {
 
     #[test]
     fn test_vpt_prev_close_zero() -> PolarsResult<()> {
-        let df = polars::prelude::df!{
+        let df = polars::prelude::df! {
             "close" => vec![Some(10.0), Some(0.0), Some(5.0)],
             "volume" => vec![Some(100.0), Some(100.0), Some(100.0)]
         }?;
@@ -744,7 +893,7 @@ mod tests {
         assert_eq!(vpt.get(2).unwrap(), AnyValue::Null);
         Ok(())
     }
-    
+
     #[test]
     fn test_vpt_empty_df() -> PolarsResult<()> {
         let df = DataFrame::empty(); // This will fail if columns don't exist. Create with schema.
@@ -758,9 +907,9 @@ mod tests {
         Ok(())
     }
 
-     #[test]
+    #[test]
     fn test_vpt_with_nones() -> PolarsResult<()> {
-        let df = polars::prelude::df!{
+        let df = polars::prelude::df! {
             "close" => vec![Some(10.0), None, Some(5.0), Some(6.0)],
             "volume" => vec![Some(100.0), Some(100.0), Some(100.0), Some(100.0)]
         }?;
@@ -775,7 +924,11 @@ mod tests {
         assert_eq!(vpt.get(0).unwrap().try_extract::<f64>().unwrap(), 0.0);
         assert_eq!(vpt.get(1).unwrap(), AnyValue::Null);
         assert_eq!(vpt.get(2).unwrap(), AnyValue::Null);
-        assert!((vpt.get(3).unwrap().try_extract::<f64>().unwrap() - (0.0 + 100.0 * (6.0-5.0)/5.0) ).abs() < 1e-6 );
+        assert!(
+            (vpt.get(3).unwrap().try_extract::<f64>().unwrap() - (0.0 + 100.0 * (6.0 - 5.0) / 5.0))
+                .abs()
+                < 1e-6
+        );
         Ok(())
     }
 
@@ -784,8 +937,14 @@ mod tests {
         // Close:  10, 10.5, 10.2, 10.2, 10.7
         // Volume:100, 110,  90,   120,  130
         let close_vec = vec![Some(10.0), Some(10.5), Some(10.2), Some(10.2), Some(10.7)];
-        let volume_vec = vec![Some(100.0), Some(110.0), Some(90.0), Some(120.0), Some(130.0)];
-        let df = polars::prelude::df!{"close" => close_vec, "volume" => volume_vec}?; 
+        let volume_vec = vec![
+            Some(100.0),
+            Some(110.0),
+            Some(90.0),
+            Some(120.0),
+            Some(130.0),
+        ];
+        let df = polars::prelude::df! {"close" => close_vec, "volume" => volume_vec}?;
 
         let obv = calculate_obv(&df)?;
 
@@ -807,8 +966,14 @@ mod tests {
     #[test]
     fn test_obv_with_nones_in_data() -> PolarsResult<()> {
         let close_vec = vec![Some(10.0), None, Some(10.2), Some(10.0), Some(10.5)];
-        let volume_vec = vec![Some(100.0), Some(110.0), Some(90.0), Some(120.0), Some(130.0)];
-        let df = polars::prelude::df!{"close" => close_vec, "volume" => volume_vec}?; 
+        let volume_vec = vec![
+            Some(100.0),
+            Some(110.0),
+            Some(90.0),
+            Some(120.0),
+            Some(130.0),
+        ];
+        let df = polars::prelude::df! {"close" => close_vec, "volume" => volume_vec}?;
         let obv = calculate_obv(&df)?;
 
         // OBV[0] = 0
@@ -824,12 +989,12 @@ mod tests {
         assert_eq!(obv.get(4).unwrap().try_extract::<f64>().unwrap(), 10.0);
         Ok(())
     }
-    
+
     #[test]
     fn test_obv_first_val_none() -> PolarsResult<()> {
         let close_vec = vec![None, Some(10.5)];
         let volume_vec = vec![Some(100.0), Some(110.0)];
-        let df = polars::prelude::df!{"close" => close_vec, "volume" => volume_vec}?; 
+        let df = polars::prelude::df! {"close" => close_vec, "volume" => volume_vec}?;
         let obv = calculate_obv(&df)?;
         assert_eq!(obv.get(0).unwrap(), AnyValue::Null);
         assert_eq!(obv.get(1).unwrap(), AnyValue::Null); // prev_close is None
@@ -838,7 +1003,7 @@ mod tests {
 
     #[test]
     fn test_obv_empty_df() -> PolarsResult<()> {
-         let schema = polars::prelude::Schema::from_iter(vec![
+        let schema = polars::prelude::Schema::from_iter(vec![
             ("close".into(), DataType::Float64),
             ("volume".into(), DataType::Float64),
         ]);
@@ -847,4 +1012,4 @@ mod tests {
         assert_eq!(obv.len(), 0);
         Ok(())
     }
-} 
+}

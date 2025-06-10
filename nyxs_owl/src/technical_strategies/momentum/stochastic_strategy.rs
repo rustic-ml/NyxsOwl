@@ -73,8 +73,13 @@ pub fn stochastic_signals(
         )));
     }
 
+    // Convert Columns to Series for calculation
+    let high_series_clone = high_series.clone().as_series();
+    let low_series_clone = low_series.clone().as_series();
+    let close_series_clone = close_series.clone().as_series();
+    
     // Calculate Stochastic indicators
-    let (k_line, d_line) = calculate_stochastic(high_series, low_series, close_series, k_period, d_period)
+    let (k_line, d_line) = calculate_stochastic(&high_series_clone, &low_series_clone, &close_series_clone, k_period, d_period)
         .map_err(|e| NyxsOwlError::IndicatorError(format!("Stochastic calculation failed: {}", e)))?;
 
     // Extract values for signal generation
@@ -98,7 +103,7 @@ pub fn stochastic_signals(
             let prev_k_above = prev_k > prev_d;
 
             // Detect crossovers in specific zones
-            if let Some(was_above) = previous_k_above {
+            if let Some(was_above) = previous_k_above_d {
                 if !was_above && current_k_above && current_k < oversold_threshold {
                     // %K crossed above %D in oversold zone -> Buy signal
                     signals[i] = Signal::Buy;
@@ -108,7 +113,7 @@ pub fn stochastic_signals(
                 }
             }
 
-            previous_k_above = Some(current_k_above);
+            previous_k_above_d = Some(current_k_above);
         }
     }
 

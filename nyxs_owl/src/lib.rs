@@ -35,7 +35,7 @@ pub mod prelude {
 
     // Re-export common types and new simplified types
     pub use crate::simple_types::{NyxsOwlError, Price, Result, Signal};
-    
+
     // Re-export forecasting specific items if any become necessary for prelude
     // #[cfg(feature = "forecasting")]
     // pub use crate::forecasting::some_forecast_type; // Example
@@ -90,7 +90,7 @@ pub mod simple_types {
                 Signal::Sell => PositionType::Short,
                 Signal::Hold => PositionType::Hold,
             };
-            
+
             Self {
                 signal,
                 position_type,
@@ -99,17 +99,17 @@ pub mod simple_types {
                 metadata: None,
             }
         }
-        
+
         pub fn with_confidence(mut self, confidence: f64) -> Self {
             self.confidence = confidence;
             self
         }
-        
+
         pub fn with_timestamp(mut self, timestamp: chrono::DateTime<chrono::Utc>) -> Self {
             self.timestamp = Some(timestamp);
             self
         }
-        
+
         pub fn with_metadata(mut self, metadata: std::collections::HashMap<String, f64>) -> Self {
             self.metadata = Some(metadata);
             self
@@ -168,16 +168,16 @@ pub mod simple_types {
 }
 
 // Export main modules
-pub mod trade_math; // Core module for technical indicator calculations
-pub mod performance_utils; // High-performance SIMD-accelerated operations
+pub mod async_parallel;
 pub mod memory_optimized; // Cache-conscious data structures and memory optimization
-pub mod async_parallel; // Async/parallel processing for concurrent forecasting
+pub mod performance_utils; // High-performance SIMD-accelerated operations
+pub mod trade_math; // Core module for technical indicator calculations // Async/parallel processing for concurrent forecasting
 
 #[cfg(feature = "forecasting")] // Keep forecasting feature-gated if it's substantial
 pub mod forecasting;
 
-// TODO: Re-enable when ta_lib_in_rust dependency is properly configured
-// pub mod technical_strategies;
+// Enable technical strategies module
+pub mod technical_strategies;
 
 // Remove old/unused module declarations and re-exports
 // #[cfg(feature = "day-trading")]

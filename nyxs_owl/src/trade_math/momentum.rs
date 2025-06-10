@@ -3,7 +3,7 @@
 use polars::prelude::*;
 
 /// Calculate RSI (Relative Strength Index)
-/// 
+///
 /// RSI is a momentum oscillator that measures the speed and magnitude of price changes.
 /// It oscillates between 0 and 100, with values above 70 typically indicating overbought conditions
 /// and values below 30 indicating oversold conditions.
@@ -17,7 +17,7 @@ use polars::prelude::*;
 pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
     if period == 0 {
         return Err(PolarsError::InvalidOperation(
-            "RSI period must be greater than 0".into()
+            "RSI period must be greater than 0".into(),
         ));
     }
 
@@ -33,7 +33,7 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
     let mut losses = Vec::new();
 
     for i in 1..price_values.len() {
-        if let (Some(current), Some(previous)) = (price_values[i], price_values[i-1]) {
+        if let (Some(current), Some(previous)) = (price_values[i], price_values[i - 1]) {
             let change = current - previous;
             if change > 0.0 {
                 gains.push(change);
@@ -57,7 +57,11 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
     let mut avg_loss = losses[..period].iter().sum::<f64>() / period as f64;
 
     // Calculate RSI for the first valid period
-    let rs = if avg_loss != 0.0 { avg_gain / avg_loss } else { 100.0 };
+    let rs = if avg_loss != 0.0 {
+        avg_gain / avg_loss
+    } else {
+        100.0
+    };
     rsi_values[period] = Some(100.0 - (100.0 / (1.0 + rs)));
 
     // Calculate RSI using EMA-style smoothing for subsequent periods
@@ -69,7 +73,11 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
             avg_gain = alpha * gains[gain_idx] + (1.0 - alpha) * avg_gain;
             avg_loss = alpha * losses[gain_idx] + (1.0 - alpha) * avg_loss;
 
-            let rs = if avg_loss != 0.0 { avg_gain / avg_loss } else { 100.0 };
+            let rs = if avg_loss != 0.0 {
+                avg_gain / avg_loss
+            } else {
+                100.0
+            };
             rsi_values[i] = Some(100.0 - (100.0 / (1.0 + rs)));
         }
     }
@@ -91,20 +99,20 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
 /// # Returns
 /// * `PolarsResult<(Series, Series, Series)>` - (MACD line, Signal line, Histogram)
 pub fn calculate_macd(
-    prices: &Series, 
-    fast_period: usize, 
-    slow_period: usize, 
-    signal_period: usize
+    prices: &Series,
+    fast_period: usize,
+    slow_period: usize,
+    signal_period: usize,
 ) -> PolarsResult<(Series, Series, Series)> {
     if fast_period == 0 || slow_period == 0 || signal_period == 0 {
         return Err(PolarsError::InvalidOperation(
-            "MACD periods must be greater than 0".into()
+            "MACD periods must be greater than 0".into(),
         ));
     }
 
     if fast_period >= slow_period {
         return Err(PolarsError::InvalidOperation(
-            "Fast period must be less than slow period".into()
+            "Fast period must be less than slow period".into(),
         ));
     }
 
@@ -124,7 +132,7 @@ pub fn calculate_macd(
     Ok((
         macd_line.with_name("macd".into()),
         signal_line.with_name("signal".into()),
-        histogram.with_name("histogram".into())
+        histogram.with_name("histogram".into()),
     ))
 }
 
@@ -189,7 +197,7 @@ pub fn calculate_stochastic(
 ) -> PolarsResult<(Series, Series)> {
     if k_period == 0 || d_period == 0 {
         return Err(PolarsError::InvalidOperation(
-            "Stochastic periods must be greater than 0".into()
+            "Stochastic periods must be greater than 0".into(),
         ));
     }
 
@@ -197,13 +205,16 @@ pub fn calculate_stochastic(
     let low_values: Vec<Option<f64>> = low.f64()?.into_iter().collect();
     let close_values: Vec<Option<f64>> = close.f64()?.into_iter().collect();
 
-    let len = high_values.len().min(low_values.len()).min(close_values.len());
+    let len = high_values
+        .len()
+        .min(low_values.len())
+        .min(close_values.len());
     let mut k_values = vec![None; len];
 
     // Calculate %K
     for i in k_period - 1..len {
         let start_idx = i + 1 - k_period;
-        
+
         let mut highest_high = f64::NEG_INFINITY;
         let mut lowest_low = f64::INFINITY;
         let mut valid_data = true;
@@ -251,7 +262,7 @@ pub fn calculate_stochastic(
 
     Ok((
         Series::new("stoch_k".into(), k_values),
-        Series::new("stoch_d".into(), d_values)
+        Series::new("stoch_d".into(), d_values),
     ))
 }
 
@@ -261,26 +272,29 @@ mod tests {
     use approx::assert_relative_eq;
 
     fn create_test_series() -> Series {
-        Series::new("close".into(), vec![
-            44.0, 44.25, 44.5, 43.75, 44.5, 44.75, 44.0, 44.25,
-            44.75, 44.5, 44.0, 44.25, 45.0, 45.25, 45.5
-        ])
+        Series::new(
+            "close".into(),
+            vec![
+                44.0, 44.25, 44.5, 43.75, 44.5, 44.75, 44.0, 44.25, 44.75, 44.5, 44.0, 44.25, 45.0,
+                45.25, 45.5,
+            ],
+        )
     }
 
     #[test]
     fn test_rsi_calculation() {
         let prices = create_test_series();
         let rsi = calculate_rsi(&prices, 14).unwrap();
-        
+
         // Verify length
         assert_eq!(rsi.len(), prices.len());
-        
+
         // Verify first 14 values are null
         let rsi_values: Vec<Option<f64>> = rsi.f64().unwrap().into_iter().collect();
         for i in 0..14 {
             assert!(rsi_values[i].is_none());
         }
-        
+
         // Verify RSI is between 0 and 100
         for i in 14..rsi_values.len() {
             if let Some(rsi_val) = rsi_values[i] {
@@ -293,12 +307,12 @@ mod tests {
     fn test_macd_calculation() {
         let prices = create_test_series();
         let (macd, signal, histogram) = calculate_macd(&prices, 5, 10, 3).unwrap();
-        
+
         // Verify lengths
         assert_eq!(macd.len(), prices.len());
         assert_eq!(signal.len(), prices.len());
         assert_eq!(histogram.len(), prices.len());
-        
+
         // Verify names
         assert_eq!(macd.name(), "macd");
         assert_eq!(signal.name(), "signal");
@@ -310,13 +324,13 @@ mod tests {
         let high = Series::new("high".into(), vec![45.0, 45.5, 46.0, 45.75, 46.25]);
         let low = Series::new("low".into(), vec![44.0, 44.25, 44.5, 44.0, 44.75]);
         let close = Series::new("close".into(), vec![44.5, 45.0, 45.5, 44.5, 45.5]);
-        
+
         let (k, d) = calculate_stochastic(&high, &low, &close, 3, 2).unwrap();
-        
+
         // Verify lengths
         assert_eq!(k.len(), 5);
         assert_eq!(d.len(), 5);
-        
+
         // Verify names
         assert_eq!(k.name(), "stoch_k");
         assert_eq!(d.name(), "stoch_d");
@@ -332,13 +346,13 @@ mod tests {
     #[test]
     fn test_macd_invalid_periods() {
         let prices = create_test_series();
-        
+
         // Fast period >= slow period
         let result = calculate_macd(&prices, 12, 12, 9);
         assert!(result.is_err());
-        
+
         // Zero periods
         let result = calculate_macd(&prices, 0, 26, 9);
         assert!(result.is_err());
     }
-} 
+}

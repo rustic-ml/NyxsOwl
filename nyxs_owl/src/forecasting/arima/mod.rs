@@ -25,13 +25,14 @@
 
 use crate::forecasting::{
     // Signal, // Removed, will use simple_types::Signal
-    Strategy, StrategyConfig, 
+    Strategy,
+    StrategyConfig,
     // StrategyError, // Removed, will use simple_types::NyxsOwlError
-}; 
-use crate::simple_types::{Signal, NyxsOwlError, Result as NyxsOwlResult}; // Added
-use polars::prelude::*;
+};
+use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal}; // Added
+use chrono::{DateTime, Utc};
 use log::{debug, error, info, warn};
-use chrono::{DateTime, Utc}; 
+use polars::prelude::*;
 
 /// Enum to define the type of ARIMA strategy application.
 ///
@@ -50,10 +51,12 @@ impl ArimaStrategyType {
     /// Parses a string to an `ArimaStrategyType`.
     ///
     /// Accepts "trend_following" (case-insensitive).
-    fn from_string(s: &str) -> NyxsOwlResult<Self> { // Changed to NyxsOwlResult
+    fn from_string(s: &str) -> NyxsOwlResult<Self> {
+        // Changed to NyxsOwlResult
         match s.to_lowercase().as_str() {
             "trend_following" | "trendfollowing" => Ok(ArimaStrategyType::TrendFollowing),
-            _ => Err(NyxsOwlError::InvalidParameter(format!( // Changed to NyxsOwlError
+            _ => Err(NyxsOwlError::InvalidParameter(format!(
+                // Changed to NyxsOwlError
                 "Unknown ArimaStrategyType: {}",
                 s
             ))),
@@ -107,7 +110,10 @@ impl Strategy for ArimaStrategy {
 
         let p = config.get_int("p").map_or_else(
             |e: NyxsOwlError| {
-                error!("ARIMA Strategy: Error getting 'p' parameter: {}. Assuming missing.", e);
+                error!(
+                    "ARIMA Strategy: Error getting 'p' parameter: {}. Assuming missing.",
+                    e
+                );
                 panic!("ARIMA Strategy: Missing or invalid 'p' parameter in configuration.");
             },
             |val| val as usize,
@@ -115,7 +121,10 @@ impl Strategy for ArimaStrategy {
 
         let d = config.get_int("d").map_or_else(
             |e: NyxsOwlError| {
-                error!("ARIMA Strategy: Error getting 'd' parameter: {}. Assuming missing.", e);
+                error!(
+                    "ARIMA Strategy: Error getting 'd' parameter: {}. Assuming missing.",
+                    e
+                );
                 panic!("ARIMA Strategy: Missing or invalid 'd' parameter in configuration.");
             },
             |val| val as usize,
@@ -123,16 +132,26 @@ impl Strategy for ArimaStrategy {
 
         let q = config.get_int("q").map_or_else(
             |e: NyxsOwlError| {
-                error!("ARIMA Strategy: Error getting 'q' parameter: {}. Assuming missing.", e);
+                error!(
+                    "ARIMA Strategy: Error getting 'q' parameter: {}. Assuming missing.",
+                    e
+                );
                 panic!("ARIMA Strategy: Missing or invalid 'q' parameter in configuration.");
             },
             |val| val as usize,
         );
 
-        let threshold = config.get_float("threshold").unwrap_or_else(|e: NyxsOwlError| {
-            error!("ARIMA Strategy: Error getting 'threshold' parameter: {}. Assuming missing.", e);
-            panic!("ARIMA Strategy: Missing or invalid 'threshold' parameter in configuration.");
-        });
+        let threshold = config
+            .get_float("threshold")
+            .unwrap_or_else(|e: NyxsOwlError| {
+                error!(
+                    "ARIMA Strategy: Error getting 'threshold' parameter: {}. Assuming missing.",
+                    e
+                );
+                panic!(
+                    "ARIMA Strategy: Missing or invalid 'threshold' parameter in configuration."
+                );
+            });
 
         let strategy_type_str = config
             .get_string("strategy_type")
@@ -141,16 +160,17 @@ impl Strategy for ArimaStrategy {
                 panic!("ARIMA Strategy: Missing or invalid 'strategy_type' parameter in configuration.");
             });
 
-        let strategy_type = ArimaStrategyType::from_string(strategy_type_str).unwrap_or_else(|e: NyxsOwlError| {
-            error!(
-                "ARIMA Strategy: Invalid 'strategy_type' configured: {}. Error: {}",
-                strategy_type_str, e
-            );
-            panic!(
-                "ARIMA Strategy: Invalid 'strategy_type' configured: {}. Error: {}",
-                strategy_type_str, e
-            );
-        });
+        let strategy_type =
+            ArimaStrategyType::from_string(strategy_type_str).unwrap_or_else(|e: NyxsOwlError| {
+                error!(
+                    "ARIMA Strategy: Invalid 'strategy_type' configured: {}. Error: {}",
+                    strategy_type_str, e
+                );
+                panic!(
+                    "ARIMA Strategy: Invalid 'strategy_type' configured: {}. Error: {}",
+                    strategy_type_str, e
+                );
+            });
 
         info!(
             "ARIMA Strategy initialized with p={}, d={}, q={}, threshold={}, strategy_type={:?}",
@@ -167,7 +187,8 @@ impl Strategy for ArimaStrategy {
         }
     }
 
-    fn generate_signals(&self, data: &DataFrame) -> NyxsOwlResult<Series> { // Changed to NyxsOwlResult
+    fn generate_signals(&self, data: &DataFrame) -> NyxsOwlResult<Series> {
+        // Changed to NyxsOwlResult
         self.validate_data(data)?; // This now returns NyxsOwlResult
         info!(
             "ARIMA Strategy: Generating signals for {} data points.",
@@ -178,7 +199,10 @@ impl Strategy for ArimaStrategy {
         let timestamps_ca = data.column("timestamp")?.datetime()?;
 
         let forecasts_series = self.get_arima_forecasts(timestamps_ca, close_prices_ca)?; // Assuming this will also return NyxsOwlResult
-        debug!("ARIMA Strategy: Forecasts series obtained: {:?}", forecasts_series);
+        debug!(
+            "ARIMA Strategy: Forecasts series obtained: {:?}",
+            forecasts_series
+        );
         let forecast_prices_ca = forecasts_series.f64()?;
 
         if close_prices_ca.len() != forecast_prices_ca.len() {
@@ -187,7 +211,8 @@ impl Strategy for ArimaStrategy {
                 forecast_prices_ca.len(),
                 close_prices_ca.len()
             );
-            return Err(NyxsOwlError::StrategyError( // Changed to NyxsOwlError::StrategyError
+            return Err(NyxsOwlError::StrategyError(
+                // Changed to NyxsOwlError::StrategyError
                 "Forecast series length does not match price series length.".to_string(),
             ));
         }
@@ -209,7 +234,7 @@ impl Strategy for ArimaStrategy {
                         }
                     } else {
                         if i >= self.min_data_points() {
-                           debug!(
+                            debug!(
                                 "ARIMA Strategy: Holding signal at index {} due to missing current price or forecast. Current: {:?}, Forecast: {:?}.",
                                 i, close_prices_ca.get(i), forecast_prices_ca.get(i)
                             );
@@ -255,13 +280,12 @@ impl ArimaStrategy {
         &self,
         timestamps_ca: &DatetimeChunked,
         close_prices_ca: &Float64Chunked,
-    ) -> NyxsOwlResult<Series> { // Changed to NyxsOwlResult
+    ) -> NyxsOwlResult<Series> {
+        // Changed to NyxsOwlResult
         let data_values_options_vec: Vec<Option<f64>> = close_prices_ca.into_iter().collect();
-        
-        let timestamps_options_vec: Vec<Option<i64>> = timestamps_ca
-            .into_iter()
-            .map(|opt_ndt| opt_ndt)
-            .collect();
+
+        let timestamps_options_vec: Vec<Option<i64>> =
+            timestamps_ca.into_iter().map(|opt_ndt| opt_ndt).collect();
 
         let series_len = data_values_options_vec.len();
         if series_len == 0 {
@@ -270,11 +294,13 @@ impl ArimaStrategy {
         }
         if series_len != timestamps_options_vec.len() {
             error!("ARIMA Strategy: Mismatch in processed timestamp and close price lengths internally.");
-            return Err(NyxsOwlError::StrategyError( // Corrected from ValidationError
-                "Timestamp and close price vector length mismatch after initial processing.".to_string(),
+            return Err(NyxsOwlError::StrategyError(
+                // Corrected from ValidationError
+                "Timestamp and close price vector length mismatch after initial processing."
+                    .to_string(),
             ));
         }
-        
+
         let mut historical_forecasts: Vec<Option<f64>> = vec![None; series_len];
         info!(
             "ARIMA Strategy: Starting walk-forward forecasting for series of length {}. ARIMA(p={}, d={}, q={})",
@@ -284,7 +310,8 @@ impl ArimaStrategy {
         let initial_fit_window_size = self.min_data_points();
         // oxidiviner::quick::arima_forecast_custom creates TimeSeriesData internally, which needs at least 1 point.
         // The actual model fitting (ARIMAModel::fit) will have more robust requirements based on p,d,q and data length.
-        let min_dense_values_for_arima = (self.arima_p.max(1) + self.arima_q.max(1) + self.arima_d + 5).max(10); 
+        let min_dense_values_for_arima =
+            (self.arima_p.max(1) + self.arima_q.max(1) + self.arima_d + 5).max(10);
 
         if series_len < initial_fit_window_size {
             warn!(
@@ -301,7 +328,10 @@ impl ArimaStrategy {
 
             // Collect only non-missing pairs up to index i (exclusive for current observation)
             for k in 0..i {
-                if let (Some(ts_opt), Some(val_opt)) = (timestamps_options_vec.get(k), data_values_options_vec.get(k)) {
+                if let (Some(ts_opt), Some(val_opt)) = (
+                    timestamps_options_vec.get(k),
+                    data_values_options_vec.get(k),
+                ) {
                     if let (Some(ts), Some(val)) = (ts_opt, val_opt) {
                         // Convert i64 milliseconds to DateTime<Utc>
                         if let Some(dt) = chrono::DateTime::from_timestamp_millis(*ts) {
@@ -311,7 +341,7 @@ impl ArimaStrategy {
                     }
                 }
             }
-            
+
             if current_values_for_fit.len() < min_dense_values_for_arima {
                 warn!(
                     "ARIMA Strategy: Not enough dense data points ({} available, {} required) in window [0..{}] to fit ARIMA for forecast at index {}. Skipping forecast.",
@@ -333,7 +363,10 @@ impl ArimaStrategy {
                 Ok(forecast_vec) => {
                     if !forecast_vec.is_empty() {
                         historical_forecasts[i] = Some(forecast_vec[0]);
-                        debug!("ARIMA Strategy: Forecast for index {}: {}", i, forecast_vec[0]);
+                        debug!(
+                            "ARIMA Strategy: Forecast for index {}: {}",
+                            i, forecast_vec[0]
+                        );
                     } else {
                         warn!(
                             "ARIMA Strategy: Forecast for index {} returned empty. Setting to None.", i
@@ -362,34 +395,41 @@ impl ArimaStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{DataFrame, NamedFrom, Series, Float64Chunked, DataType, TimeUnit, AnyValue};
     use chrono::NaiveDateTime;
+    use polars::prelude::{
+        AnyValue, DataFrame, DataType, Float64Chunked, NamedFrom, Series, TimeUnit,
+    };
 
     // Updated to include a timestamp column
     fn create_test_data(len: usize) -> DataFrame {
-        let start_naive_dt = NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
-        
+        let start_naive_dt =
+            NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
         let timestamps_ms: Vec<Option<i64>> = (0..len)
             .map(|i| {
-                if i % 15 == 0 && i > 0 { // Introduce some None timestamps to test robustness
+                if i % 15 == 0 && i > 0 {
+                    // Introduce some None timestamps to test robustness
                     None
                 } else {
-                    Some(start_naive_dt.and_utc().timestamp_millis() + (i as i64 * 24 * 60 * 60 * 1000)) // daily interval
+                    Some(
+                        start_naive_dt.and_utc().timestamp_millis()
+                            + (i as i64 * 24 * 60 * 60 * 1000),
+                    ) // daily interval
                 }
             })
             .collect();
 
         let close_values: Vec<Option<f64>> = (0..len)
             .map(|i| {
-                if i % 10 == 0 && i > 0 { // Introduce some Nones for close values
+                if i % 10 == 0 && i > 0 {
+                    // Introduce some Nones for close values
                     None
-                }
-                else {
+                } else {
                     Some(100.0 + (i as f64 * 0.1) - ((i % 10) as f64 * 0.05))
                 }
             })
             .collect();
-        
+
         polars::df![
             "timestamp" => Series::new("timestamp".into(), timestamps_ms).cast(&DataType::Datetime(TimeUnit::Milliseconds, Some("UTC".into()))).unwrap(),
             "close" => Series::new("close".into(), close_values)
@@ -452,7 +492,7 @@ mod tests {
         let strategy = ArimaStrategy::new(config);
         let min_points = strategy.min_data_points();
 
-        let data_too_short = create_test_data(min_points -1 ); 
+        let data_too_short = create_test_data(min_points - 1);
         match strategy.generate_signals(&data_too_short) {
             Ok(signals) => {
                 assert_eq!(signals.len(), data_too_short.height());
@@ -467,13 +507,19 @@ mod tests {
                     data_too_short.height(), min_points, signals
                 );
             }
-            Err(crate::forecasting::NyxsOwlError::StrategyError(msg)) => { // Expecting strategy error due to min_data_points check in validate_data
-                 assert!(msg.contains(&format!("requires at least {} data points, but got", min_points)));
+            Err(crate::forecasting::NyxsOwlError::StrategyError(msg)) => {
+                // Expecting strategy error due to min_data_points check in validate_data
+                assert!(msg.contains(&format!(
+                    "requires at least {} data points, but got",
+                    min_points
+                )));
             }
-            Err(e) => panic!(
+            Err(e) => {
+                panic!(
                 "generate_signals failed unexpectedly for too_short data ({} points, min {}): {:?}",
                  data_too_short.height(), min_points, e
-            ),
+            )
+            }
         }
 
         // Test with data exactly at min_data_points. Should produce all Hold because loop for forecasts won't run.
@@ -481,14 +527,19 @@ mod tests {
         match strategy.generate_signals(&data_just_enough) {
             Ok(signals) => {
                 assert_eq!(signals.len(), data_just_enough.height());
-                 let all_hold = signals
+                let all_hold = signals
                     .i32()
                     .unwrap()
                     .into_iter()
                     .all(|s_opt| s_opt.map_or(false, |s| s == Signal::Hold.to_int()));
                 assert!(all_hold, "Expected all Hold signals when data length ({}) equals min_data_points ({}). Forecast loop doesn't run. Signals: {:?}", data_just_enough.height(), min_points, signals);
             }
-            Err(e) => panic!("generate_signals failed for just_enough data ({} points, min {}): {:?}", data_just_enough.height(), min_points, e),
+            Err(e) => panic!(
+                "generate_signals failed for just_enough data ({} points, min {}): {:?}",
+                data_just_enough.height(),
+                min_points,
+                e
+            ),
         }
 
         // Test with sufficient data to run the forecast loop at least once
@@ -498,15 +549,34 @@ mod tests {
                 assert_eq!(signals.len(), data_sufficient.height());
                 // Actual signals depend on OxiDiviner's output, which is mocked here by being None for first few points
                 // For a real test, we'd need more predictable mock forecasts or to inspect the None pattern for initial points
-                println!("Signals for {} data points (min_points {}): {:?}", data_sufficient.height(), min_points, signals);
+                println!(
+                    "Signals for {} data points (min_points {}): {:?}",
+                    data_sufficient.height(),
+                    min_points,
+                    signals
+                );
                 // Example check: the first `min_points` should be Hold
                 for i in 0..min_points {
-                    assert_eq!(signals.i32().unwrap().get(i).unwrap_or(Signal::Buy.to_int()), Signal::Hold.to_int(), "Signal at index {} was not Hold", i);
+                    assert_eq!(
+                        signals
+                            .i32()
+                            .unwrap()
+                            .get(i)
+                            .unwrap_or(Signal::Buy.to_int()),
+                        Signal::Hold.to_int(),
+                        "Signal at index {} was not Hold",
+                        i
+                    );
                 }
-                 // The last point might have a non-Hold signal if forecast was generated
-                 // This is hard to assert without knowing mock forecast behavior from OxiDiviner
+                // The last point might have a non-Hold signal if forecast was generated
+                // This is hard to assert without knowing mock forecast behavior from OxiDiviner
             }
-            Err(e) => panic!("generate_signals failed for sufficient data ({} points, min {}): {:?}", data_sufficient.height(), min_points, e),
+            Err(e) => panic!(
+                "generate_signals failed for sufficient data ({} points, min {}): {:?}",
+                data_sufficient.height(),
+                min_points,
+                e
+            ),
         }
     }
 
@@ -545,13 +615,16 @@ mod tests {
             }
         }
 
-        fn generate_signals(&self, data: &DataFrame) -> Result<Series, crate::forecasting::NyxsOwlError> {
+        fn generate_signals(
+            &self,
+            data: &DataFrame,
+        ) -> Result<Series, crate::forecasting::NyxsOwlError> {
             self.validate_data(data)?;
             let close_prices_ca = data.column("close")?.f64()?;
             // Timestamps are present in data but not explicitly used by MockArimaStrategy's signal logic directly,
             // as it uses self.mock_forecasts.
             // let _timestamps_ca = data.column("timestamp")?.datetime()?;
-            
+
             let forecast_prices_ca = self.mock_forecasts.f64()?;
 
             if close_prices_ca.len() != forecast_prices_ca.len() {
@@ -603,17 +676,18 @@ mod tests {
         }
         fn min_data_points(&self) -> usize {
             // Mock can have a simpler min_data_points for testing
-            (self.arima_p + self.arima_d + self.arima_q + 1).max(2) 
+            (self.arima_p + self.arima_d + self.arima_q + 1).max(2)
         }
     }
 
     #[test]
     fn test_trend_following_logic_with_mock_forecasts() {
         let config = create_config(1, 0, 0, 0.01, "trend_following");
-        
+
         // Create test data with timestamps and close prices
         let n_rows = 5;
-        let start_naive_dt = NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let start_naive_dt =
+            NaiveDateTime::parse_from_str("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
         let timestamps_ms: Vec<i64> = (0..n_rows)
             .map(|i| start_naive_dt.and_utc().timestamp_millis() + (i as i64 * 24 * 60 * 60 * 1000))
             .collect();
@@ -631,35 +705,62 @@ mod tests {
             ].unwrap();
 
         // Test Buy signal
-        let forecasts_buy_options: Vec<Option<f64>> = vec![Some(100.0), Some(102.0), Some(100.1), Some(100.15), Some(100.2)]; 
+        let forecasts_buy_options: Vec<Option<f64>> = vec![
+            Some(100.0),
+            Some(102.0),
+            Some(100.1),
+            Some(100.15),
+            Some(100.2),
+        ];
         let forecasts_buy = Series::new("forecast".into(), forecasts_buy_options);
         let mut strategy_buy = MockArimaStrategy::new(config.clone());
         strategy_buy.mock_forecasts = forecasts_buy;
         let signals_buy = strategy_buy.generate_signals(&data).unwrap();
-        assert_eq!(signals_buy.i32().unwrap().get(1).unwrap_or_default(), Signal::Buy.to_int());
+        assert_eq!(
+            signals_buy.i32().unwrap().get(1).unwrap_or_default(),
+            Signal::Buy.to_int()
+        );
 
         // Test Sell signal
-        let forecasts_sell_options: Vec<Option<f64>> = vec![Some(100.0), Some(98.0), Some(100.1), Some(100.15), Some(100.2)];
+        let forecasts_sell_options: Vec<Option<f64>> = vec![
+            Some(100.0),
+            Some(98.0),
+            Some(100.1),
+            Some(100.15),
+            Some(100.2),
+        ];
         let forecasts_sell = Series::new("forecast".into(), forecasts_sell_options);
         let mut strategy_sell = MockArimaStrategy::new(config.clone());
         strategy_sell.mock_forecasts = forecasts_sell;
         let signals_sell = strategy_sell.generate_signals(&data).unwrap();
-        assert_eq!(signals_sell.i32().unwrap().get(1).unwrap_or_default(), Signal::Sell.to_int());
+        assert_eq!(
+            signals_sell.i32().unwrap().get(1).unwrap_or_default(),
+            Signal::Sell.to_int()
+        );
 
         // Test Hold signal
-        let forecasts_hold_options: Vec<Option<f64>> = vec![Some(100.0), Some(100.06), Some(100.1), Some(100.15), Some(100.2)];
+        let forecasts_hold_options: Vec<Option<f64>> = vec![
+            Some(100.0),
+            Some(100.06),
+            Some(100.1),
+            Some(100.15),
+            Some(100.2),
+        ];
         let forecasts_hold = Series::new("forecast".into(), forecasts_hold_options);
         let mut strategy_hold = MockArimaStrategy::new(config.clone());
         strategy_hold.mock_forecasts = forecasts_hold;
         let signals_hold = strategy_hold.generate_signals(&data).unwrap();
-        assert_eq!(signals_hold.i32().unwrap().get(1).unwrap_or_default(), Signal::Hold.to_int());
+        assert_eq!(
+            signals_hold.i32().unwrap().get(1).unwrap_or_default(),
+            Signal::Hold.to_int()
+        );
     }
 
     #[test]
     fn test_arima_required_columns_validation() {
         let config = create_config(1, 0, 0, 0.01, "trend_following");
         let strategy = ArimaStrategy::new(config);
-        let correct_data = create_test_data(strategy.min_data_points()); 
+        let correct_data = create_test_data(strategy.min_data_points());
         assert!(strategy.validate_data(&correct_data).is_ok());
 
         let incorrect_data_no_close = polars::df!["timestamp" => Series::new("timestamp".into(), vec![0i64]).cast(&DataType::Datetime(TimeUnit::Milliseconds, None)).unwrap()].unwrap();
@@ -669,9 +770,11 @@ mod tests {
             }
             _ => panic!("Expected MissingData error for 'close'"),
         }
-        
-        let incorrect_data_no_timestamp = polars::df!["close" => Series::new("close".into(), vec![Some(1.0), Some(2.0)])].unwrap();
-         match strategy.validate_data(&incorrect_data_no_timestamp) {
+
+        let incorrect_data_no_timestamp =
+            polars::df!["close" => Series::new("close".into(), vec![Some(1.0), Some(2.0)])]
+                .unwrap();
+        match strategy.validate_data(&incorrect_data_no_timestamp) {
             Err(crate::forecasting::NyxsOwlError::MissingData(msg)) => {
                 assert!(msg.contains("Column 'timestamp' not found"));
             }
@@ -685,7 +788,7 @@ mod tests {
         let strategy = ArimaStrategy::new(config);
         let min_points = strategy.min_data_points();
 
-        let insufficient_data = create_test_data(min_points - 1); 
+        let insufficient_data = create_test_data(min_points - 1);
         match strategy.validate_data(&insufficient_data) {
             Err(crate::forecasting::NyxsOwlError::StrategyError(msg)) => {
                 assert!(msg.contains(&format!(
@@ -694,7 +797,11 @@ mod tests {
                     min_points - 1
                 )));
             }
-            _ => panic!("Expected StrategyError for insufficient data ({} rows, min {})", min_points-1, min_points),
+            _ => panic!(
+                "Expected StrategyError for insufficient data ({} rows, min {})",
+                min_points - 1,
+                min_points
+            ),
         }
 
         let sufficient_data = create_test_data(min_points);

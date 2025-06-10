@@ -1,5 +1,6 @@
 # RusTaLib Technical Indicators: Usage and Trading Strategies
 
+
 This document provides an overview of the technical indicators available in the RusTaLib library and common trading strategies associated with them.
 
 The library offers a comprehensive suite of indicators, categorized for ease of use:

@@ -54,8 +54,11 @@ pub fn macd_signals(
         )));
     }
 
+    // Convert Column to Series for calculation
+    let prices_series_clone = prices_series.clone().as_series();
+    
     // Calculate MACD indicators
-    let (macd_line, signal_line, _histogram) = calculate_macd(prices_series, fast_period, slow_period, signal_period)
+    let (macd_line, signal_line, _histogram) = calculate_macd(&prices_series_clone, fast_period, slow_period, signal_period)
         .map_err(|e| NyxsOwlError::IndicatorError(format!("MACD calculation failed: {}", e)))?;
 
     // Extract values for signal generation
@@ -79,7 +82,7 @@ pub fn macd_signals(
             let prev_macd_above = prev_macd > prev_signal;
 
             // Detect crossovers
-            if let Some(was_above) = previous_macd_above {
+            if let Some(was_above) = previous_macd_above_signal {
                 if !was_above && current_macd_above {
                     // MACD crossed above signal line -> Buy signal
                     signals[i] = Signal::Buy;
@@ -89,7 +92,7 @@ pub fn macd_signals(
                 }
             }
 
-            previous_macd_above = Some(current_macd_above);
+            previous_macd_above_signal = Some(current_macd_above);
         }
     }
 

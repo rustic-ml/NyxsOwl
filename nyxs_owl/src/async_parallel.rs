@@ -1,11 +1,11 @@
+use crate::memory_optimized::{CacheOptimizedTimeSeries, MemoryPool};
+use crate::performance_utils::SimdMath;
+use crate::simple_types::Price;
+use futures::future::join_all;
+use rayon::prelude::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
-use rayon::prelude::*;
-use futures::future::join_all;
-use crate::simple_types::Price;
-use crate::performance_utils::SimdMath;
-use crate::memory_optimized::{CacheOptimizedTimeSeries, MemoryPool};
 
 /// Market data structure for processing
 #[derive(Debug, Clone)]
@@ -114,26 +114,25 @@ impl AsyncParallelProcessor {
         // Sort by priority (lower number = higher priority)
         sorted_tasks.sort_by_key(|task| task.priority);
 
-        let futures = sorted_tasks.into_iter().map(|task| {
-            self.process_single_forecast(task)
-        });
+        let futures = sorted_tasks
+            .into_iter()
+            .map(|task| self.process_single_forecast(task));
 
         join_all(futures).await.into_iter().flatten().collect()
     }
 
     /// Process a single forecast task with timeout and resource management
-    async fn process_single_forecast(
-        &self,
-        task: ForecastTask,
-    ) -> Option<ParallelForecastResult> {
+    async fn process_single_forecast(&self, task: ForecastTask) -> Option<ParallelForecastResult> {
         let _permit = self.semaphore.acquire().await.ok()?;
         let start_time = Instant::now();
-        
-        let worker_id = self.task_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        let worker_id = self
+            .task_counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Timeout wrapper
         let forecast_future = self.execute_forecast_task(task.clone(), worker_id);
-        
+
         match tokio::time::timeout(self.config.forecast_timeout, forecast_future).await {
             Ok(Some(result)) => {
                 let processing_time = start_time.elapsed();
@@ -165,10 +164,13 @@ impl AsyncParallelProcessor {
         // Move CPU-intensive work to blocking thread pool
         let data = task.data.clone();
         let symbol = task.symbol.clone();
-        
+
         tokio::task::spawn_blocking(move || {
             Self::compute_forecast_blocking(&data, &symbol, worker_id)
-        }).await.ok().flatten()
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     /// CPU-intensive forecast computation (runs on blocking thread pool)
@@ -190,7 +192,7 @@ impl AsyncParallelProcessor {
 
         // Parallel trend analysis using Rayon
         let trend_strength = Self::parallel_trend_analysis(&prices);
-        
+
         // Generate forecast
         let forecast_price = mean + (trend_strength * volatility * 0.1);
         let confidence = (1.0f64 - (volatility / mean).min(1.0)).max(0.0);
@@ -214,14 +216,14 @@ impl AsyncParallelProcessor {
 
         // Split into chunks for parallel processing
         let chunk_size = (prices.len() / num_cpus::get()).max(10);
-        
+
         let trend_components: Vec<f64> = prices
             .par_chunks(chunk_size)
             .map(|chunk| {
                 if chunk.len() < 2 {
                     return 0.0;
                 }
-                
+
                 // Calculate local trend for this chunk
                 let first = chunk[0];
                 let last = chunk[chunk.len() - 1];
@@ -268,9 +270,10 @@ impl AsyncParallelProcessor {
         market_data
             .par_chunks(self.config.parallel_chunk_size)
             .flat_map(|chunk| {
-                chunk.par_iter().map(|data| {
-                    ProcessedMarketData::from_market_data(data)
-                }).collect::<Vec<_>>()
+                chunk
+                    .par_iter()
+                    .map(|data| ProcessedMarketData::from_market_data(data))
+                    .collect::<Vec<_>>()
             })
             .collect()
     }
@@ -302,7 +305,7 @@ impl ProcessedMarketData {
         // Simulate processing with some calculations
         let volatility = (data.high - data.low) / data.close;
         let momentum = (data.close - data.open) / data.open;
-        
+
         Self {
             symbol: data.symbol.clone(),
             price: data.close,
@@ -348,10 +351,10 @@ impl AsyncDataPipeline {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
-            
+
             loop {
                 interval_timer.tick().await;
-                
+
                 // Process buffered data
                 let data = {
                     let mut buffer = data_buffer.write().await;
@@ -377,8 +380,8 @@ impl AsyncDataPipeline {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::MarketData;
+    use super::*;
 
     #[tokio::test]
     async fn test_parallel_forecast_processing() {
@@ -391,7 +394,7 @@ mod tests {
         };
 
         let processor = AsyncParallelProcessor::new(config);
-        
+
         // Create test data
         let mut time_series = CacheOptimizedTimeSeries::new();
         for i in 0..100 {
@@ -419,7 +422,7 @@ mod tests {
 
         let results = processor.process_forecasts_concurrent(tasks).await;
         assert_eq!(results.len(), 2);
-        
+
         for result in &results {
             assert!(result.result.confidence > 0.0);
             assert!(result.processing_time.as_nanos() >= 0); // More lenient timing check
@@ -430,18 +433,16 @@ mod tests {
     async fn test_ensemble_parallel_processing() {
         let config = ParallelConfig::default();
         let processor = AsyncParallelProcessor::new(config);
-        
+
         let mut time_series = CacheOptimizedTimeSeries::new();
         for i in 0..50 {
             time_series.add_price((100.0 + (i as f64 * 0.2)) as f32);
         }
         let data = Arc::new(time_series);
 
-        let results = processor.process_ensemble_parallel(
-            data,
-            5,
-            "TEST".to_string()
-        ).await;
+        let results = processor
+            .process_ensemble_parallel(data, 5, "TEST".to_string())
+            .await;
 
         assert_eq!(results.len(), 5);
         for result in &results {
@@ -473,7 +474,7 @@ mod tests {
 
         assert_eq!(processed.len(), 1000);
         println!("Processed {} items in {:?}", processed.len(), duration);
-        
+
         // Verify processing
         for (i, item) in processed.iter().enumerate() {
             assert!(item.volatility >= 0.0);
@@ -513,8 +514,8 @@ mod tests {
 
         // Let it process for a short time
         tokio::time::sleep(Duration::from_millis(200)).await;
-        
+
         // Pipeline should be running (test passes if no panic)
         assert!(true);
     }
-} 
+}

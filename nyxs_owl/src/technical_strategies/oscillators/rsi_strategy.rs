@@ -52,7 +52,7 @@ pub fn rsi_signals(
         )));
     }
 
-    let rsi_series = calculate_rsi(df, price_column, period).map_err(|e| {
+    let rsi_series = calculate_rsi(df, period, price_column).map_err(|e| {
         NyxsOwlError::StrategyError(format!("Failed to calculate RSI: {:?}", e))
     })?;
     
@@ -158,7 +158,7 @@ mod tests {
             Ok(signals) => {
                 assert_eq!(signals.len(), prices_for_rsi_calc.len());
                 
-                let rsi_series = calculate_rsi(&df, "close", period).unwrap();
+                let rsi_series = calculate_rsi(&df, period, "close").unwrap();
                 // println!("Test RSI Series: {:?}", rsi_series);
 
                 let mut buy_signal_found = false;

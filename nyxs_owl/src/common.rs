@@ -1,1 +1,1 @@
-// Placeholder for the common module. 
+// Placeholder for the common module.

@@ -53,7 +53,7 @@ impl ExponentialSmoothingConfig {
         // Validate alpha
         if !(0.0..=1.0).contains(&alpha) {
             return Err(NyxsOwlError::InvalidParameter(
-                "Alpha must be between 0.0 and 1.0".to_string()
+                "Alpha must be between 0.0 and 1.0".to_string(),
             ));
         }
 
@@ -61,7 +61,7 @@ impl ExponentialSmoothingConfig {
         if let Some(b) = beta {
             if !(0.0..=1.0).contains(&b) {
                 return Err(NyxsOwlError::InvalidParameter(
-                    "Beta must be between 0.0 and 1.0".to_string()
+                    "Beta must be between 0.0 and 1.0".to_string(),
                 ));
             }
         }
@@ -70,7 +70,7 @@ impl ExponentialSmoothingConfig {
         if let Some(g) = gamma {
             if !(0.0..=1.0).contains(&g) {
                 return Err(NyxsOwlError::InvalidParameter(
-                    "Gamma must be between 0.0 and 1.0".to_string()
+                    "Gamma must be between 0.0 and 1.0".to_string(),
                 ));
             }
         }
@@ -79,7 +79,7 @@ impl ExponentialSmoothingConfig {
         if let Some(sp) = seasonal_periods {
             if sp < 2 {
                 return Err(NyxsOwlError::InvalidParameter(
-                    "Seasonal periods must be at least 2".to_string()
+                    "Seasonal periods must be at least 2".to_string(),
                 ));
             }
         }
@@ -87,25 +87,25 @@ impl ExponentialSmoothingConfig {
         // Validate other parameters
         if forecast_horizon == 0 {
             return Err(NyxsOwlError::InvalidParameter(
-                "Forecast horizon must be greater than 0".to_string()
+                "Forecast horizon must be greater than 0".to_string(),
             ));
         }
 
         if threshold < 0.0 {
             return Err(NyxsOwlError::InvalidParameter(
-                "Threshold must be non-negative".to_string()
+                "Threshold must be non-negative".to_string(),
             ));
         }
 
         if min_data_points < 10 {
             return Err(NyxsOwlError::InvalidParameter(
-                "Minimum data points must be at least 10".to_string()
+                "Minimum data points must be at least 10".to_string(),
             ));
         }
 
         if window_size < min_data_points {
             return Err(NyxsOwlError::InvalidParameter(
-                "Window size must be at least as large as minimum data points".to_string()
+                "Window size must be at least as large as minimum data points".to_string(),
             ));
         }
 
@@ -198,42 +198,47 @@ impl ExponentialSmoothingStrategy {
     ) -> Result<Vec<Signal>> {
         // Validate inputs
         self.validate_inputs(df, price_column, timestamp_column)?;
-        
+
         // Extract price data
         let prices = self.extract_prices(df, price_column)?;
         let timestamps = self.extract_timestamps(df, timestamp_column)?;
-        
+
         // Generate forecasts using rolling window approach
         let signals = self.generate_rolling_forecasts(&prices, &timestamps)?;
-        
+
         Ok(signals)
     }
-    
+
     // Private helper methods
     fn validate_inputs(&self, df: &DataFrame, price_col: &str, timestamp_col: &str) -> Result<()> {
         if df.height() < self.config.min_data_points {
             return Err(NyxsOwlError::MissingData(format!(
-                "Insufficient data: {} rows, need at least {}", 
-                df.height(), self.config.min_data_points
+                "Insufficient data: {} rows, need at least {}",
+                df.height(),
+                self.config.min_data_points
             )));
         }
-        
+
         // Validate columns exist
-        df.column(price_col).map_err(|e| 
+        df.column(price_col).map_err(|e| {
             NyxsOwlError::DataError(format!("Price column '{}' not found: {}", price_col, e))
-        )?;
-        
-        df.column(timestamp_col).map_err(|e|
-            NyxsOwlError::DataError(format!("Timestamp column '{}' not found: {}", timestamp_col, e))
-        )?;
-        
+        })?;
+
+        df.column(timestamp_col).map_err(|e| {
+            NyxsOwlError::DataError(format!(
+                "Timestamp column '{}' not found: {}",
+                timestamp_col, e
+            ))
+        })?;
+
         Ok(())
     }
-    
+
     fn extract_prices(&self, df: &DataFrame, price_col: &str) -> Result<Vec<f64>> {
-        let price_series = df.column(price_col)
+        let price_series = df
+            .column(price_col)
             .map_err(|e| NyxsOwlError::DataError(format!("Failed to get price column: {}", e)))?;
-        
+
         match price_series.dtype() {
             DataType::Float64 => {
                 let prices: Vec<f64> = price_series
@@ -242,7 +247,7 @@ impl ExponentialSmoothingStrategy {
                     .into_no_null_iter()
                     .collect();
                 Ok(prices)
-            },
+            }
             DataType::Float32 => {
                 let prices: Vec<f64> = price_series
                     .f32()
@@ -251,36 +256,42 @@ impl ExponentialSmoothingStrategy {
                     .map(|x| x as f64)
                     .collect();
                 Ok(prices)
-            },
+            }
             _ => Err(NyxsOwlError::DataError(format!(
-                "Price column must be numeric, found: {:?}", 
+                "Price column must be numeric, found: {:?}",
                 price_series.dtype()
-            )))
+            ))),
         }
     }
-    
+
     fn extract_timestamps(&self, df: &DataFrame, timestamp_col: &str) -> Result<Vec<String>> {
-        let timestamp_series = df.column(timestamp_col)
-            .map_err(|e| NyxsOwlError::DataError(format!("Failed to get timestamp column: {}", e)))?;
-        
+        let timestamp_series = df.column(timestamp_col).map_err(|e| {
+            NyxsOwlError::DataError(format!("Failed to get timestamp column: {}", e))
+        })?;
+
         // Handle different timestamp column types
         match timestamp_series.dtype() {
             DataType::String => {
                 let timestamps: Vec<String> = timestamp_series
                     .str()
-                    .map_err(|e| NyxsOwlError::DataError(format!("Failed to cast timestamp to string: {}", e)))?
+                    .map_err(|e| {
+                        NyxsOwlError::DataError(format!(
+                            "Failed to cast timestamp to string: {}",
+                            e
+                        ))
+                    })?
                     .into_no_null_iter()
                     .map(|s| s.to_string())
                     .collect();
                 Ok(timestamps)
-            },
+            }
             DataType::Datetime(_, _) => {
                 // Convert datetime to string
                 let timestamps: Vec<String> = (0..timestamp_series.len())
                     .map(|i| format!("timestamp_{}", i))
                     .collect();
                 Ok(timestamps)
-            },
+            }
             _ => {
                 // Fallback: generate sequential timestamps
                 let timestamps: Vec<String> = (0..timestamp_series.len())
@@ -290,32 +301,36 @@ impl ExponentialSmoothingStrategy {
             }
         }
     }
-    
-    fn generate_rolling_forecasts(&self, prices: &[f64], _timestamps: &[String]) -> Result<Vec<Signal>> {
+
+    fn generate_rolling_forecasts(
+        &self,
+        prices: &[f64],
+        _timestamps: &[String],
+    ) -> Result<Vec<Signal>> {
         let mut signals = Vec::with_capacity(prices.len());
         let window_size = self.config.window_size;
-        
+
         // For the first window_size points, we can't generate forecasts
         for _ in 0..window_size {
             signals.push(Signal::Hold);
         }
-        
+
         // Generate forecasts using rolling window
         for i in window_size..prices.len() {
             let window_data = &prices[i - window_size..i];
             let current_price = prices[i];
-            
+
             match self.generate_exponential_smoothing_forecast(window_data) {
                 Ok(forecast) => {
                     let signal = self.forecast_to_signal(current_price, forecast);
                     signals.push(signal);
-                },
+                }
                 Err(_) => {
                     signals.push(Signal::Hold);
                 }
             }
         }
-        
+
         Ok(signals)
     }
 
@@ -326,7 +341,7 @@ impl ExponentialSmoothingStrategy {
         }
 
         let mut level = data[0];
-        
+
         for &value in data.iter().skip(1) {
             level = self.config.alpha * value + (1.0 - self.config.alpha) * level;
         }
@@ -337,7 +352,9 @@ impl ExponentialSmoothingStrategy {
     /// Double exponential smoothing (Holt's method) forecast
     fn double_exponential_smoothing(&self, data: &[f64], beta: f64) -> Result<f64> {
         if data.len() < 2 {
-            return Err(NyxsOwlError::DataError("Need at least 2 data points for trend".to_string()));
+            return Err(NyxsOwlError::DataError(
+                "Need at least 2 data points for trend".to_string(),
+            ));
         }
 
         let mut level = data[0];
@@ -355,16 +372,17 @@ impl ExponentialSmoothingStrategy {
 
     /// Triple exponential smoothing (Holt-Winters) forecast
     fn triple_exponential_smoothing(
-        &self, 
-        data: &[f64], 
-        beta: f64, 
-        gamma: f64, 
-        seasonal_periods: usize
+        &self,
+        data: &[f64],
+        beta: f64,
+        gamma: f64,
+        seasonal_periods: usize,
     ) -> Result<f64> {
         if data.len() < seasonal_periods * 2 {
-            return Err(NyxsOwlError::DataError(
-                format!("Need at least {} data points for seasonality", seasonal_periods * 2)
-            ));
+            return Err(NyxsOwlError::DataError(format!(
+                "Need at least {} data points for seasonality",
+                seasonal_periods * 2
+            )));
         }
 
         // Initialize seasonal factors
@@ -392,45 +410,47 @@ impl ExponentialSmoothingStrategy {
         for (t, &value) in data.iter().enumerate().skip(1) {
             let season_idx = t % seasonal_periods;
             let prev_level = level;
-            
-            level = self.config.alpha * (value / seasonal[season_idx]) + 
-                   (1.0 - self.config.alpha) * (level + trend);
+
+            level = self.config.alpha * (value / seasonal[season_idx])
+                + (1.0 - self.config.alpha) * (level + trend);
             trend = beta * (level - prev_level) + (1.0 - beta) * trend;
-            seasonal[season_idx] = gamma * (value / level) + 
-                                  (1.0 - gamma) * seasonal[season_idx];
+            seasonal[season_idx] = gamma * (value / level) + (1.0 - gamma) * seasonal[season_idx];
         }
 
         // Forecast
-        let forecast_season_idx = (data.len() + self.config.forecast_horizon - 1) % seasonal_periods;
+        let forecast_season_idx =
+            (data.len() + self.config.forecast_horizon - 1) % seasonal_periods;
         Ok((level + trend * self.config.forecast_horizon as f64) * seasonal[forecast_season_idx])
     }
 
     /// Generate forecast using appropriate exponential smoothing method
     fn generate_exponential_smoothing_forecast(&self, data: &[f64]) -> Result<f64> {
-        match (self.config.beta, self.config.gamma, self.config.seasonal_periods) {
+        match (
+            self.config.beta,
+            self.config.gamma,
+            self.config.seasonal_periods,
+        ) {
             (None, None, None) => {
                 // Simple exponential smoothing
                 self.simple_exponential_smoothing(data)
-            },
+            }
             (Some(beta), None, None) => {
                 // Double exponential smoothing (Holt's method)
                 self.double_exponential_smoothing(data, beta)
-            },
+            }
             (Some(beta), Some(gamma), Some(seasonal_periods)) => {
                 // Triple exponential smoothing (Holt-Winters)
                 self.triple_exponential_smoothing(data, beta, gamma, seasonal_periods)
-            },
-            _ => {
-                Err(NyxsOwlError::InvalidParameter(
-                    "Invalid combination of smoothing parameters".to_string()
-                ))
             }
+            _ => Err(NyxsOwlError::InvalidParameter(
+                "Invalid combination of smoothing parameters".to_string(),
+            )),
         }
     }
-    
+
     fn forecast_to_signal(&self, current_price: f64, forecast: f64) -> Signal {
         let price_change = (forecast - current_price) / current_price;
-        
+
         if price_change > self.config.threshold {
             Signal::Buy
         } else if price_change < -self.config.threshold {
@@ -441,8 +461,6 @@ impl ExponentialSmoothingStrategy {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -452,11 +470,11 @@ mod tests {
         let timestamps: Vec<String> = (0..len)
             .map(|i| format!("2023-01-{:02} 09:30:00", (i % 30) + 1))
             .collect();
-            
+
         let prices: Vec<f64> = (0..len)
             .map(|i| 100.0 + (i as f64 * 0.1) + (i as f64 * 0.1).sin() * 5.0)
             .collect();
-            
+
         df! {
             "timestamp" => timestamps,
             "close" => prices,
@@ -478,7 +496,8 @@ mod tests {
         assert!(config.is_err());
 
         // Invalid seasonal periods
-        let config = ExponentialSmoothingConfig::new(0.3, Some(0.1), Some(0.1), Some(1), 1, 0.02, 20, 50);
+        let config =
+            ExponentialSmoothingConfig::new(0.3, Some(0.1), Some(0.1), Some(1), 1, 0.02, 20, 50);
         assert!(config.is_err());
     }
 
@@ -493,7 +512,7 @@ mod tests {
     fn test_exponential_smoothing_insufficient_data() {
         let config = ExponentialSmoothingConfig::default();
         let strategy = ExponentialSmoothingStrategy::new(config);
-        
+
         let df = create_test_data(10).unwrap(); // Only 10 points, need 20
         let result = strategy.generate_signals(&df, "close", "timestamp");
         assert!(matches!(result, Err(NyxsOwlError::MissingData(_))));
@@ -503,13 +522,13 @@ mod tests {
     fn test_exponential_smoothing_missing_columns() {
         let config = ExponentialSmoothingConfig::default();
         let strategy = ExponentialSmoothingStrategy::new(config);
-        
+
         let df = create_test_data(100).unwrap();
-        
+
         // Test missing price column
         let result = strategy.generate_signals(&df, "missing_price", "timestamp");
         assert!(matches!(result, Err(NyxsOwlError::DataError(_))));
-        
+
         // Test missing timestamp column
         let result = strategy.generate_signals(&df, "close", "missing_timestamp");
         assert!(matches!(result, Err(NyxsOwlError::DataError(_))));
@@ -528,14 +547,14 @@ mod tests {
             window_size: 20,
         };
         let strategy = ExponentialSmoothingStrategy::new(config);
-        
+
         let df = create_test_data(100).unwrap();
         let result = strategy.generate_signals(&df, "close", "timestamp");
         assert!(result.is_ok());
-        
+
         let signals = result.unwrap();
         assert_eq!(signals.len(), df.height());
-        
+
         // Verify signals are valid
         for signal in &signals {
             assert!(matches!(signal, Signal::Buy | Signal::Sell | Signal::Hold));
@@ -555,11 +574,11 @@ mod tests {
             window_size: 20,
         };
         let strategy = ExponentialSmoothingStrategy::new(config);
-        
+
         let df = create_test_data(100).unwrap();
         let result = strategy.generate_signals(&df, "close", "timestamp");
         assert!(result.is_ok());
-        
+
         let signals = result.unwrap();
         assert!(!signals.is_empty());
     }
@@ -570,17 +589,17 @@ mod tests {
         let conservative = ExponentialSmoothingConfig::conservative();
         assert_eq!(conservative.alpha, 0.1);
         assert_eq!(conservative.threshold, 0.03);
-        
+
         // Test moderate config
         let moderate = ExponentialSmoothingConfig::moderate();
         assert_eq!(moderate.alpha, 0.3);
         assert!(moderate.beta.is_some());
-        
+
         // Test aggressive config
         let aggressive = ExponentialSmoothingConfig::aggressive();
         assert_eq!(aggressive.alpha, 0.5);
         assert_eq!(aggressive.threshold, 0.015);
-        
+
         // Test seasonal config
         let seasonal = ExponentialSmoothingConfig::seasonal(12);
         assert!(seasonal.is_ok());
@@ -593,19 +612,20 @@ mod tests {
     fn test_exponential_smoothing_edge_cases() {
         let config = ExponentialSmoothingConfig::default();
         let strategy = ExponentialSmoothingStrategy::new(config);
-        
+
         // Test with constant prices
         let df = df! {
             "timestamp" => (0..60).map(|i| format!("2023-01-{:02}", i + 1)).collect::<Vec<_>>(),
             "close" => vec![100.0; 60],
-        }.unwrap();
-        
+        }
+        .unwrap();
+
         let result = strategy.generate_signals(&df, "close", "timestamp");
         assert!(result.is_ok());
-        
+
         // Should generate mostly hold signals for constant prices
         let signals = result.unwrap();
         let hold_signals = signals.iter().filter(|&&s| s == Signal::Hold).count();
         assert!(hold_signals > signals.len() / 2); // Most signals should be Hold
     }
-} 
+}

@@ -4,8 +4,8 @@
 //! for basic technical analysis.
 
 use nyxs_owl::prelude::*;
-use nyxs_owl::trade_math::moving_averages::{calculate_sma, calculate_ema};
 use nyxs_owl::trade_math::momentum::calculate_rsi;
+use nyxs_owl::trade_math::moving_averages::{calculate_ema, calculate_sma};
 use nyxs_owl::trade_math::volatility::calculate_bollinger_bands;
 use polars::prelude::*;
 
@@ -15,8 +15,7 @@ fn main() -> Result<()> {
 
     // Sample price data (e.g., closing prices for the last 10 days)
     let prices_vec = vec![
-        100.0, 102.0, 101.5, 103.0, 104.5,
-        106.0, 105.5, 107.0, 108.5, 107.0
+        100.0, 102.0, 101.5, 103.0, 104.5, 106.0, 105.5, 107.0, 108.5, 107.0,
     ];
 
     println!("\n📊 Price Data: {:?}", prices_vec);
@@ -52,7 +51,7 @@ fn main() -> Result<()> {
         println!("RSI(5): {:?}", rsi_values);
         if let Some(latest_rsi) = rsi_values.iter().filter_map(|&x| x).last() {
             println!("Latest RSI: {:.2}", latest_rsi);
-            
+
             // Simple trading signal based on RSI
             if latest_rsi > 70.0 {
                 println!("🔴 RSI Signal: OVERBOUGHT - Consider selling");
@@ -69,20 +68,20 @@ fn main() -> Result<()> {
         let upper_values: Vec<Option<f64>> = upper_band.f64().unwrap().into_iter().collect();
         let middle_values: Vec<Option<f64>> = middle_band.f64().unwrap().into_iter().collect();
         let lower_values: Vec<Option<f64>> = lower_band.f64().unwrap().into_iter().collect();
-        
+
         if let (Some(upper), Some(middle), Some(lower)) = (
             upper_values.iter().filter_map(|&x| x).last(),
             middle_values.iter().filter_map(|&x| x).last(),
-            lower_values.iter().filter_map(|&x| x).last()
+            lower_values.iter().filter_map(|&x| x).last(),
         ) {
             println!("\n📊 Bollinger Bands (5, 2.0):");
             println!("Upper Band:  {:.2}", upper);
             println!("Middle Band: {:.2}", middle);
             println!("Lower Band:  {:.2}", lower);
-            
+
             let current_price = *prices_vec.last().unwrap();
             println!("Current Price: {:.2}", current_price);
-            
+
             // Simple trading signal based on Bollinger Bands
             if current_price > upper {
                 println!("🔴 BB Signal: Price above upper band - Consider selling");
@@ -110,4 +109,4 @@ fn main() -> Result<()> {
     println!("   cargo run --example arima_strategy_example --features forecasting");
 
     Ok(())
-} 
+}

@@ -45,13 +45,16 @@ pub fn sma_crossover_signals(
         )));
     }
 
+    // Convert Column to Series for calculation
+    let prices_series = prices.clone().as_series();
+    
     // Use the calculate_sma from trade_math module
-    let sma_short = calculate_sma(prices, short_period).map_err(|e| {
+    let sma_short = calculate_sma(&prices_series, short_period).map_err(|e| {
         NyxsOwlError::StrategyError(format!(
             "Failed to calculate short SMA (period {}): {}", short_period, e
         ))
     })?;
-    let sma_long = calculate_sma(prices, long_period).map_err(|e| {
+    let sma_long = calculate_sma(&prices_series, long_period).map_err(|e| {
         NyxsOwlError::StrategyError(format!(
             "Failed to calculate long SMA (period {}): {}", long_period, e
         ))

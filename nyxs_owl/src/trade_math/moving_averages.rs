@@ -1,26 +1,32 @@
-use polars::prelude::{PolarsResult, Series, NamedFrom, DataType, RollingOptionsFixedWindow, DataFrame, SeriesOpsTime};
+use polars::prelude::{
+    DataFrame, DataType, NamedFrom, PolarsResult, RollingOptionsFixedWindow, Series, SeriesOpsTime,
+};
 
 use polars::error::PolarsError;
 
 /// Calculates the Simple Moving Average (SMA) for a series.
-/// 
+///
 /// # Arguments
 /// * `series` - The input Series of data (expected to be Float64).
 /// * `period` - The lookback period for the SMA.
-/// 
+///
 /// # Returns
 /// A `PolarsResult<Series>` containing the SMA values.
 pub fn calculate_sma(series: &Series, period: usize) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("SMA period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "SMA period must be greater than 0".into(),
+        ));
     }
     if series.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError("Input series for SMA must be of type Float64.".into()));
+        return Err(PolarsError::ComputeError(
+            "Input series for SMA must be of type Float64.".into(),
+        ));
     }
     if series.len() < period {
         // Not enough data for a full window, return series of nulls
         let nulls: Vec<Option<f64>> = vec![None; series.len()];
-        return Ok(Series::new(series.name().clone(), nulls)); 
+        return Ok(Series::new(series.name().clone(), nulls));
     }
 
     let sma = series.rolling_mean(RollingOptionsFixedWindow {
@@ -50,13 +56,19 @@ pub fn calculate_sma(series: &Series, period: usize) -> PolarsResult<Series> {
 /// A `PolarsResult<Series>` containing the EMA values.
 pub fn calculate_ema(series: &Series, period: usize, smoothing: f64) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("EMA period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "EMA period must be greater than 0".into(),
+        ));
     }
     if smoothing <= 0.0 {
-        return Err(PolarsError::ComputeError("EMA smoothing factor must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "EMA smoothing factor must be greater than 0".into(),
+        ));
     }
     if series.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError("Input series for EMA must be of type Float64.".into()));
+        return Err(PolarsError::ComputeError(
+            "Input series for EMA must be of type Float64.".into(),
+        ));
     }
 
     let ca = series.f64()?;
@@ -65,7 +77,7 @@ pub fn calculate_ema(series: &Series, period: usize, smoothing: f64) -> PolarsRe
     if len == 0 {
         return Ok(Series::new_empty(series.name().clone(), &DataType::Float64));
     }
-    
+
     if len < period {
         // Not enough data for even the initial SMA, return series of nulls
         let nulls: Vec<Option<f64>> = vec![None; len];
@@ -79,29 +91,29 @@ pub fn calculate_ema(series: &Series, period: usize, smoothing: f64) -> PolarsRe
     // The first 'period' elements of SMA will be null if min_periods = period
     // The first valid SMA is at index period - 1
     let initial_sma_series = calculate_sma(series, period)?;
-    
-    if let Some(initial_value) = initial_sma_series.f64()?.get(period - 1) {
-            ema_values[period - 1] = Some(initial_value);
 
-            // Calculate subsequent EMA values
-            for i in period..len {
-                if let Some(current_price) = ca.get(i) {
-                    if let Some(prev_ema) = ema_values[i-1] { // previous EMA must be valid
-                         ema_values[i] = Some((current_price - prev_ema) * multiplier + prev_ema);
-                    } else {
-                        // This case should ideally not be hit if logic is correct and period >=1
-                        // If prev_ema is None but we are past the initial SMA period, it's an issue
-                        // For robustness, could attempt to re-seed SMA if a large gap of Nones occurred
-                        // but for now, if prev_ema is None, current EMA also becomes None.
-                         ema_values[i] = None;
-                    }
+    if let Some(initial_value) = initial_sma_series.f64()?.get(period - 1) {
+        ema_values[period - 1] = Some(initial_value);
+
+        // Calculate subsequent EMA values
+        for i in period..len {
+            if let Some(current_price) = ca.get(i) {
+                if let Some(prev_ema) = ema_values[i - 1] {
+                    // previous EMA must be valid
+                    ema_values[i] = Some((current_price - prev_ema) * multiplier + prev_ema);
                 } else {
-                    ema_values[i] = None; // If current price is None, EMA is None
+                    // This case should ideally not be hit if logic is correct and period >=1
+                    // If prev_ema is None but we are past the initial SMA period, it's an issue
+                    // For robustness, could attempt to re-seed SMA if a large gap of Nones occurred
+                    // but for now, if prev_ema is None, current EMA also becomes None.
+                    ema_values[i] = None;
                 }
+            } else {
+                ema_values[i] = None; // If current price is None, EMA is None
             }
+        }
     }
     // If initial_sma_series.f64()?.get(period - 1) was None, ema_values remains all None which is correct.
-
 
     Ok(Series::new(series.name().clone(), ema_values))
 }
@@ -120,10 +132,14 @@ pub fn calculate_ema(series: &Series, period: usize, smoothing: f64) -> PolarsRe
 /// A `PolarsResult<Series>` containing the WMA values.
 pub fn calculate_wma(series: &Series, period: usize) -> PolarsResult<Series> {
     if period == 0 {
-        return Err(PolarsError::ComputeError("WMA period must be greater than 0".into()));
+        return Err(PolarsError::ComputeError(
+            "WMA period must be greater than 0".into(),
+        ));
     }
     if series.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError("Input series for WMA must be of type Float64.".into()));
+        return Err(PolarsError::ComputeError(
+            "Input series for WMA must be of type Float64.".into(),
+        ));
     }
 
     let ca = series.f64()?;
@@ -133,7 +149,7 @@ pub fn calculate_wma(series: &Series, period: usize) -> PolarsResult<Series> {
         return Ok(Series::new_empty(series.name().clone(), &DataType::Float64));
     }
 
-            if len < period {
+    if len < period {
         let nulls: Vec<Option<f64>> = vec![None; len];
         return Ok(Series::new(series.name().clone(), nulls));
     }
@@ -156,7 +172,7 @@ pub fn calculate_wma(series: &Series, period: usize) -> PolarsResult<Series> {
             }
             current_weight -= 1.0;
         }
-        
+
         if all_some {
             wma_values[i] = Some(weighted_sum / sum_of_weights);
         } else {
@@ -215,7 +231,7 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
         }
     }
     let cumulative_tp_volume = Series::new("cumulative_tp_volume".into(), cumulative_tp_vol_values);
-    
+
     let volume_series = Series::from(volume.clone());
     let vol_ca = volume_series.f64()?;
     let mut cumulative_vol_values = Vec::with_capacity(vol_ca.len());
@@ -229,7 +245,7 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
         }
     }
     let cumulative_volume = Series::new("cumulative_volume".into(), cumulative_vol_values);
-    
+
     // Handle potential division by zero if cumulative_volume is 0 at any point
     // This can happen if volume is 0 for initial rows.
     let vwap_values: Vec<Option<f64>> = cumulative_tp_volume
@@ -249,16 +265,19 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
     use polars::prelude::AnyValue;
+    use polars::prelude::*;
 
     fn create_test_series(name: &str, data: Vec<Option<f64>>) -> Series {
         Series::new(name.into(), data)
     }
-    
+
     #[test]
     fn test_sma_calculation() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)]);
+        let s = create_test_series(
+            "price",
+            vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)],
+        );
         let sma2 = calculate_sma(&s, 2)?;
         assert_eq!(sma2.get(0).unwrap(), AnyValue::Null);
         assert_eq!(sma2.get(1).unwrap(), AnyValue::Float64(1.5));
@@ -305,7 +324,17 @@ mod tests {
 
     #[test]
     fn test_ema_calculation() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(10.0), Some(11.0), Some(12.0), Some(13.0), Some(14.0), Some(15.0)]);
+        let s = create_test_series(
+            "price",
+            vec![
+                Some(10.0),
+                Some(11.0),
+                Some(12.0),
+                Some(13.0),
+                Some(14.0),
+                Some(15.0),
+            ],
+        );
         let period = 3;
         let smoothing = 2.0;
 
@@ -317,19 +346,41 @@ mod tests {
         // EMA[5] = (Price[5] - EMA[4]) * 0.5 + EMA[4] = (15 - 13.0) * 0.5 + 13.0 = 1.0 + 13.0 = 14.0
 
         let ema_series = calculate_ema(&s, period, smoothing)?;
-        
+
         assert_eq!(ema_series.get(0).unwrap(), AnyValue::Null);
         assert_eq!(ema_series.get(1).unwrap(), AnyValue::Null);
-        assert_eq!(ema_series.get(2).unwrap().try_extract::<f64>().unwrap(), 11.0);
-        assert_eq!(ema_series.get(3).unwrap().try_extract::<f64>().unwrap(), 12.0);
-        assert_eq!(ema_series.get(4).unwrap().try_extract::<f64>().unwrap(), 13.0);
-        assert_eq!(ema_series.get(5).unwrap().try_extract::<f64>().unwrap(), 14.0);
+        assert_eq!(
+            ema_series.get(2).unwrap().try_extract::<f64>().unwrap(),
+            11.0
+        );
+        assert_eq!(
+            ema_series.get(3).unwrap().try_extract::<f64>().unwrap(),
+            12.0
+        );
+        assert_eq!(
+            ema_series.get(4).unwrap().try_extract::<f64>().unwrap(),
+            13.0
+        );
+        assert_eq!(
+            ema_series.get(5).unwrap().try_extract::<f64>().unwrap(),
+            14.0
+        );
         Ok(())
     }
 
     #[test]
     fn test_ema_with_nones_in_data() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(10.0), Some(11.0), Some(12.0), None, Some(14.0), Some(15.0)]);
+        let s = create_test_series(
+            "price",
+            vec![
+                Some(10.0),
+                Some(11.0),
+                Some(12.0),
+                None,
+                Some(14.0),
+                Some(15.0),
+            ],
+        );
         let period = 3;
         let smoothing = 2.0;
         // SMA(3) for first value: (10+11+12)/3 = 11.0. EMA[2]
@@ -341,13 +392,16 @@ mod tests {
         let ema_series = calculate_ema(&s, period, smoothing)?;
         assert_eq!(ema_series.get(0).unwrap(), AnyValue::Null);
         assert_eq!(ema_series.get(1).unwrap(), AnyValue::Null);
-        assert_eq!(ema_series.get(2).unwrap().try_extract::<f64>().unwrap(), 11.0);
+        assert_eq!(
+            ema_series.get(2).unwrap().try_extract::<f64>().unwrap(),
+            11.0
+        );
         assert_eq!(ema_series.get(3).unwrap(), AnyValue::Null); // Due to None price
         assert_eq!(ema_series.get(4).unwrap(), AnyValue::Null); // Due to previous EMA being None
         assert_eq!(ema_series.get(5).unwrap(), AnyValue::Null); // Due to previous EMA being None
         Ok(())
     }
-    
+
     #[test]
     fn test_ema_insufficient_data() -> PolarsResult<()> {
         let s = create_test_series("price", vec![Some(1.0), Some(2.0)]);
@@ -385,7 +439,10 @@ mod tests {
 
     #[test]
     fn test_wma_calculation() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)]);
+        let s = create_test_series(
+            "price",
+            vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0), Some(5.0)],
+        );
         let period = 3;
         // Weights for period 3: 3, 2, 1. Sum of weights = 6.
         // WMA[2]: (1*1 + 2*2 + 3*3) / 6 = (1+4+9)/6 = 14/6 = 2.333333
@@ -402,15 +459,36 @@ mod tests {
         let wma_series = calculate_wma(&s, period)?;
         assert_eq!(wma_series.get(0).unwrap(), AnyValue::Null);
         assert_eq!(wma_series.get(1).unwrap(), AnyValue::Null);
-        assert!((wma_series.get(2).unwrap().try_extract::<f64>().unwrap() - (1.0*3.0 + 2.0*2.0 + 3.0*1.0)/6.0).abs() < 1e-6, "WMA[2] incorrect. Expected {}, got {}", (1.0*3.0 + 2.0*2.0 + 3.0*1.0)/6.0, wma_series.get(2).unwrap().try_extract::<f64>().unwrap());
-        assert!((wma_series.get(3).unwrap().try_extract::<f64>().unwrap() - (2.0*3.0 + 3.0*2.0 + 4.0*1.0)/6.0).abs() < 1e-6);
-        assert!((wma_series.get(4).unwrap().try_extract::<f64>().unwrap() - (3.0*3.0 + 4.0*2.0 + 5.0*1.0)/6.0).abs() < 1e-6);
+        assert!(
+            (wma_series.get(2).unwrap().try_extract::<f64>().unwrap()
+                - (1.0 * 3.0 + 2.0 * 2.0 + 3.0 * 1.0) / 6.0)
+                .abs()
+                < 1e-6,
+            "WMA[2] incorrect. Expected {}, got {}",
+            (1.0 * 3.0 + 2.0 * 2.0 + 3.0 * 1.0) / 6.0,
+            wma_series.get(2).unwrap().try_extract::<f64>().unwrap()
+        );
+        assert!(
+            (wma_series.get(3).unwrap().try_extract::<f64>().unwrap()
+                - (2.0 * 3.0 + 3.0 * 2.0 + 4.0 * 1.0) / 6.0)
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (wma_series.get(4).unwrap().try_extract::<f64>().unwrap()
+                - (3.0 * 3.0 + 4.0 * 2.0 + 5.0 * 1.0) / 6.0)
+                .abs()
+                < 1e-6
+        );
         Ok(())
     }
 
     #[test]
     fn test_wma_with_nones() -> PolarsResult<()> {
-        let s = create_test_series("price", vec![Some(1.0), Some(2.0), None, Some(4.0), Some(5.0)]);
+        let s = create_test_series(
+            "price",
+            vec![Some(1.0), Some(2.0), None, Some(4.0), Some(5.0)],
+        );
         let period = 3;
         let wma_series = calculate_wma(&s, period)?;
         assert_eq!(wma_series.get(0).unwrap(), AnyValue::Null);
@@ -441,7 +519,7 @@ mod tests {
         let s_int = Series::new("price_int".into(), vec![1i32, 2, 3, 4, 5]);
         assert!(calculate_wma(&s_int, 3).is_err());
     }
-    
+
     #[test]
     fn test_wma_len_zero_series() -> PolarsResult<()> {
         let s_empty = create_test_series("price", vec![]);
@@ -457,7 +535,7 @@ mod tests {
             "low" => &[Some(9.9), Some(10.0), Some(10.0), Some(10.2), Some(10.3)],
             "close" => &[Some(10.0), Some(10.2), Some(10.1), Some(10.4), Some(10.5)],
             "volume" => &[Some(100.0), Some(150.0), Some(120.0), Some(200.0), Some(180.0)]
-        }?; 
+        }?;
 
         // Expected calculations:
         // Period 0: TP = (10.1+9.9+10.0)/3 = 10.0. TP_Vol = 1000. CumTPVol=1000. CumVol=100. VWAP=10.0
@@ -485,14 +563,17 @@ mod tests {
             "low" => &[Some(9.9), Some(10.0), Some(10.0)],
             "close" => &[Some(10.0), Some(10.2), Some(10.1)],
             "volume" => &[Some(0.0), Some(150.0), Some(120.0)] // First volume is zero
-        }?; 
+        }?;
         let vwap_series = calculate_vwap(&df)?;
         assert_eq!(vwap_series.get(0).unwrap(), AnyValue::Null); // VWAP is None if CumVol is 0
-        // P1: TP1=(10.3+10.0+10.2)/3 = 10.166667. TPVol1=1525. CumVol=150. CumTPVol=1525(since P0 had 0 vol). VWAP = 10.166667
-        assert!((vwap_series.get(1).unwrap().try_extract::<f64>().unwrap() - 10.166666666666666).abs() < 1e-6);
+                                                                 // P1: TP1=(10.3+10.0+10.2)/3 = 10.166667. TPVol1=1525. CumVol=150. CumTPVol=1525(since P0 had 0 vol). VWAP = 10.166667
+        assert!(
+            (vwap_series.get(1).unwrap().try_extract::<f64>().unwrap() - 10.166666666666666).abs()
+                < 1e-6
+        );
         Ok(())
     }
-    
+
     #[test]
     fn test_vwap_with_all_zero_volume() -> PolarsResult<()> {
         let df = polars::prelude::df! {
@@ -500,7 +581,7 @@ mod tests {
             "low" => &[Some(9.9), Some(10.0)],
             "close" => &[Some(10.0), Some(10.2)],
             "volume" => &[Some(0.0), Some(0.0)]
-        }?; 
+        }?;
         let vwap_series = calculate_vwap(&df)?;
         assert!(vwap_series.is_null().all());
         Ok(())
@@ -510,7 +591,8 @@ mod tests {
     fn test_vwap_missing_columns() {
         let df_no_high = polars::prelude::df! {
             "low" => &[Some(9.9)], "close" => &[Some(10.0)], "volume" => &[Some(100.0)]
-        }.unwrap();
+        }
+        .unwrap();
         assert!(calculate_vwap(&df_no_high).is_err());
     }
 
@@ -521,7 +603,8 @@ mod tests {
             "low" => Vec::<Option<f64>>::new(),
             "close" => Vec::<Option<f64>>::new(),
             "volume" => Vec::<Option<f64>>::new()
-        }.unwrap();
+        }
+        .unwrap();
         let vwap_series = calculate_vwap(&df_empty)?;
         assert_eq!(vwap_series.len(), 0);
         Ok(())
@@ -538,4 +621,4 @@ mod tests {
         };
         assert!(df_result.is_err()); // DataFrame creation should fail with mismatched column heights
     }
-} 
+}

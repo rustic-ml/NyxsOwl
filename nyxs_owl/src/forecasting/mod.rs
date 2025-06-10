@@ -15,8 +15,8 @@ pub mod arima;
 pub mod forecast_trade;
 
 // Forecasting strategies submodules
-pub mod strategies;
 pub mod backtest;
+pub mod strategies;
 pub mod utils;
 
 // TODO: Add other forecasting strategy sub-modules here as they are developed.
@@ -33,13 +33,36 @@ pub enum ConfigValue {
 }
 
 // From implementations for ConfigValue for easier parameter setting
-impl From<i32> for ConfigValue { fn from(i: i32) -> Self { ConfigValue::Int(i as i64) } }
-impl From<i64> for ConfigValue { fn from(i: i64) -> Self { ConfigValue::Int(i) } }
-impl From<f64> for ConfigValue { fn from(f: f64) -> Self { ConfigValue::Float(f) } }
-impl From<String> for ConfigValue { fn from(s: String) -> Self { ConfigValue::String(s) } }
-impl From<&str> for ConfigValue { fn from(s: &str) -> Self { ConfigValue::String(s.to_string()) } }
-impl From<bool> for ConfigValue { fn from(b: bool) -> Self { ConfigValue::Bool(b) } }
-
+impl From<i32> for ConfigValue {
+    fn from(i: i32) -> Self {
+        ConfigValue::Int(i as i64)
+    }
+}
+impl From<i64> for ConfigValue {
+    fn from(i: i64) -> Self {
+        ConfigValue::Int(i)
+    }
+}
+impl From<f64> for ConfigValue {
+    fn from(f: f64) -> Self {
+        ConfigValue::Float(f)
+    }
+}
+impl From<String> for ConfigValue {
+    fn from(s: String) -> Self {
+        ConfigValue::String(s)
+    }
+}
+impl From<&str> for ConfigValue {
+    fn from(s: &str) -> Self {
+        ConfigValue::String(s.to_string())
+    }
+}
+impl From<bool> for ConfigValue {
+    fn from(b: bool) -> Self {
+        ConfigValue::Bool(b)
+    }
+}
 
 /// Holds configuration parameters for a trading strategy.
 ///
@@ -68,7 +91,11 @@ impl StrategyConfig {
     ///     .with_parameter("risk_percentage", 0.01)
     ///     .with_parameter("asset_name", "BTC/USD");
     /// ```
-    pub fn with_parameter<K: Into<String>, V: Into<ConfigValue>>(mut self, key: K, value: V) -> Self {
+    pub fn with_parameter<K: Into<String>, V: Into<ConfigValue>>(
+        mut self,
+        key: K,
+        value: V,
+    ) -> Self {
         self.parameters.insert(key.into(), value.into());
         self
     }
@@ -139,7 +166,8 @@ impl StrategyConfig {
     ///
     /// Returns `Ok(())` if all keys are present, otherwise `Err` with a message
     /// listing the missing keys.
-    pub fn validate(&self, required_keys: &[&str]) -> Result<(), String> { // This Result is std::result::Result
+    pub fn validate(&self, required_keys: &[&str]) -> Result<(), String> {
+        // This Result is std::result::Result
         let missing_keys: Vec<String> = required_keys
             .iter()
             .filter(|&&key| !self.parameters.contains_key(key))
@@ -149,11 +177,13 @@ impl StrategyConfig {
         if missing_keys.is_empty() {
             Ok(())
         } else {
-            Err(format!("Missing required config keys: {}", missing_keys.join(", ")))
+            Err(format!(
+                "Missing required config keys: {}",
+                missing_keys.join(", ")
+            ))
         }
     }
 }
-
 
 /// Defines the common interface for all trading strategies.
 ///
@@ -163,7 +193,9 @@ pub trait Strategy: Send + Sync {
     /// Creates a new instance of the strategy with the given configuration.
     ///
     /// This typically involves parsing and validating parameters from `config`.
-    fn new(config: StrategyConfig) -> Self where Self: Sized;
+    fn new(config: StrategyConfig) -> Self
+    where
+        Self: Sized;
 
     /// Generates trading signals based on the provided market data.
     ///
@@ -203,21 +235,23 @@ pub trait Strategy: Send + Sync {
         // Check for required columns
         for col_name in self.required_columns() {
             if data.column(col_name).is_err() {
-                let err_msg = format!(
-                    "Column '{}' not found",
-                    col_name
-                );
+                let err_msg = format!("Column '{}' not found", col_name);
                 error!("Strategy Validation Error (MissingData): {}", err_msg);
                 return Err(NyxsOwlError::MissingData(err_msg));
             }
         }
         // Check for minimum data points
         if data.height() < self.min_data_points() {
-             let err_msg = format!(
+            let err_msg = format!(
                 "Insufficient data: {} requires at least {} data points, but got {}",
-                self.name(), self.min_data_points(), data.height()
+                self.name(),
+                self.min_data_points(),
+                data.height()
             );
-            warn!("Strategy Validation Warning (Insufficient Data): {}", err_msg);
+            warn!(
+                "Strategy Validation Warning (Insufficient Data): {}",
+                err_msg
+            );
             return Err(NyxsOwlError::StrategyError(err_msg));
         }
         Ok(())
@@ -252,7 +286,7 @@ mod tests {
         assert!(config.get_int("factor").is_err()); // Wrong type
         assert!(config.get_string("period").is_err()); // Wrong type
         assert!(config.get_bool("name").is_err()); // Wrong type
-        assert!(config.get_float("enabled").is_err());// Wrong type
+        assert!(config.get_float("enabled").is_err()); // Wrong type
 
         assert!(config.get_int("non_existent").is_err());
         Ok(())
@@ -291,11 +325,21 @@ mod tests {
             // Return a series of CrateSignal::Hold (as i32) for simplicity
             Ok(Series::from_iter(vec![CrateSignal::Hold as i32; 5]).with_name("signals".into()))
         }
-        fn name(&self) -> &str { "MockTestStrategy" }
-        fn description(&self) -> &str { "A mock strategy for testing." }
-        fn required_columns(&self) -> Vec<&str> { self.req_cols.clone() }
-        fn config(&self) -> &StrategyConfig { &self.config }
-        fn min_data_points(&self) -> usize { self.min_points }
+        fn name(&self) -> &str {
+            "MockTestStrategy"
+        }
+        fn description(&self) -> &str {
+            "A mock strategy for testing."
+        }
+        fn required_columns(&self) -> Vec<&str> {
+            self.req_cols.clone()
+        }
+        fn config(&self) -> &StrategyConfig {
+            &self.config
+        }
+        fn min_data_points(&self) -> usize {
+            self.min_points
+        }
         // Using default validate_data
     }
 
@@ -317,8 +361,9 @@ mod tests {
         let df = polars::prelude::df! {
             "close" => &[1.0, 2.0, 3.0, 4.0, 5.0]
             // "volume" column is missing
-        }.unwrap();
-        
+        }
+        .unwrap();
+
         match strategy.validate_data(&df) {
             Err(NyxsOwlError::MissingData(msg)) => {
                 assert!(msg.contains("Column 'volume' not found"));
@@ -334,13 +379,15 @@ mod tests {
         let df = polars::prelude::df! {
             "close" => &[1.0, 2.0, 3.0],
             "volume" => &[100.0, 110.0, 120.0]
-        }.unwrap();
-        
+        }
+        .unwrap();
+
         match strategy.validate_data(&df) {
-            Err(NyxsOwlError::StrategyError(msg)) => { // Changed from ValidationError
+            Err(NyxsOwlError::StrategyError(msg)) => {
+                // Changed from ValidationError
                 assert!(msg.contains("requires at least 10 data points, but got 3"));
             }
             _ => panic!("Expected StrategyError for insufficient rows"),
         }
     }
-} 
+}

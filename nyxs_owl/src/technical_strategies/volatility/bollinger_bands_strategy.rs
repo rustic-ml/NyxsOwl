@@ -36,9 +36,12 @@ pub fn bollinger_bands_signals(
         ));
     }
 
-    let close_prices_series = df.column(price_column).map_err(|e| {
+    let close_prices_column = df.column(price_column).map_err(|e| {
         NyxsOwlError::DataError(format!("Price column '{}' not found: {}", price_column, e))
     })?;
+    
+    // Convert Column to Series for calculation
+    let close_prices_series = close_prices_column.clone().as_series();
     
     let data_len = df.height();
     if data_len < period + 1 {
@@ -54,7 +57,7 @@ pub fn bollinger_bands_signals(
             NyxsOwlError::StrategyError(format!("Failed to calculate Bollinger Bands using trade_math: {}", e))
         })?;
 
-    let close_prices_ca: &ChunkedArray<Float64Type> = close_prices_series.f64().map_err(|_| NyxsOwlError::DataError("Close price Series is not Float64".to_string()))?;
+    let close_prices_ca: &ChunkedArray<Float64Type> = close_prices_column.f64().map_err(|_| NyxsOwlError::DataError("Close price Series is not Float64".to_string()))?;
     let upper_band_ca: &ChunkedArray<Float64Type> = upper_band_series.f64().map_err(|_| NyxsOwlError::StrategyError("Upper_Band Series is not Float64".to_string()))?;
     let lower_band_ca: &ChunkedArray<Float64Type> = lower_band_series.f64().map_err(|_| NyxsOwlError::StrategyError("Lower_Band Series is not Float64".to_string()))?;
 
