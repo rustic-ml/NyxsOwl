@@ -269,7 +269,6 @@ pub fn calculate_stochastic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_series() -> Series {
         Series::new(

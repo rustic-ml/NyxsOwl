@@ -4,9 +4,8 @@
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::volatility::calculate_bollinger_bands;
 use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, Float64Type};
-use polars::error::PolarsResult;
 use polars::prelude::*;
+use polars::prelude::{DataFrame, Float64Type};
 
 /// Generates trading signals based on Bollinger Bands, typically for mean reversion.
 ///

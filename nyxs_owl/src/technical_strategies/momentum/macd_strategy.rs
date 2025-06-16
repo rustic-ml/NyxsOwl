@@ -60,13 +60,9 @@ pub fn macd_signals(
         .ok_or_else(|| NyxsOwlError::DataError("Failed to convert Column to Series".to_string()))?;
 
     // Calculate MACD indicators
-    let (macd_line, signal_line, _histogram) = calculate_macd(
-        prices_series_clone,
-        fast_period,
-        slow_period,
-        signal_period,
-    )
-    .map_err(|e| NyxsOwlError::IndicatorError(format!("MACD calculation failed: {}", e)))?;
+    let (macd_line, signal_line, _histogram) =
+        calculate_macd(prices_series_clone, fast_period, slow_period, signal_period)
+            .map_err(|e| NyxsOwlError::IndicatorError(format!("MACD calculation failed: {}", e)))?;
 
     // Extract values for signal generation
     let macd_values: Vec<Option<f64>> = macd_line

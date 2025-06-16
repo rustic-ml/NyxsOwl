@@ -611,7 +611,6 @@ impl AdaptiveEnsembleStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_data(len: usize) -> PolarsResult<DataFrame> {
         let timestamps: Vec<String> = (0..len).map(|i| format!("2023-01-{:02}", i + 1)).collect();

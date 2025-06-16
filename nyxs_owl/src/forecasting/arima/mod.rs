@@ -284,8 +284,7 @@ impl ArimaStrategy {
         // Changed to NyxsOwlResult
         let data_values_options_vec: Vec<Option<f64>> = close_prices_ca.into_iter().collect();
 
-        let timestamps_options_vec: Vec<Option<i64>> =
-            timestamps_ca.into_iter().collect();
+        let timestamps_options_vec: Vec<Option<i64>> = timestamps_ca.into_iter().collect();
 
         let series_len = data_values_options_vec.len();
         if series_len == 0 {
@@ -396,9 +395,7 @@ impl ArimaStrategy {
 mod tests {
     use super::*;
     use chrono::NaiveDateTime;
-    use polars::prelude::{
-        DataFrame, DataType, NamedFrom, Series, TimeUnit,
-    };
+    use polars::prelude::{DataFrame, DataType, NamedFrom, Series, TimeUnit};
 
     // Updated to include a timestamp column
     fn create_test_data(len: usize) -> DataFrame {

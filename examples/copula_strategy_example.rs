@@ -116,15 +116,15 @@ fn load_single_asset_data(_file_path: &str) -> Result<DataFrame> {
     let n = 500;
     let mut prices = Vec::with_capacity(n);
     let mut timestamps = Vec::with_capacity(n);
-    
+
     let mut price = 100.0;
-    
+
     for i in 0..n {
         // Simulate correlated price movements
         let innovation: f64 = (i as f64 * 0.1).sin() * 0.5; // Deterministic but varied data
         let return_pct = innovation * 0.02; // 2% daily volatility
         price *= (1.0 + return_pct);
-        
+
         prices.push(price);
         timestamps.push(i as i64);
     }
@@ -469,7 +469,7 @@ fn detailed_copula_analysis(df: &DataFrame) -> Result<()> {
         transaction_cost: 0.001, // 0.1%
         slippage: 0.0005,        // 0.05%
         position_size: 0.25,     // 25% of capital per trade
-        risk_free_rate: 0.02,        // 2%
+        risk_free_rate: 0.02,    // 2%
     };
 
     let backtester = ForecastBacktester::new(backtest_config);

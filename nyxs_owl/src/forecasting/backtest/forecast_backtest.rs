@@ -102,11 +102,11 @@ pub struct BacktestConfig {
     /// Transaction cost as percentage (e.g., 0.001 for 0.1%)
     pub transaction_cost: f64, // As percentage (e.g., 0.001 for 0.1%)
     /// Slippage cost as percentage
-    pub slippage: f64,         // As percentage
+    pub slippage: f64, // As percentage
     /// Annual risk-free rate for Sharpe ratio calculation
-    pub risk_free_rate: f64,   // Annual risk-free rate for Sharpe ratio
+    pub risk_free_rate: f64, // Annual risk-free rate for Sharpe ratio
     /// Fraction of capital to use per trade
-    pub position_size: f64,    // Fraction of capital to use per trade
+    pub position_size: f64, // Fraction of capital to use per trade
 }
 
 impl Default for BacktestConfig {

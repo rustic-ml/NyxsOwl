@@ -350,11 +350,15 @@ mod tests {
 
     #[test]
     fn test_signal_combination() {
-        let signals1 = [TechnicalSignal::new(Signal::Buy).with_strength(0.8),
-            TechnicalSignal::new(Signal::Hold).with_strength(0.5)];
+        let signals1 = [
+            TechnicalSignal::new(Signal::Buy).with_strength(0.8),
+            TechnicalSignal::new(Signal::Hold).with_strength(0.5),
+        ];
 
-        let signals2 = [TechnicalSignal::new(Signal::Buy).with_strength(0.9),
-            TechnicalSignal::new(Signal::Sell).with_strength(0.7)];
+        let signals2 = [
+            TechnicalSignal::new(Signal::Buy).with_strength(0.9),
+            TechnicalSignal::new(Signal::Sell).with_strength(0.7),
+        ];
 
         let signal_sources = vec![(&signals1[..], 0.6), (&signals2[..], 0.4)];
         let combined =

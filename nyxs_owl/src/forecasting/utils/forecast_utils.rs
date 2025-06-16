@@ -154,7 +154,6 @@ impl SimpleStats {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    
 
     fn create_test_dataframe() -> PolarsResult<DataFrame> {
         df! {

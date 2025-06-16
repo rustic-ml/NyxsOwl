@@ -10,9 +10,7 @@
 
 use crate::forecasting::{Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
-use crate::technical_strategies::{
-    PerformanceMetrics, TechnicalSignal, TechnicalStrategy,
-};
+use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -343,7 +341,6 @@ impl Strategy for WilliamsRStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_data() -> DataFrame {
         let dates = (0..50)

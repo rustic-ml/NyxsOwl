@@ -110,11 +110,7 @@ fn test_regime_model(name: &str, model_type: RegimeSwitchingType, df: &DataFrame
     analyze_signals(&signals, name);
 
     // Extract prices for backtest
-    let prices: Vec<f64> = df
-        .column("close")?
-        .f64()?
-        .into_no_null_iter()
-        .collect();
+    let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
 
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
@@ -154,11 +150,7 @@ fn test_preset_configuration(
     analyze_regime_detection(&config, df)?;
 
     // Extract prices for backtest
-    let prices: Vec<f64> = df
-        .column("close")?
-        .f64()?
-        .into_no_null_iter()
-        .collect();
+    let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
 
     // Perform backtesting
     let backtest_config = BacktestConfig::default();
@@ -557,7 +549,7 @@ fn detailed_regime_analysis(df: &DataFrame) -> Result<()> {
         initial_capital: 100000.0,
         transaction_cost: 0.001, // 0.1%
         slippage: 0.0005,        // 0.05%
-        risk_free_rate: 0.02,        // 2%
+        risk_free_rate: 0.02,    // 2%
         position_size: 0.25,     // 25% of capital per trade
     };
 

@@ -4,7 +4,6 @@
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::momentum::calculate_stochastic;
 use polars::prelude::DataFrame;
-use polars::error::PolarsResult;
 use polars::prelude::*;
 
 /// Generates trading signals based on Stochastic Oscillator.

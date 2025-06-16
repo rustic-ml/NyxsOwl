@@ -35,18 +35,9 @@ fn demo_basic_strategy(df: &DataFrame) -> std::result::Result<(), Box<dyn std::e
     let signals = strategy.generate_signals(df, "close", "timestamp")?;
 
     // Analyze signals - using the new simplified Signal enum
-    let buy_count = signals
-        .iter()
-        .filter(|&s| *s == Signal::Buy)
-        .count();
-    let sell_count = signals
-        .iter()
-        .filter(|&s| *s == Signal::Sell)
-        .count();
-    let hold_count = signals
-        .iter()
-        .filter(|&s| *s == Signal::Hold)
-        .count();
+    let buy_count = signals.iter().filter(|&s| *s == Signal::Buy).count();
+    let sell_count = signals.iter().filter(|&s| *s == Signal::Sell).count();
+    let hold_count = signals.iter().filter(|&s| *s == Signal::Hold).count();
 
     println!("  📊 Signal Distribution:");
     println!("    🟢 Buy signals: {}", buy_count);

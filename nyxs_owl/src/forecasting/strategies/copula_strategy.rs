@@ -797,7 +797,6 @@ impl CopulaStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_dataframe(prices1: Vec<f64>, prices2: Vec<f64>) -> DataFrame {
         assert_eq!(prices1.len(), prices2.len());

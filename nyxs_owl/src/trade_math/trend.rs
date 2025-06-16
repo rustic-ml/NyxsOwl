@@ -371,14 +371,14 @@ mod aroon_tests {
 
 // ADX and DI related functions
 /// Calculate Wilder's smoothing (Modified Moving Average)
-/// 
+///
 /// This is a variation of exponential moving average that uses a different smoothing factor.
 /// It's commonly used in technical indicators like RSI and ATR.
-/// 
+///
 /// # Arguments
 /// * `series` - Input price series
 /// * `period` - Number of periods for smoothing
-/// 
+///
 /// # Returns
 /// A Series with Wilder's smoothed values
 pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series> {
@@ -430,17 +430,17 @@ pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series>
 }
 
 /// Calculate True Range for volatility measurement
-/// 
+///
 /// True Range is the greatest of:
 /// - Current High - Current Low
 /// - Absolute value of Current High - Previous Close
 /// - Absolute value of Current Low - Previous Close
-/// 
+///
 /// # Arguments
 /// * `high` - High price series
 /// * `low` - Low price series  
 /// * `close` - Close price series
-/// 
+///
 /// # Returns
 /// A Series with True Range values
 pub fn calculate_true_range(high: &Series, low: &Series, close: &Series) -> PolarsResult<Series> {

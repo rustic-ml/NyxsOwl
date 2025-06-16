@@ -1266,7 +1266,6 @@ impl ArimaStrategy {
     /// Calculate task priority based on position and market volatility
     fn calculate_task_priority(&self, index: usize, total_length: usize) -> u8 {
         // Recent data points get higher priority (lower number)
-        
 
         // Ensure we don't exceed priority bounds
         ((total_length - index) as f64 / total_length as f64 * 255.0) as u8
@@ -1416,7 +1415,6 @@ impl ArimaStrategy {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    
 
     fn create_test_data(len: usize) -> PolarsResult<DataFrame> {
         // Create synthetic test data with trend and noise

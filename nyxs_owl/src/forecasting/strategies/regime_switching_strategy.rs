@@ -961,7 +961,6 @@ impl RegimeSwitchingStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_dataframe(prices: Vec<f64>) -> DataFrame {
         let timestamps: Vec<String> = (0..prices.len())

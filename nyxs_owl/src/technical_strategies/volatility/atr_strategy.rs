@@ -378,7 +378,6 @@ impl Strategy for ATRStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     fn create_test_data() -> DataFrame {
         let dates = (0..50)
