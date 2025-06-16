@@ -52,14 +52,15 @@ fn demo_cache_optimized_time_series() -> Result<(), Box<dyn std::error::Error>> 
     // Create a cache-optimized time series
     let mut time_series = CacheOptimizedTimeSeries::with_capacity(5000);
 
-    // Generate realistic financial data
+    // Generate realistic financial data (reduced for testing)
     let start_time = 1609459200u64; // 2021-01-01 00:00:00 UTC
     let start_price = 100.0;
 
-    println!("Building time series with 5000 data points...");
+    let data_points = if cfg!(test) { 1000 } else { 5000 }; // Smaller datasets for tests
+    println!("Building time series with {} data points...", data_points);
     let build_start = Instant::now();
 
-    for i in 0..5000 {
+    for i in 0..data_points {
         let timestamp = start_time + (i as u64 * 3600); // Hourly data
         let price = start_price + (i as f64 * 0.1) + (i as f64 * 0.01).sin() * 10.0;
         let volume = 1000 + (i * 50);

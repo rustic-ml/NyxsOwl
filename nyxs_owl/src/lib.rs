@@ -11,15 +11,20 @@
 //!
 //! ```rust
 //! use nyxs_owl::prelude::*;
+//! use nyxs_owl::common::time_series::sma;
+//! use nyxs_owl::trade_math::momentum::calculate_rsi;
+//! use polars::prelude::*;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> Result<()> {
 //! let prices = vec![100.0, 102.0, 101.5, 103.0, 104.5];
 //!
 //! // Simple technical analysis
-//! let sma_values = sma(&prices, 3)?;
-//! let rsi_values = rsi(&prices, 14)?;
+//! let sma_values = sma(&prices, 3);
+//! let price_series = Series::new("price".into(), &prices);
+//! let rsi_series = calculate_rsi(&price_series, 3).unwrap();
 //!
 //! println!("SMA: {:?}", sma_values);
+//! println!("RSI length: {}", rsi_series.len());
 //! # Ok(())
 //! # }
 //! ```
@@ -184,6 +189,7 @@ pub mod simple_types {
 
 // Export main modules
 /// Async and parallel processing capabilities for concurrent forecasting
+#[cfg(feature = "async-support")]
 pub mod async_parallel;
 /// Memory optimization utilities and cache-conscious data structures
 pub mod memory_optimized; // Cache-conscious data structures and memory optimization

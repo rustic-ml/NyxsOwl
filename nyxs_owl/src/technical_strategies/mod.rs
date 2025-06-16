@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! use nyxs_owl::technical_strategies::prelude::*;
-//! use nyxs_owl::forecasting::{Strategy, StrategyConfig};
+//! use nyxs_owl::technical_strategies::{Strategy, StrategyConfig};
 //! use polars::prelude::*;
 //!
 //! // Create strategy configuration
@@ -29,18 +29,76 @@
 //!     .with_parameter("long_period", 20)
 //!     .with_parameter("signal_threshold", 0.02);
 //!
-//! // Initialize strategy
-//! let strategy = SmaStrategy::new(config);
+//! // Create sample market data with sufficient data points
+//! let prices: Vec<f64> = (0..25).map(|i| 100.0 + (i as f64) * 0.5).collect();
+//! let highs: Vec<f64> = prices.iter().map(|p| p + 1.0).collect();
+//! let lows: Vec<f64> = prices.iter().map(|p| p - 1.0).collect();
+//! let volumes: Vec<f64> = (0..25).map(|i| 1000.0 + (i as f64) * 50.0).collect();
+//!
+//! let market_data = df! {
+//!     "close" => prices,
+//!     "high" => highs,
+//!     "low" => lows,
+//!     "volume" => volumes
+//! }.unwrap();
+//!
+//! // Initialize strategy (using MultiFactorStrategy as an example)
+//! let strategy = MultiFactorStrategy::new(config);
 //!
 //! // Generate signals
-//! let signals = strategy.generate_signals(&market_data)?;
+//! let signals = strategy.generate_signals(&market_data).unwrap();
+//! # assert!(signals.len() <= 25); // Basic validation
 //! ```
 
 use polars::prelude::{DataFrame, Series};
 use std::collections::HashMap;
 
 // Import common types from forecasting module for consistency
-pub use crate::forecasting::{ConfigValue, Strategy, StrategyConfig};
+// Use appropriate types based on available features
+#[cfg(feature = "forecasting")]
+pub use crate::forecasting::{ConfigValue, StrategyConfig, Strategy};
+
+#[cfg(not(feature = "forecasting"))]
+pub use crate::common::{ConfigValue, StrategyConfig};
+#[cfg(not(feature = "forecasting"))]
+use crate::simple_types::NyxsOwlError;
+
+// Define a simplified Strategy trait for technical strategies (when forecasting is not available)
+#[cfg(not(feature = "forecasting"))]
+pub trait Strategy {
+    fn new(config: StrategyConfig) -> Self where Self: Sized;
+    fn generate_signals(&self, data: &DataFrame) -> NyxsOwlResult<Series>;
+    fn name(&self) -> &str;
+    fn description(&self) -> &str;
+    fn required_columns(&self) -> Vec<&str>;
+    fn config(&self) -> &StrategyConfig;
+    fn min_data_points(&self) -> usize;
+    
+    /// Validate input data against strategy requirements
+    fn validate_data(&self, data: &DataFrame) -> NyxsOwlResult<()> {
+        // Check required columns
+        for col in self.required_columns() {
+            if !data.get_column_names().iter().any(|c| c.as_str() == col) {
+                return Err(NyxsOwlError::DataError(format!("Required column '{}' not found", col)));
+            }
+        }
+        
+        // Check minimum data points
+        if data.height() < self.min_data_points() {
+            return Err(NyxsOwlError::DataError(format!(
+                "Insufficient data: {} rows provided, {} required",
+                data.height(),
+                self.min_data_points()
+            )));
+        }
+        
+        Ok(())
+    }
+}
+
+// Re-export from forecasting when available (already imported above)
+// #[cfg(feature = "forecasting")]
+// pub use crate::forecasting::Strategy;
 use crate::simple_types::{Result as NyxsOwlResult, Signal};
 
 // Declare strategy category modules

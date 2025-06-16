@@ -190,12 +190,14 @@ fn create_sample_ohlcv_data() -> PolarsResult<DataFrame> {
         price = close;
     }
 
+    let volumes_f64: Vec<f64> = volumes.into_iter().map(|v| v as f64).collect();
+    
     df! {
         "open" => &open_prices,
         "high" => &high_prices,
         "low" => &low_prices,
         "close" => &close_prices,
-        "volume" => &volumes,
+        "volume" => &volumes_f64,
     }
 }
 

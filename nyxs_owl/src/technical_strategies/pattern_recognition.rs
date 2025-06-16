@@ -3,7 +3,7 @@
 //! This module implements trading strategies based on chart pattern recognition,
 //! including candlestick patterns, geometric patterns, and trend patterns.
 
-use crate::forecasting::{Strategy, StrategyConfig};
+use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::simple_types::{Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
 use polars::prelude::{DataFrame, NamedFrom, Series};

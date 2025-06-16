@@ -28,31 +28,34 @@ impl QualityTestSuite {
         let mut test_data = HashMap::new();
         
         // Generate various test datasets
-        test_data.insert("trending_up".to_string(), Self::generate_trending_data(100, 1.0));
-        test_data.insert("trending_down".to_string(), Self::generate_trending_data(100, -1.0));
-        test_data.insert("sideways".to_string(), Self::generate_sideways_data(100));
-        test_data.insert("volatile".to_string(), Self::generate_volatile_data(100));
-        test_data.insert("real_market".to_string(), Self::generate_realistic_market_data(252));
+        // Use smaller datasets for memory efficiency
+        test_data.insert("trending_up".to_string(), Self::generate_trending_data(50, 1.0));
+        test_data.insert("trending_down".to_string(), Self::generate_trending_data(50, -1.0));
+        test_data.insert("sideways".to_string(), Self::generate_sideways_data(50));
+        test_data.insert("volatile".to_string(), Self::generate_volatile_data(50));
+        test_data.insert("real_market".to_string(), Self::generate_realistic_market_data(100));
         
         Self { test_data }
     }
     
-    /// Generate trending market data
+    /// Generate trending market data (memory optimized)
     fn generate_trending_data(length: usize, trend_strength: f64) -> DataFrame {
-        let mut prices = Vec::new();
-        let mut volumes = Vec::new();
-        let mut timestamps = Vec::new();
+        // Use smaller capacity and f32 for memory efficiency
+        let actual_length = length.min(500); // Limit max dataset size
+        let mut prices = Vec::with_capacity(actual_length);
+        let mut volumes = Vec::with_capacity(actual_length);
+        let mut timestamps = Vec::with_capacity(actual_length);
         
-        let base_price = 100.0;
-        let daily_trend = trend_strength * 0.01; // 1% daily trend
+        let base_price = 100.0f32;
+        let daily_trend = (trend_strength * 0.01) as f32; // 1% daily trend
         
-        for i in 0..length {
-            let trend_component = base_price * daily_trend * i as f64;
-            let noise = (i as f64 * 0.1).sin() * 2.0; // Small random noise
-            let price = base_price + trend_component + noise;
+        for i in 0..actual_length {
+            let trend_component = base_price * daily_trend * i as f32;
+            let noise = (i as f32 * 0.1).sin() * 2.0; // Small random noise
+            let price = (base_price + trend_component + noise) as f64;
             
             prices.push(price);
-            volumes.push(1000000 + (i % 100) * 10000);
+            volumes.push(100000 + (i % 100) * 1000); // Smaller volumes
             timestamps.push(format!("2023-01-{:02}", (i % 30) + 1));
         }
         

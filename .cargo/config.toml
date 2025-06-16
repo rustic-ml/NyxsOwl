@@ -1,26 +1,35 @@
 # Optimized Cargo configuration for better test performance
 [build]
-# Use fewer codegen units for faster compilation in debug mode
+# Reduce parallel jobs to limit memory usage
+jobs = 2
+
+# Use less memory for compilation
 codegen-units = 1
 
+[target.x86_64-unknown-linux-gnu]
+# Optimize linking to reduce memory usage
+linker = "lld"
+
 [profile.dev]
-# Reduce debug info to speed up compilation and reduce binary size
-debug = 1
-# Optimize for compilation speed
+# Reduce memory usage in debug builds
+incremental = true
+debug = 1  # Reduce debug info
 opt-level = 0
-# Reduce memory usage during compilation
-codegen-units = 4
 
 [profile.test]
-# Optimize test builds
+# Optimize test builds for memory
+incremental = true
 debug = 1
-opt-level = 1
-codegen-units = 4
+opt-level = 1  # Slight optimization to reduce memory
 
 [target.'cfg(test)']
 # Reduce incremental compilation overhead for tests
 rustflags = ["-C", "incremental=off"]
 
 [env]
+# Limit memory usage for builds
+CARGO_BUILD_JOBS = "2"
+RUST_MIN_STACK = "16777216"  # 16MB stack
+
 # Limit test parallelism to prevent system overload
 RUST_TEST_THREADS = "4" 

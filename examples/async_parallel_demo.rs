@@ -119,7 +119,7 @@ async fn process_dataset(
 fn create_sample_datasets() -> Vec<DataFrame> {
     (0..4)
         .map(|i| {
-            let size = 50 + i * 25;
+            let size = if cfg!(test) { 25 + i * 10 } else { 50 + i * 25 }; // Smaller for tests
             let values: Vec<f64> = (0..size)
                 .map(|j| 100.0 + (j as f64 * 0.1) + (i as f64 * 10.0))
                 .collect();

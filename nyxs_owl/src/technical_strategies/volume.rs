@@ -4,7 +4,7 @@
 //! including Volume Weighted Average Price (VWAP), On-Balance Volume (OBV),
 //! and other volume-based indicators.
 
-use crate::forecasting::{Strategy, StrategyConfig};
+use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
 use crate::trade_math::{calculate_obv, calculate_vwap};

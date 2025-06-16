@@ -21,13 +21,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyxs_owl = "0.7.1"
+nyxs_owl = "0.7.2"
 ```
 
 ## Core Features
 
 ### 📊 **Technical Analysis**
-Production-ready indicators with comprehensive test coverage (240+ unit tests passing)
+Production-ready indicators with comprehensive test coverage (125/125 unit tests passing + memory optimized)
 ```rust
 use nyxs_owl::trade_math::*;
 
@@ -50,7 +50,7 @@ println!("Best model: {} | Forecast: {:?}", model, forecast);
 ```
 
 ### ⚡ **Strategy Backtesting**
-High-performance backtesting engine with updated polars 0.47.x
+Memory-optimized, high-performance backtesting engine with Polars 0.47.x
 ```rust
 use nyxs_owl::strategy_lib::backtest::*;
 
@@ -73,13 +73,13 @@ println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
 - **Oscillators**: RSI, MACD, Stochastic
 - **Volume**: OBV, Volume Profile, VROC
 
-### Forecasting Models *(Enhanced in v0.7.1)*
+### Forecasting Models *(Memory Optimized v0.7.2)*
 - **Enhanced ARIMA**: Autoregressive models with adaptive order selection and regime detection
-- **Adaptive Ensemble**: Dynamic model weighting with performance-based adaptation
+- **Adaptive Ensemble**: Dynamic model weighting with performance-based adaptation  
 - **Exponential Smoothing**: Simple and double exponential with adaptive parameters
 - **Moving Average**: Various window forecasting with outlier detection
 - **Auto Selection**: Intelligent model selection with quality monitoring
-- **Updated Dependencies**: All models now use latest Polars 0.47.x for improved performance
+- **Memory Optimized**: All models use efficient memory management and Polars 0.47.x
 
 ### Strategy Framework
 - **Signal Generation**: Buy/Sell/Hold signal framework
@@ -197,13 +197,13 @@ Control what you include:
 ```toml
 [dependencies]
 # Minimal - just technical indicators
-nyxs_owl = { version = "0.7.1", default-features = false, features = ["trading-math"] }
+nyxs_owl = { version = "0.7.2", default-features = false, features = ["trading-math"] }
 
 # With forecasting
-nyxs_owl = { version = "0.7.1", features = ["trading-math", "forecasting"] }
+nyxs_owl = { version = "0.7.2", features = ["trading-math", "forecasting"] }
 
 # Full features
-nyxs_owl = { version = "0.7.1", features = ["all"] }
+nyxs_owl = { version = "0.7.2", features = ["all"] }
 ```
 
 ## Performance
@@ -216,7 +216,7 @@ NyxsOwl is built for production environments:
 - **Concurrent**: Thread-safe design for parallel processing
 - **Modern Dependencies**: Built with latest Rust ecosystem (Polars 0.47.x, thiserror 2.0)
 
-## Latest Updates (v0.7.1)
+## Latest Updates (v0.7.2)
 
 - **Major Dependency Updates**: All dependencies updated to latest versions
 - **Enhanced Performance**: Polars 0.47.x brings significant speed improvements

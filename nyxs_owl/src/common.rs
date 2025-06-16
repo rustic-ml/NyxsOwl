@@ -300,6 +300,20 @@ impl StrategyConfig {
     pub fn get_float(&self, key: &str) -> Option<f64> {
         self.parameters.get(key)?.as_float()
     }
+    
+    /// Get an integer parameter (compatible with forecasting interface)
+    pub fn get_int_compat(&self, key: &str) -> Result<i64, crate::simple_types::NyxsOwlError> {
+        self.get_int(key).ok_or_else(|| {
+            crate::simple_types::NyxsOwlError::ValidationError(format!("Parameter '{}' not found or not an integer", key))
+        })
+    }
+    
+    /// Get a float parameter (compatible with forecasting interface)
+    pub fn get_float_compat(&self, key: &str) -> Result<f64, crate::simple_types::NyxsOwlError> {
+        self.get_float(key).ok_or_else(|| {
+            crate::simple_types::NyxsOwlError::ValidationError(format!("Parameter '{}' not found or not a float", key))
+        })
+    }
 
     /// Get a string parameter
     pub fn get_string(&self, key: &str) -> Option<&str> {
