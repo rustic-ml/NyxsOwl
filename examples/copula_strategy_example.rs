@@ -123,7 +123,7 @@ fn load_single_asset_data(_file_path: &str) -> Result<DataFrame> {
         // Simulate correlated price movements
         let innovation: f64 = (i as f64 * 0.1).sin() * 0.5; // Deterministic but varied data
         let return_pct = innovation * 0.02; // 2% daily volatility
-        price *= (1.0 + return_pct);
+        price *= 1.0 + return_pct;
 
         prices.push(price);
         timestamps.push(i as i64);
@@ -145,7 +145,7 @@ fn create_combined_dataframe(asset_data: &[(String, DataFrame)]) -> Result<DataF
     }
 
     // Start with the first asset's timestamp
-    let mut combined = asset_data[0].1.clone();
+    let combined = asset_data[0].1.clone();
 
     // Add price columns for each asset
     for (asset, df) in asset_data.iter() {

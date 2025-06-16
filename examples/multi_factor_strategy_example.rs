@@ -4,13 +4,12 @@
 //! This example demonstrates how to combine multiple technical indicators
 //! to create a more robust trading strategy using the NyxsOwl library.
 
-use nyxs_owl::technical_strategies::{Strategy, StrategyConfig};
-use nyxs_owl::prelude::*;
 use nyxs_owl::simple_types::{Result as NyxsOwlResult, Signal};
 use nyxs_owl::technical_strategies::{
     multi_factor::MultiFactorStrategy, pattern_recognition::CandlestickPatternStrategy,
     volume::VWAPStrategy, CombinationMethod, SignalFilter, TechnicalSignal, TechnicalStrategy,
 };
+use nyxs_owl::technical_strategies::{Strategy, StrategyConfig};
 use polars::prelude::*;
 
 fn main() -> NyxsOwlResult<()> {

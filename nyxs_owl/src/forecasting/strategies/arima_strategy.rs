@@ -1302,10 +1302,8 @@ impl ArimaStrategy {
     /// Convert parallel processing result to ForecastResult
     fn convert_parallel_result_to_forecast(
         &self,
-        #[cfg(feature = "async-support")]
-        result: &crate::async_parallel::ForecastResult,
-        #[cfg(not(feature = "async-support"))]
-        result: &(),
+        #[cfg(feature = "async-support")] result: &crate::async_parallel::ForecastResult,
+        #[cfg(not(feature = "async-support"))] result: &(),
     ) -> ForecastResult {
         ForecastResult {
             point_forecast: result.forecast_price,

@@ -2,7 +2,6 @@ use nyxs_owl::forecasting::backtest::{BacktestConfig, ForecastBacktester};
 use nyxs_owl::forecasting::strategies::{ExponentialSmoothingConfig, ExponentialSmoothingStrategy};
 use nyxs_owl::simple_types::{Result, Signal};
 use polars::prelude::*;
-use std::fs;
 
 fn main() -> Result<()> {
     // Create sample data since the Polars CSV scanning API has changed
@@ -45,7 +44,7 @@ fn main() -> Result<()> {
     for (config_name, config) in configs {
         println!("\n📊 Testing {config_name} Exponential Smoothing:");
 
-        let mut strategy = ExponentialSmoothingStrategy::new(config);
+        let strategy = ExponentialSmoothingStrategy::new(config);
 
         match strategy.generate_signals(&df, "close", "timestamp") {
             Ok(signals) => {

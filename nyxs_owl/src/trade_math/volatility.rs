@@ -896,7 +896,6 @@ mod tests {
 
     #[test]
     fn test_vpt_empty_df() -> PolarsResult<()> {
-        let df = DataFrame::empty(); // This will fail if columns don't exist. Create with schema.
         let schema = polars::prelude::Schema::from_iter(vec![
             ("close".into(), DataType::Float64),
             ("volume".into(), DataType::Float64),

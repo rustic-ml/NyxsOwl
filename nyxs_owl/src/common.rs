@@ -300,18 +300,24 @@ impl StrategyConfig {
     pub fn get_float(&self, key: &str) -> Option<f64> {
         self.parameters.get(key)?.as_float()
     }
-    
+
     /// Get an integer parameter (compatible with forecasting interface)
     pub fn get_int_compat(&self, key: &str) -> Result<i64, crate::simple_types::NyxsOwlError> {
         self.get_int(key).ok_or_else(|| {
-            crate::simple_types::NyxsOwlError::ValidationError(format!("Parameter '{}' not found or not an integer", key))
+            crate::simple_types::NyxsOwlError::ValidationError(format!(
+                "Parameter '{}' not found or not an integer",
+                key
+            ))
         })
     }
-    
+
     /// Get a float parameter (compatible with forecasting interface)
     pub fn get_float_compat(&self, key: &str) -> Result<f64, crate::simple_types::NyxsOwlError> {
         self.get_float(key).ok_or_else(|| {
-            crate::simple_types::NyxsOwlError::ValidationError(format!("Parameter '{}' not found or not a float", key))
+            crate::simple_types::NyxsOwlError::ValidationError(format!(
+                "Parameter '{}' not found or not a float",
+                key
+            ))
         })
     }
 
@@ -520,8 +526,8 @@ mod tests {
         let int_val = ConfigValue::from(42);
         assert_eq!(int_val.as_int(), Some(42));
 
-        let float_val = ConfigValue::from(3.14);
-        assert_eq!(float_val.as_float(), Some(3.14));
+        let float_val = ConfigValue::from(std::f64::consts::PI);
+        assert_eq!(float_val.as_float(), Some(std::f64::consts::PI));
 
         let string_val = ConfigValue::from("test");
         assert_eq!(string_val.as_string(), Some("test"));

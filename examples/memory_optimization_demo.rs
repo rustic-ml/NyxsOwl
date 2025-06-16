@@ -120,7 +120,7 @@ fn demo_cache_optimized_time_series() -> Result<(), Box<dyn std::error::Error>> 
         last_100_returns[last_100_returns.len() - 1] * 100.0
     );
 
-    println!("");
+    println!();
     Ok(())
 }
 
@@ -228,7 +228,7 @@ fn demo_memory_pool_efficiency() -> Result<(), Box<dyn std::error::Error>> {
         println!("✓ Memory pool overhead: {:.1}%", -efficiency_improvement);
     }
 
-    println!("");
+    println!();
     Ok(())
 }
 
@@ -316,7 +316,7 @@ fn demo_compact_price_encoding() -> Result<(), Box<dyn std::error::Error>> {
         println!("✓ Encoding maintains 4 decimal place precision!");
     }
 
-    println!("");
+    println!();
     Ok(())
 }
 
@@ -370,7 +370,7 @@ fn demo_circular_buffer() -> Result<(), Box<dyn std::error::Error>> {
             .collect::<Vec<_>>()
     );
 
-    println!("");
+    println!();
     Ok(())
 }
 
@@ -500,6 +500,6 @@ fn demo_performance_comparison() -> Result<(), Box<dyn std::error::Error>> {
         if results_match { "PASSED" } else { "FAILED" }
     );
 
-    println!("");
+    println!();
     Ok(())
 }

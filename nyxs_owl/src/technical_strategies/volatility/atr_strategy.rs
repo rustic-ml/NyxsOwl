@@ -10,9 +10,9 @@
 //! - |Current High - Previous Close|
 //! - |Current Low - Previous Close|
 
-use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
+use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::trade_math::volatility::calculate_atr;
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};

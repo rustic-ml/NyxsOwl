@@ -3,9 +3,9 @@
 //! This module implements strategies that combine multiple technical indicators
 //! to generate more robust trading signals.
 
-use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
+use crate::technical_strategies::{Strategy, StrategyConfig};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use std::collections::HashMap;
 
@@ -79,7 +79,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
 
     fn validate_parameters(&self) -> NyxsOwlResult<()> {
         // Validate signal strength parameter
-        if let Some(min_strength) = self.config.get_float("min_signal_strength") {
+        if let Ok(min_strength) = self.config.get_float("min_signal_strength") {
             if !(0.0..=1.0).contains(&min_strength) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_signal_strength must be between 0.0 and 1.0".to_string(),
@@ -88,7 +88,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
         }
 
         // Validate confidence parameter
-        if let Some(min_confidence) = self.config.get_float("min_confidence") {
+        if let Ok(min_confidence) = self.config.get_float("min_confidence") {
             if !(0.0..=1.0).contains(&min_confidence) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_confidence must be between 0.0 and 1.0".to_string(),
@@ -97,7 +97,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
         }
 
         // Validate MA periods if set
-        if let (Some(short_ma), Some(long_ma)) = (
+        if let (Ok(short_ma), Ok(long_ma)) = (
             self.config.get_int("short_ma_period"),
             self.config.get_int("long_ma_period"),
         ) {

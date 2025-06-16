@@ -2,9 +2,8 @@ use nyxs_owl::forecasting::backtest::{BacktestConfig, ForecastBacktester};
 use nyxs_owl::forecasting::strategies::garch_strategy::{
     GarchStrategy, GarchStrategyConfig, GarchType,
 };
-use nyxs_owl::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
+use nyxs_owl::simple_types::{Result as NyxsOwlResult, Signal};
 use polars::prelude::*;
-use std::env;
 
 fn main() -> NyxsOwlResult<()> {
     env_logger::init();
@@ -77,7 +76,7 @@ fn test_garch_model(name: &str, garch_type: GarchType, df: &DataFrame) -> NyxsOw
         risk_adjustment: 1.2,
     };
 
-    let mut strategy = GarchStrategy::new(config);
+    let strategy = GarchStrategy::new(config);
 
     // Generate signals
     let signals = strategy.generate_signals(df, "close", "timestamp")?;
@@ -95,7 +94,7 @@ fn demo_comprehensive_backtest(df: &DataFrame) -> NyxsOwlResult<()> {
 
     // Create aggressive GARCH strategy for backtesting
     let config = GarchStrategyConfig::aggressive();
-    let mut strategy = GarchStrategy::new(config);
+    let strategy = GarchStrategy::new(config);
 
     // Generate signals
     let signals = strategy.generate_signals(df, "close", "timestamp")?;

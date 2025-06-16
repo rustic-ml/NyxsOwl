@@ -458,7 +458,7 @@ mod tests {
 
         for result in &results {
             assert!(result.result.confidence > 0.0);
-            assert!(result.processing_time.as_nanos() >= 0); // More lenient timing check
+            // Processing time is always >= 0 for Duration
         }
     }
 
@@ -549,6 +549,6 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Pipeline should be running (test passes if no panic)
-        assert!(true);
+        // Test completed successfully
     }
 }
