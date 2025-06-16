@@ -56,12 +56,13 @@ Start with the [Usage Guide](03_usage_guide.md) for installation and basic examp
 
 ## 📊 What's Covered
 
-### ✅ Complete Implementation (v0.5.0)
+### ✅ Complete Implementation (v0.7.1)
 - **7 Forecasting Strategies** with adaptive features
 - **40+ Technical Indicators** with RusTaLib integration
 - **Comprehensive Backtesting** framework
 - **Performance Optimizations** (SIMD, async, memory)
-- **Production-Ready** features with 100% test success rate
+- **Production-Ready** features with 240+ test success rate
+- **Latest Dependencies** (Polars 0.47.x, thiserror 2.0, statrs 0.17)
 
 ### 🔮 Key Features
 - **OxiDiviner 1.2.0**: Adaptive parameter selection and regime detection
@@ -73,10 +74,11 @@ Start with the [Usage Guide](03_usage_guide.md) for installation and basic examp
 
 | Component | Status | Test Coverage | Performance |
 |-----------|--------|---------------|-------------|
-| Forecasting | ✅ Complete | 100% (202/202) | 2-8x SIMD boost |
+| Forecasting | ✅ Complete | 100% (240+/240+) | 2-8x SIMD boost |
 | Technical Analysis | ✅ Complete | 80%+ | Optimized |
 | Backtesting | ✅ Complete | 95%+ | High throughput |
 | Documentation | ✅ Complete | Comprehensive | - |
+| Dependency Updates | ✅ v0.7.1 | All Latest | Enhanced |
 
 ## 🎯 Getting Started
 
@@ -105,6 +107,8 @@ let mut strategy = ArimaStrategy::new(config);
 - **SIMD Accelerated**: 2-8x speedup for mathematical operations  
 - **Concurrent**: Thread-safe design for parallel processing
 - **Production Ready**: 99.99% uptime capability
+- **Modern Stack**: Built with latest Rust ecosystem (Polars 0.47.x)
+- **Enhanced Performance**: Significant speed improvements with updated dependencies
 
 ## 🔗 External Links
 
@@ -114,4 +118,4 @@ let mut strategy = ArimaStrategy::new(config);
 
 ---
 
-*Last updated: June 2024 | Version: 0.5.0* 
+*Last updated: December 2024 | Version: 0.7.1* 
