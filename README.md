@@ -21,7 +21,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyxs_owl = "0.7.2"
+nyxs_owl = "0.7.3"
 ```
 
 ## Core Features
@@ -73,7 +73,7 @@ println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
 - **Oscillators**: RSI, MACD, Stochastic
 - **Volume**: OBV, Volume Profile, VROC
 
-### Forecasting Models *(Memory Optimized v0.7.2)*
+### Forecasting Models *(Memory Optimized v0.7.3)*
 - **Enhanced ARIMA**: Autoregressive models with adaptive order selection and regime detection
 - **Adaptive Ensemble**: Dynamic model weighting with performance-based adaptation  
 - **Exponential Smoothing**: Simple and double exponential with adaptive parameters
@@ -197,13 +197,13 @@ Control what you include:
 ```toml
 [dependencies]
 # Minimal - just technical indicators
-nyxs_owl = { version = "0.7.2", default-features = false, features = ["trading-math"] }
+nyxs_owl = { version = "0.7.3", default-features = false, features = ["trading-math"] }
 
 # With forecasting
-nyxs_owl = { version = "0.7.2", features = ["trading-math", "forecasting"] }
+nyxs_owl = { version = "0.7.3", features = ["trading-math", "forecasting"] }
 
 # Full features
-nyxs_owl = { version = "0.7.2", features = ["all"] }
+nyxs_owl = { version = "0.7.3", features = ["all"] }
 ```
 
 ## Performance

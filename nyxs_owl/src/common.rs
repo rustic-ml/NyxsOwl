@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
+// Import TechnicalSignal for use in tests
+#[cfg(test)]
+use crate::technical_strategies::TechnicalSignal;
+#[cfg(test)]
+use crate::simple_types::Signal as SimpleSignal;
+
 /// Main result type for NyxsOwl operations
 pub type NyxsOwlResult<T> = Result<T, NyxsOwlError>;
 
@@ -943,12 +949,12 @@ mod tests {
 
     #[test]
     fn test_technical_signal() {
-        let signal = TechnicalSignal::new(Signal::Buy)
+        let signal = TechnicalSignal::new(SimpleSignal::Buy)
             .with_strength(0.8)
             .with_confidence(0.9)
             .with_metadata("rsi", 75.0);
 
-        assert_eq!(signal.signal, Signal::Buy);
+        assert_eq!(signal.signal, SimpleSignal::Buy);
         assert_eq!(signal.strength, 0.8);
         assert_eq!(signal.confidence, 0.9);
         assert_eq!(signal.metadata.get("rsi"), Some(&75.0));

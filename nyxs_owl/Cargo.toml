@@ -1,6 +1,6 @@
 [package]
 name = "nyxs_owl"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 description = "A comprehensive Rust library for trading, forecasting, and financial analysis"
 authors = ["Celsis Durham <durhamcelsis@gmail.com>"]

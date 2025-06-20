@@ -58,12 +58,12 @@ pub fn aroon_signals(
 
     // Use the new calculate_aroon function from trade_math
     let (aroon_up_series, aroon_down_series) = calculate_aroon(
-        high_prices_series.as_series().ok_or_else(|| {
-            NyxsOwlError::DataError("Failed to convert high column to series".into())
-        })?,
-        low_prices_series.as_series().ok_or_else(|| {
-            NyxsOwlError::DataError("Failed to convert low column to series".into())
-        })?,
+        high_prices_series
+            .as_series()
+            .ok_or_else(|| NyxsOwlError::DataError("Failed to convert high column to series".into()))?,
+        low_prices_series
+            .as_series()
+            .ok_or_else(|| NyxsOwlError::DataError("Failed to convert low column to series".into()))?,
         period,
     )
     .map_err(|e| {
@@ -198,7 +198,11 @@ mod tests {
                 if !(has_buy_signal || has_sell_signal) {
                     let high_s = df.column("high").unwrap();
                     let low_s = df.column("low").unwrap();
-                    if let Ok((up, down)) = calculate_aroon(high_s, low_s, period) {
+                    if let Ok((up, down)) = calculate_aroon(
+                        high_s.as_series().unwrap(),
+                        low_s.as_series().unwrap(),
+                        period
+                    ) {
                         println!("Aroon Up: {:?}", up.f64().unwrap().to_vec());
                         println!("Aroon Down: {:?}", down.f64().unwrap().to_vec());
                         println!("Signals: {:?}", signals);
