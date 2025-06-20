@@ -3,6 +3,7 @@
 //! This module provides the foundational types and error handling
 //! that are shared across all components of the trading library.
 
+use chrono::{DateTime, Utc};
 use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -41,6 +42,33 @@ pub enum NyxsOwlError {
     /// Polars DataFrame errors
     PolarsError(String),
 
+    /// Configuration error
+    ConfigurationError(String),
+
+    /// Data validation error
+    DataValidationError(String),
+
+    /// Indicator calculation error
+    IndicatorError(String),
+
+    /// Signal generation error
+    SignalError(String),
+
+    /// State management error
+    StateError(String),
+
+    /// Strategy initialization error
+    InitializationError(String),
+
+    /// Strategy execution error
+    ExecutionError(String),
+
+    /// Insufficient data error
+    InsufficientData { required: usize, available: usize },
+
+    /// Serialization error
+    SerializationError(String),
+
     /// Generic error for unspecified issues
     Other(String),
 }
@@ -57,6 +85,22 @@ impl fmt::Display for NyxsOwlError {
             NyxsOwlError::OptimizationError(msg) => write!(f, "Optimization Error: {}", msg),
             NyxsOwlError::IoError(msg) => write!(f, "I/O Error: {}", msg),
             NyxsOwlError::PolarsError(msg) => write!(f, "Polars Error: {}", msg),
+            NyxsOwlError::ConfigurationError(msg) => write!(f, "Configuration Error: {}", msg),
+            NyxsOwlError::DataValidationError(msg) => write!(f, "Data Validation Error: {}", msg),
+            NyxsOwlError::IndicatorError(msg) => write!(f, "Indicator Error: {}", msg),
+            NyxsOwlError::SignalError(msg) => write!(f, "Signal Error: {}", msg),
+            NyxsOwlError::StateError(msg) => write!(f, "State Error: {}", msg),
+            NyxsOwlError::InitializationError(msg) => write!(f, "Initialization Error: {}", msg),
+            NyxsOwlError::ExecutionError(msg) => write!(f, "Execution Error: {}", msg),
+            NyxsOwlError::InsufficientData {
+                required,
+                available,
+            } => write!(
+                f,
+                "Insufficient Data: required {}, available {}",
+                required, available
+            ),
+            NyxsOwlError::SerializationError(msg) => write!(f, "Serialization Error: {}", msg),
             NyxsOwlError::Other(msg) => write!(f, "Error: {}", msg),
         }
     }
@@ -73,6 +117,12 @@ impl From<PolarsError> for NyxsOwlError {
 impl From<std::io::Error> for NyxsOwlError {
     fn from(error: std::io::Error) -> Self {
         NyxsOwlError::IoError(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for NyxsOwlError {
+    fn from(error: serde_json::Error) -> Self {
+        NyxsOwlError::SerializationError(error.to_string())
     }
 }
 
@@ -119,105 +169,469 @@ impl fmt::Display for Signal {
     }
 }
 
-/// Enhanced technical signal with metadata
-#[derive(Debug, Clone, PartialEq)]
-pub struct TechnicalSignal {
-    /// Base trading signal
-    pub signal: Signal,
-
+/// NyxsOwl signal types for advanced strategies
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlSignal {
+    /// Signal timestamp
+    pub timestamp: DateTime<Utc>,
+    /// Signal type
+    pub signal_type: NyxsOwlSignalType,
     /// Signal strength (0.0 to 1.0)
     pub strength: f64,
-
-    /// Signal confidence (0.0 to 1.0)
+    /// Confidence level (0.0 to 1.0)
     pub confidence: f64,
-
-    /// Additional metadata
-    pub metadata: HashMap<String, f64>,
-
-    /// Timestamp (optional)
-    pub timestamp: Option<i64>,
+    /// Target price (if applicable)
+    pub target_price: Option<f64>,
+    /// Stop loss price (if applicable)
+    pub stop_loss: Option<f64>,
+    /// Take profit price (if applicable)
+    pub take_profit: Option<f64>,
+    /// Signal metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// Strategy that generated the signal
+    pub strategy_name: String,
+    /// Signal expiration time
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
-impl TechnicalSignal {
-    /// Create a new technical signal
-    pub fn new(signal: Signal) -> Self {
-        Self {
-            signal,
-            strength: 1.0,
-            confidence: 1.0,
-            metadata: HashMap::new(),
-            timestamp: None,
-        }
-    }
-
-    /// Set signal strength
-    pub fn with_strength(mut self, strength: f64) -> Self {
-        self.strength = strength.max(0.0).min(1.0);
-        self
-    }
-
-    /// Set signal confidence
-    pub fn with_confidence(mut self, confidence: f64) -> Self {
-        self.confidence = confidence.max(0.0).min(1.0);
-        self
-    }
-
-    /// Add metadata
-    pub fn with_metadata(mut self, key: &str, value: f64) -> Self {
-        self.metadata.insert(key.to_string(), value);
-        self
-    }
-
-    /// Set timestamp
-    pub fn with_timestamp(mut self, timestamp: i64) -> Self {
-        self.timestamp = Some(timestamp);
-        self
-    }
-}
-
-impl Default for TechnicalSignal {
-    fn default() -> Self {
-        Self::new(Signal::Hold)
-    }
-}
-
-/// Performance metrics for strategy evaluation
+/// NyxsOwl signal types
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PerformanceMetrics {
-    /// Total return as percentage
-    pub total_return: f64,
-
-    /// Sharpe ratio (risk-adjusted return)
-    pub sharpe_ratio: f64,
-
-    /// Maximum drawdown as percentage
-    pub max_drawdown: f64,
-
-    /// Win rate (percentage of winning trades)
-    pub win_rate: f64,
-
-    /// Total number of trades
-    pub total_trades: i32,
-
-    /// Average return per trade
-    pub avg_trade_return: f64,
-
-    /// Return volatility (standard deviation)
-    pub volatility: f64,
+pub enum NyxsOwlSignalType {
+    /// Buy signal
+    Buy,
+    /// Sell signal
+    Sell,
+    /// Hold signal
+    Hold,
+    /// Close position signal
+    Close,
+    /// Reduce position signal
+    Reduce(f64),
+    /// Increase position signal
+    Increase(f64),
 }
 
-impl Default for PerformanceMetrics {
-    fn default() -> Self {
+/// Strategy category enumeration
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NyxsOwlStrategyCategory {
+    /// Trend following strategies
+    TrendFollowing,
+    /// Mean reversion strategies
+    MeanReversion,
+    /// Momentum-based strategies
+    Momentum,
+    /// Technical indicator strategies
+    TechnicalIndicators,
+    /// Forecasting model strategies
+    ForecastingModels,
+    /// Statistical arbitrage strategies
+    StatisticalArbitrage,
+    /// Machine learning strategies
+    MachineLearning,
+    /// Ensemble strategies
+    Ensemble,
+    /// Custom user-defined strategies
+    Custom(String),
+}
+
+/// Strategy complexity levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StrategyComplexity {
+    /// Simple strategies with basic logic
+    Simple,
+    /// Moderate complexity with multiple conditions
+    Moderate,
+    /// Complex strategies with advanced logic
+    Complex,
+    /// Advanced strategies with ML/AI components
+    Advanced,
+}
+
+/// Market condition types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MarketCondition {
+    /// Trending markets
+    Trending,
+    /// Sideways/ranging markets
+    Sideways,
+    /// High volatility markets
+    Volatile,
+    /// Low volatility markets
+    LowVolatility,
+    /// Bull markets
+    BullMarket,
+    /// Bear markets
+    BearMarket,
+    /// All market conditions
+    AllConditions,
+}
+
+/// Expected performance characteristics
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExpectedPerformance {
+    /// Typical win rate (0.0 to 1.0)
+    pub typical_win_rate: f64,
+    /// Typical Sharpe ratio
+    pub typical_sharpe_ratio: f64,
+    /// Expected maximum drawdown (0.0 to 1.0)
+    pub max_drawdown_expectation: f64,
+    /// Expected volatility range (min, max)
+    pub volatility_range: (f64, f64),
+    /// Expected annual return range (min, max)
+    pub annual_return_range: (f64, f64),
+}
+
+/// Computational cost estimation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ComputationalCost {
+    /// Low cost (< 1ms per data point)
+    Low,
+    /// Medium cost (1-10ms per data point)
+    Medium,
+    /// High cost (10-100ms per data point)
+    High,
+    /// Very high cost (> 100ms per data point)
+    VeryHigh,
+}
+
+/// Strategy parameter definition
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StrategyParameter {
+    /// Parameter name
+    pub name: String,
+    /// Parameter description
+    pub description: String,
+    /// Parameter type
+    pub param_type: ParameterType,
+    /// Default value
+    pub default_value: ParameterValue,
+    /// Valid range (for numeric parameters)
+    pub range: Option<(f64, f64)>,
+    /// Valid options (for enum parameters)
+    pub options: Option<Vec<String>>,
+    /// Whether parameter is required
+    pub required: bool,
+}
+
+/// Parameter type enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ParameterType {
+    /// Integer parameter
+    Integer,
+    /// Float parameter
+    Float,
+    /// String parameter
+    String,
+    /// Boolean parameter
+    Boolean,
+    /// Enum parameter with predefined options
+    Enum,
+}
+
+/// Parameter value enumeration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ParameterValue {
+    /// Integer value
+    Integer(i64),
+    /// Float value
+    Float(f64),
+    /// String value
+    String(String),
+    /// Boolean value
+    Boolean(bool),
+}
+
+/// Risk profile definition
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskProfile {
+    /// Risk level (1-10 scale)
+    pub risk_level: u8,
+    /// Maximum position size as percentage of portfolio
+    pub max_position_size: f64,
+    /// Maximum drawdown tolerance
+    pub max_drawdown_tolerance: f64,
+    /// Volatility tolerance
+    pub volatility_tolerance: f64,
+    /// Correlation with market
+    pub market_correlation: f64,
+}
+
+/// Strategy metadata structure
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlStrategyMetadata {
+    /// Strategy name
+    pub name: String,
+    /// Strategy description
+    pub description: String,
+    /// Strategy category
+    pub category: NyxsOwlStrategyCategory,
+    /// Strategy version
+    pub version: String,
+    /// Strategy author
+    pub author: String,
+    /// Strategy complexity level
+    pub complexity: StrategyComplexity,
+    /// Suitable timeframes
+    pub timeframe_suitability: Vec<String>,
+    /// Market conditions where strategy performs well
+    pub market_conditions: Vec<MarketCondition>,
+    /// Expected performance characteristics
+    pub expected_performance: ExpectedPerformance,
+    /// Computational cost estimation
+    pub computational_cost: ComputationalCost,
+    /// Required technical indicators
+    pub required_indicators: Vec<String>,
+    /// Strategy parameters
+    pub parameters: Vec<StrategyParameter>,
+    /// Risk characteristics
+    pub risk_profile: RiskProfile,
+}
+
+/// Position sizing methods
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum PositionSizingMethod {
+    /// Fixed dollar amount
+    FixedAmount(f64),
+    /// Fixed percentage of portfolio
+    FixedPercentage(f64),
+    /// Kelly criterion
+    Kelly,
+    /// Risk parity
+    RiskParity,
+    /// Volatility targeting
+    VolatilityTargeting(f64),
+}
+
+/// Risk management parameters
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskParameters {
+    /// Maximum position size
+    pub max_position_size: f64,
+    /// Stop loss percentage
+    pub stop_loss: Option<f64>,
+    /// Take profit percentage
+    pub take_profit: Option<f64>,
+    /// Maximum drawdown before stopping
+    pub max_drawdown: f64,
+    /// Position sizing method
+    pub position_sizing: PositionSizingMethod,
+}
+
+/// Rebalancing frequency options
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RebalancingFrequency {
+    /// Never rebalance
+    Never,
+    /// Daily rebalancing
+    Daily,
+    /// Weekly rebalancing
+    Weekly,
+    /// Monthly rebalancing
+    Monthly,
+    /// Custom frequency in days
+    Custom(u32),
+}
+
+/// Execution parameters
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExecutionParameters {
+    /// Minimum signal strength to act on
+    pub min_signal_strength: f64,
+    /// Signal confirmation requirements
+    pub confirmation_required: bool,
+    /// Maximum holding period
+    pub max_holding_period: Option<chrono::Duration>,
+    /// Rebalancing frequency
+    pub rebalancing_frequency: RebalancingFrequency,
+}
+
+/// Data frequency options
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DataFrequency {
+    /// Tick data
+    Tick,
+    /// 1-minute bars
+    Minute1,
+    /// 5-minute bars
+    Minute5,
+    /// 15-minute bars
+    Minute15,
+    /// 1-hour bars
+    Hour1,
+    /// Daily bars
+    Daily,
+    /// Weekly bars
+    Weekly,
+    /// Monthly bars
+    Monthly,
+}
+
+/// Data requirements specification
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DataRequirements {
+    /// Minimum data points required
+    pub min_data_points: usize,
+    /// Required data frequency
+    pub required_frequency: DataFrequency,
+    /// Required indicators
+    pub required_indicators: Vec<String>,
+    /// Lookback period in days
+    pub lookback_period: u32,
+}
+
+/// NyxsOwl strategy parameters
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlParameters {
+    /// Strategy-specific parameters
+    pub parameters: HashMap<String, ParameterValue>,
+    /// Risk management parameters
+    pub risk_params: RiskParameters,
+    /// Execution parameters
+    pub execution_params: ExecutionParameters,
+}
+
+/// Strategy state management
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlStrategyState {
+    /// Whether strategy is initialized
+    pub initialized: bool,
+    /// Current state data
+    pub state_data: HashMap<String, serde_json::Value>,
+    /// Last update timestamp
+    pub last_update: DateTime<Utc>,
+    /// Number of signals generated
+    pub signals_generated: u64,
+    /// Strategy performance since initialization
+    pub performance: NyxsOwlPerformanceMetrics,
+}
+
+/// NyxsOwl performance metrics
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlPerformanceMetrics {
+    /// Total return
+    pub total_return: f64,
+    /// Annualized return
+    pub annualized_return: f64,
+    /// Sharpe ratio
+    pub sharpe_ratio: f64,
+    /// Sortino ratio
+    pub sortino_ratio: f64,
+    /// Maximum drawdown
+    pub max_drawdown: f64,
+    /// Win rate
+    pub win_rate: f64,
+    /// Profit factor
+    pub profit_factor: f64,
+    /// Total trades
+    pub total_trades: u64,
+    /// Average trade return
+    pub avg_trade_return: f64,
+    /// Volatility
+    pub volatility: f64,
+    /// Calmar ratio
+    pub calmar_ratio: f64,
+    /// Information ratio
+    pub information_ratio: f64,
+}
+
+/// NyxsOwl configuration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NyxsOwlConfig {
+    /// Enabled strategies
+    pub enabled_strategies: Vec<String>,
+    /// Strategy parameters
+    pub strategy_parameters: HashMap<String, NyxsOwlParameters>,
+    /// Global risk settings
+    pub global_risk_settings: RiskParameters,
+    /// Execution settings
+    pub execution_settings: ExecutionParameters,
+    /// Data requirements
+    pub data_requirements: DataRequirements,
+}
+
+/// OHLCV (Open, High, Low, Close, Volume) candlestick data
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OHLCV {
+    /// Timestamp of the candlestick
+    pub timestamp: DateTime<Utc>,
+    /// Opening price
+    pub open: f64,
+    /// Highest price during the period
+    pub high: f64,
+    /// Lowest price during the period
+    pub low: f64,
+    /// Closing price
+    pub close: f64,
+    /// Volume traded during the period
+    pub volume: f64,
+}
+
+impl OHLCV {
+    /// Create a new OHLCV candlestick
+    pub fn new(
+        timestamp: DateTime<Utc>,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Self {
         Self {
-            total_return: 0.0,
-            sharpe_ratio: 0.0,
-            max_drawdown: 0.0,
-            win_rate: 0.0,
-            total_trades: 0,
-            avg_trade_return: 0.0,
-            volatility: 0.0,
+            timestamp,
+            open,
+            high,
+            low,
+            close,
+            volume,
         }
     }
+
+    /// Get the typical price (HLC/3)
+    pub fn typical_price(&self) -> f64 {
+        (self.high + self.low + self.close) / 3.0
+    }
+}
+
+/// Core NyxsOwl strategy trait
+pub trait NyxsOwlStrategy: Send + Sync {
+    /// Get the strategy name
+    fn name(&self) -> &str;
+
+    /// Get the strategy version
+    fn version(&self) -> &str;
+
+    /// Get the strategy category
+    fn category(&self) -> NyxsOwlStrategyCategory;
+
+    /// Get strategy metadata
+    fn metadata(&self) -> NyxsOwlStrategyMetadata;
+
+    /// Initialize the strategy with parameters
+    fn initialize(&mut self, parameters: &NyxsOwlParameters) -> Result<(), NyxsOwlError>;
+
+    /// Process market data and generate signals
+    fn process(&mut self, data: &[OHLCV]) -> Result<Vec<NyxsOwlSignal>, NyxsOwlError>;
+
+    /// Update strategy state with new market data
+    fn update(&mut self, data: &OHLCV) -> Result<Option<NyxsOwlSignal>, NyxsOwlError>;
+
+    /// Get current strategy state
+    fn state(&self) -> NyxsOwlStrategyState;
+
+    /// Reset strategy to initial state
+    fn reset(&mut self) -> Result<(), NyxsOwlError>;
+
+    /// Validate strategy configuration
+    fn validate_config(&self, config: &NyxsOwlConfig) -> Result<(), NyxsOwlError>;
+
+    /// Get required indicators for this strategy
+    fn required_indicators(&self) -> Vec<String>;
+
+    /// Get strategy performance metrics
+    fn performance_metrics(&self) -> NyxsOwlPerformanceMetrics;
+
+    /// Clone the strategy (for parallel execution)
+    fn clone_strategy(&self) -> Box<dyn NyxsOwlStrategy>;
 }
 
 /// Configuration value types
@@ -377,6 +791,25 @@ impl From<&str> for ConfigValue {
 impl From<bool> for ConfigValue {
     fn from(value: bool) -> Self {
         ConfigValue::Bool(value)
+    }
+}
+
+impl Default for NyxsOwlPerformanceMetrics {
+    fn default() -> Self {
+        Self {
+            total_return: 0.0,
+            annualized_return: 0.0,
+            sharpe_ratio: 0.0,
+            sortino_ratio: 0.0,
+            max_drawdown: 0.0,
+            win_rate: 0.0,
+            profit_factor: 0.0,
+            total_trades: 0,
+            avg_trade_return: 0.0,
+            volatility: 0.0,
+            calmar_ratio: 0.0,
+            information_ratio: 0.0,
+        }
     }
 }
 

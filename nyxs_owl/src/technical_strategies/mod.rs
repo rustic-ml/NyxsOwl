@@ -111,6 +111,7 @@ pub mod momentum;
 pub mod multi_factor;
 pub mod oscillators;
 pub mod pattern_recognition;
+pub mod trend;
 pub mod volatility;
 pub mod volume;
 

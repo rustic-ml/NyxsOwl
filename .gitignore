@@ -44,3 +44,4 @@ dist/
 # Documentation builds
 doc/
 target/doc/ 
+docs/cursor_guide.md

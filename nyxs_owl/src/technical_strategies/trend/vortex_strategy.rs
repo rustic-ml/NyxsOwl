@@ -2,8 +2,10 @@
 //! Vortex Indicator (VI) Crossover Strategy using ta-lib-in-rust.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use polars::prelude::{DataFrame, Series, NamedFrom, PolarsResult, DataType, Float64Type};
+use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
+use crate::technical_strategies::{Strategy, StrategyConfig};
 use polars::chunked_array::ChunkedArray;
+use polars::prelude::{DataFrame, Float64Type, PolarsResult, Series};
 use ta_lib_in_rust::indicators::trend::calculate_vortex;
 
 /// Generates trading signals based on Vortex Indicator (VI+ and VI-) crossovers.
@@ -24,23 +26,24 @@ pub fn vortex_signals(
     df: &DataFrame,
     high_col: &str,
     low_col: &str,
-    close_col: &str, 
+    close_col: &str,
     period: usize,
 ) -> Result<Vec<Signal>> {
     if period == 0 {
-        return Err(NyxsOwlError::InvalidParameter(
-            String::from("Vortex Indicator period must be greater than 0."),
-        ));
+        return Err(NyxsOwlError::InvalidParameter(String::from(
+            "Vortex Indicator period must be greater than 0.",
+        )));
     }
 
     for col_name in [high_col, low_col, close_col].iter() {
         if df.column(col_name).is_err() {
             return Err(NyxsOwlError::DataError(format!(
-                "Required price column '{}' not found.", col_name
+                "Required price column '{}' not found.",
+                col_name
             )));
         }
     }
-    
+
     let data_len = df.height();
     if data_len <= period {
         return Err(NyxsOwlError::MissingData(format!(
@@ -55,31 +58,31 @@ pub fn vortex_signals(
         NyxsOwlError::StrategyError(format!("Failed to calculate Vortex Indicator: {:?}", e))
     })?;
 
-    let vi_plus_ca: &ChunkedArray<Float64Type> = vi_plus_series.f64()
+    let vi_plus_ca: &ChunkedArray<Float64Type> = vi_plus_series
+        .f64()
         .map_err(|_| NyxsOwlError::DataError("VI_Plus series not F64".to_string()))?;
-    let vi_minus_ca: &ChunkedArray<Float64Type> = vi_minus_series.f64()
+    let vi_minus_ca: &ChunkedArray<Float64Type> = vi_minus_series
+        .f64()
         .map_err(|_| NyxsOwlError::DataError("VI_Minus series not F64".to_string()))?;
 
     let mut signals = vec![Signal::Hold; data_len];
-    let first_valid_idx = period + 1; 
+    let first_valid_idx = period + 1;
 
-    for i in first_valid_idx.min(data_len-1)..data_len {
+    for i in first_valid_idx.min(data_len - 1)..data_len {
         let current_vi_plus_opt = vi_plus_ca.get(i);
         let prev_vi_plus_opt = vi_plus_ca.get(i - 1);
         let current_vi_minus_opt = vi_minus_ca.get(i);
         let prev_vi_minus_opt = vi_minus_ca.get(i - 1);
 
-        if let (
-            Some(current_plus), Some(prev_plus), 
-            Some(current_minus), Some(prev_minus)
-        ) = (
-            current_vi_plus_opt, prev_vi_plus_opt, 
-            current_vi_minus_opt, prev_vi_minus_opt
+        if let (Some(current_plus), Some(prev_plus), Some(current_minus), Some(prev_minus)) = (
+            current_vi_plus_opt,
+            prev_vi_plus_opt,
+            current_vi_minus_opt,
+            prev_vi_minus_opt,
         ) {
             if prev_plus <= prev_minus && current_plus > current_minus {
                 signals[i] = Signal::Buy;
-            }
-            else if prev_minus <= prev_plus && current_minus > current_plus {
+            } else if prev_minus <= prev_plus && current_minus > current_plus {
                 signals[i] = Signal::Sell;
             }
         }
@@ -130,7 +133,7 @@ mod tests {
     #[test]
     fn test_vortex_insufficient_data() {
         let period = 14;
-        let df_too_short = create_vortex_test_df(period).unwrap(); 
+        let df_too_short = create_vortex_test_df(period).unwrap();
         assert!(vortex_signals(&df_too_short, "high", "low", "close", period).is_err());
 
         let df_just_enough = create_vortex_test_df(period + 1).unwrap();
@@ -145,22 +148,22 @@ mod tests {
 
     #[test]
     fn test_vortex_signals_conceptual() {
-        let df = create_vortex_test_df(100).unwrap(); 
+        let df = create_vortex_test_df(100).unwrap();
         let period = 14;
 
         match vortex_signals(&df, "high", "low", "close", period) {
             Ok(signals) => {
                 assert_eq!(signals.len(), df.height());
-                
+
                 let has_buy_signal = signals.iter().any(|&s| s == Signal::Buy);
                 let has_sell_signal = signals.iter().any(|&s| s == Signal::Sell);
-                
-                if df.height() > period + 10 { 
-                    assert!(has_buy_signal || has_sell_signal, 
+
+                if df.height() > period + 10 {
+                    assert!(has_buy_signal || has_sell_signal,
                         "Expected Vortex strategy to generate signals with this data. Check calculations or test data.");
                 }
-            },
+            }
             Err(e) => panic!("Vortex signal generation failed: {:?}", e),
         }
     }
-} 
+}

@@ -78,12 +78,15 @@ thiserror = "2.0"
 csv = "1.3"
 rand = "0.8"
 
+# HashMap for metadata
+hashbrown = "0.15"
+
 # Async support for better integration
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "sync", "macros"], optional = true }
 
 # Parallel processing
-rayon = "1.10"
+rayon = { version = "1.10", optional = true }
 futures = "0.3"
 num_cpus = "1.16"
 
@@ -100,13 +103,15 @@ polars = { version = "0.47.0", features = ["lazy", "strings", "temporal", "rolli
 # ta-lib-sys = "0.1.2"
 
 # Forecasting - Updated to 1.2.0 for adaptive features
-oxidiviner = "1.2.0"
+oxidiviner = { version = "1.2.0", optional = true }
 
 # Logging and error handling for production
 log = "0.4"
 env_logger = "0.10"
 anyhow = "1.0"
 ta-lib-in-rust = "1.0.8"
+
+
 
 [dev-dependencies]
 # Core testing framework
@@ -199,6 +204,11 @@ name = "multi_factor_strategy_example"
 path = "../examples/multi_factor_strategy_example.rs"
 required-features = ["trading-math"]
 
+[[example]]
+name = "enhanced_rsi_strategy_example"
+path = "../examples/enhanced_rsi_strategy_example.rs"
+required-features = ["trading-math"]
+
 # Benchmarks for performance testing
 # Commenting out the missing trade_math_bench as well
 # [[bench]]
@@ -212,25 +222,26 @@ required-features = ["trading-math"]
 
 # Optional features that can be enabled by users
 [features]
-# Smart defaults for most users - includes essential technical analysis and backtesting
-default = ["trading-math", "backtesting", "forecasting", "async-support"]
+# Smart defaults for most users - includes essential technical analysis and technical strategies
+default = ["trading-math", "technical-strategies"]
 
 # Core feature sets
-trading-math = []          # Essential technical indicators (SMA, EMA, RSI, Bollinger Bands, etc.)
-backtesting = []           # Strategy backtesting engine
-forecasting = []           # Time series forecasting with OxiDiviner
+trading-math = []                    # Essential technical indicators (SMA, EMA, RSI, Bollinger Bands, etc.)
+technical-strategies = ["trading-math"]  # Technical analysis strategies
+backtesting = ["technical-strategies"]  # Strategy backtesting engine
+forecasting = ["dep:oxidiviner"]    # Time series forecasting with OxiDiviner
+async-support = ["dep:tokio"]       # Async runtime support for integration
 
-# Advanced features
-day-trading = []           # Day trading strategies using daily OHLCV data
-minute-trading = []        # Minute-level intraday trading strategies
-async-support = ["tokio"]  # Async runtime support for integration
+# Performance features
+simd = []                           # SIMD optimizations
+parallel = ["dep:rayon"]            # Parallel processing
 
 # Convenience meta-features
 basic = ["trading-math"]                                           # Just technical indicators
-standard = ["trading-math", "backtesting"]                        # Technical analysis + backtesting
-advanced = ["trading-math", "backtesting", "forecasting"]         # Standard + forecasting
-professional = ["trading-math", "backtesting", "forecasting", "day-trading", "minute-trading"]  # Everything
-all = ["professional", "async-support"]                           # Everything including async
+standard = ["trading-math", "technical-strategies"]               # Technical analysis + strategies
+advanced = ["trading-math", "technical-strategies", "forecasting"] # Standard + forecasting
+professional = ["trading-math", "technical-strategies", "forecasting", "backtesting"]  # Full functionality
+full = ["professional", "async-support", "simd", "parallel"]      # Everything including performance
 
 [package.metadata.tarpaulin]
 # Package-specific tarpaulin settings
@@ -259,4 +270,4 @@ name = "async_parallel_demo"
 path = "../examples/async_parallel_demo.rs"
 required-features = ["forecasting", "async-support"]
 
-# Removed debug_timeseries example 
+# Removed debug_timeseries example

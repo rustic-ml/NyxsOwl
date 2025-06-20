@@ -34,6 +34,7 @@
 
 // Common types and utilities
 pub mod common;
+pub mod simple_types;
 
 pub mod prelude {
     //! Common imports for typical NyxsOwl usage
@@ -42,150 +43,34 @@ pub mod prelude {
     //! types and functions with a single `use nyxs_owl::prelude::*;` statement.
 
     // Re-export common types and new simplified types
-    pub use crate::simple_types::{NyxsOwlError, Price, Result, Signal};
+    pub use crate::simple_types::{NyxsOwlError, Price, Result, Signal, SignalData, PositionType};
+
+    // Re-export enhanced Ichimoku functionality
+    pub use crate::technical_strategies::trend::{
+        enhanced_ichimoku_signals, EnhancedIchimokuConfig, EnhancedIchimokuSignal, MarketRegime,
+    };
+
+    // Re-export enhanced RSI functionality
+    pub use crate::technical_strategies::momentum::{
+        enhanced_rsi_signals, enhanced_rsi_signals_with_config, EnhancedRsiConfig, EnhancedRsiStrategy,
+    };
+
+    // Re-export technical strategy framework
+    pub use crate::technical_strategies::{
+        Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy,
+    };
 
     // Re-export forecasting specific items if any become necessary for prelude
-    // #[cfg(feature = "forecasting")]
-    // pub use crate::forecasting::some_forecast_type; // Example
+    #[cfg(feature = "forecasting")]
+    pub use crate::forecasting::{
+        ConfigValue as ForecastConfigValue,
+        Strategy as ForecastStrategy,
+        StrategyConfig as ForecastStrategyConfig,
+    };
 }
 
-pub mod simple_types {
-    //! Shared types and error definitions for the simplified API
-
-    /// Price type alias for clarity
-    pub type Price = f64;
-
-    /// Trading signal enumeration
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum Signal {
-        /// Hold current position
-        Hold = 0,
-        /// Buy signal
-        Buy = 1,
-        /// Sell signal
-        Sell = 2,
-    }
-
-    impl Signal {
-        /// Convert signal to integer representation
-        pub fn to_int(self) -> i32 {
-            self as i32
-        }
-    }
-
-    /// Position type for trading signals
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum PositionType {
-        /// Long position
-        Long,
-        /// Short position
-        Short,
-        /// Hold position
-        Hold,
-    }
-
-    /// Enhanced trading signal with additional metadata (for examples)
-    #[derive(Debug, Clone, PartialEq)]
-    pub struct SignalData {
-        /// The trading signal
-        pub signal: Signal,
-        /// The position type
-        pub position_type: PositionType,
-        /// Optional timestamp of the signal
-        pub timestamp: Option<chrono::DateTime<chrono::Utc>>,
-        /// Confidence level of the signal (0.0 to 1.0)
-        pub confidence: f64,
-        /// Optional metadata with additional signal information
-        pub metadata: Option<std::collections::HashMap<String, f64>>,
-    }
-
-    impl SignalData {
-        /// Create a new SignalData with default values
-        pub fn new(signal: Signal) -> Self {
-            let position_type = match signal {
-                Signal::Buy => PositionType::Long,
-                Signal::Sell => PositionType::Short,
-                Signal::Hold => PositionType::Hold,
-            };
-
-            Self {
-                signal,
-                position_type,
-                timestamp: None,
-                confidence: 1.0,
-                metadata: None,
-            }
-        }
-
-        /// Set the confidence level of the signal
-        pub fn with_confidence(mut self, confidence: f64) -> Self {
-            self.confidence = confidence;
-            self
-        }
-
-        /// Set the timestamp of the signal
-        pub fn with_timestamp(mut self, timestamp: chrono::DateTime<chrono::Utc>) -> Self {
-            self.timestamp = Some(timestamp);
-            self
-        }
-
-        /// Set the metadata of the signal
-        pub fn with_metadata(mut self, metadata: std::collections::HashMap<String, f64>) -> Self {
-            self.metadata = Some(metadata);
-            self
-        }
-    }
-
-    /// Main error type for NyxsOwl operations
-    #[derive(Debug, thiserror::Error)]
-    pub enum NyxsOwlError {
-        /// Invalid parameter provided
-        #[error("Invalid parameter: {0}")]
-        InvalidParameter(String),
-
-        /// Data processing error
-        #[error("Data error: {0}")]
-        DataError(String),
-
-        /// Strategy execution error
-        #[error("Strategy error: {0}")]
-        StrategyError(String),
-
-        /// Backtest execution error
-        #[error("Backtest error: {0}")]
-        BacktestError(String),
-
-        /// Missing required data
-        #[error("Missing data: {0}")]
-        MissingData(String),
-
-        /// Feature not implemented
-        #[error("Feature not implemented: {0}")]
-        NotImplemented(String),
-
-        /// Validation error
-        #[error("Validation error: {0}")]
-        ValidationError(String),
-
-        /// Indicator calculation error
-        #[error("Indicator error: {0}")]
-        IndicatorError(String),
-
-        /// Model error
-        #[error("Model error: {0}")]
-        ModelError(String),
-    }
-
-    /// Result type alias for convenience
-    pub type Result<T> = std::result::Result<T, NyxsOwlError>;
-
-    // Add conversion from PolarsError
-    impl From<polars::error::PolarsError> for NyxsOwlError {
-        fn from(err: polars::error::PolarsError) -> Self {
-            NyxsOwlError::DataError(format!("Polars error: {}", err))
-        }
-    }
-}
+// Re-export the comprehensive types from simple_types module
+pub use simple_types::*;
 
 // Export main modules
 /// Async and parallel processing capabilities for concurrent forecasting
