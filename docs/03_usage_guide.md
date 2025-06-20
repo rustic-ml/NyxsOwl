@@ -25,7 +25,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyxs_owl = "0.5.0"
+nyxs_owl = "0.7.4"
 ```
 
 ### Feature-based Installation
@@ -35,13 +35,13 @@ Control what you include based on your needs:
 ```toml
 [dependencies]
 # Minimal - just technical indicators
-nyxs_owl = { version = "0.5.0", default-features = false, features = ["trading-math"] }
+nyxs_owl = { version = "0.7.4", default-features = false, features = ["trading-math"] }
 
 # With forecasting
-nyxs_owl = { version = "0.5.0", features = ["trading-math", "forecasting"] }
+nyxs_owl = { version = "0.7.4", features = ["trading-math", "forecasting"] }
 
 # Full features
-nyxs_owl = { version = "0.5.0", features = ["all"] }
+nyxs_owl = { version = "0.7.4", features = ["all"] }
 
 # Additional dependencies for full functionality
 polars = { version = "0.47.0", features = ["lazy", "csv", "temporal"] }
@@ -57,16 +57,16 @@ git clone https://github.com/rustic-ml/NyxsOwl.git
 cd NyxsOwl
 
 # Run basic examples
-cargo run --example basic_demo
-cargo run --example technical_analysis
-cargo run --example forecasting_demo
+cargo run --example quick_start
+cargo run --example enhanced_rsi_strategy_example
+cargo run --example arima_strategy_example
 ```
 
 ## Memory Optimization
 
 ### 🧠 Overview
 
-NyxsOwl v0.7.2+ includes comprehensive memory optimizations that enable efficient operation even in memory-constrained environments. These optimizations provide:
+NyxsOwl v0.7.4 includes comprehensive memory optimizations that enable efficient operation even in memory-constrained environments. These optimizations provide:
 
 - **650% improvement** in available memory (90MB → 13GB tested)
 - **Zero memory-related test failures** (125/125 tests passing)
@@ -106,13 +106,13 @@ Use minimal feature sets to reduce memory footprint:
 ```toml
 [dependencies]
 # Memory-efficient: Only technical analysis
-nyxs_owl = { version = "0.7.2", default-features = false, features = ["trading-math"] }
+nyxs_owl = { version = "0.7.4", default-features = false, features = ["trading-math"] }
 
 # Balanced: Core features without heavy async processing
-nyxs_owl = { version = "0.7.2", default-features = false, features = ["trading-math", "forecasting"] }
+nyxs_owl = { version = "0.7.4", default-features = false, features = ["trading-math", "forecasting"] }
 
 # Full features: All capabilities (requires adequate memory)
-nyxs_owl = { version = "0.7.2", features = ["all"] }
+nyxs_owl = { version = "0.7.4", features = ["all"] }
 ```
 
 ### Environment Variables for Memory Control
@@ -199,12 +199,11 @@ fn check_memory_usage() {
 
 3. **Large Dataset Processing**
    ```rust
-   // Use lazy evaluation with Polars
+   // Use streaming processing for large datasets
    use polars::prelude::*;
    
-   let lazy_df = LazyFrame::scan_csv("large_file.csv", ScanArgsCSV::default())?
-       .select([col("close"), col("volume")])  // Select only needed columns
-       .limit(1000)  // Limit rows for memory-constrained environments
+   let df = LazyFrame::scan_csv("large_file.csv", ScanArgsCSV::default())?
+       .select([col("close"), col("volume")])
        .collect()?;
    ```
 
@@ -220,583 +219,482 @@ fn check_memory_usage() {
 
 ## Quick Start Examples
 
-### 1. Basic Technical Analysis
+### Basic Technical Analysis
 
 ```rust
-use nyxs_owl::trade_math::{moving_averages::*, oscillators::*};
+use nyxs_owl::trade_math::*;
+use polars::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Sample price data
-    let prices = vec![100.0, 102.0, 101.5, 103.0, 104.5, 103.8, 105.2];
+    // Create sample data
+    let prices = vec![100.0, 101.0, 99.0, 102.0, 103.0, 101.0, 104.0];
     
-    // Initialize indicators
-    let mut sma = SimpleMovingAverage::new(5)?;
-    let mut rsi = RelativeStrengthIndex::new(14)?;
-    
-    println!("Price Analysis:");
-    println!("Price\tSMA(5)\tRSI(14)\tSignal");
-    println!("----\t------\t-------\t------");
-    
+    // Calculate Simple Moving Average
+    let mut sma = moving_averages::SimpleMovingAverage::new(3)?;
     for &price in &prices {
-        // Update indicators
         sma.update(price)?;
+        if let Some(value) = sma.value() {
+            println!("SMA: {:.2}", value);
+        }
+    }
+    
+    // Calculate RSI
+    let mut rsi = oscillators::RelativeStrengthIndex::new(14)?;
+    for &price in &prices {
         rsi.update(price)?;
-        
-        // Generate simple signal
-        let signal = match rsi.value() {
-            Some(r) if r > 70.0 => "SELL - Overbought",
-            Some(r) if r < 30.0 => "BUY - Oversold",
-            _ => "HOLD"
-        };
-        
-        println!("{:.1}\t{:.2}\t{:.2}\t{}", 
-                price, 
-                sma.value().unwrap_or(0.0), 
-                rsi.value().unwrap_or(0.0),
-                signal
-        );
+        if let Some(value) = rsi.value() {
+            println!("RSI: {:.2}", value);
+        }
     }
     
     Ok(())
 }
 ```
 
-### 2. Forecasting with Adaptive Features
+### Forecasting Strategy
 
 ```rust
-use nyxs_owl::forecasting::strategies::arima_strategy::{ArimaStrategy, ArimaStrategyConfig};
+use nyxs_owl::forecasting::strategies::*;
 use polars::prelude::*;
-use chrono::{DateTime, Utc, Duration};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Generate sample data
-    let data = generate_sample_market_data()?;
+    // Load market data
+    let df = LazyFrame::scan_csv("data/AAPL_daily.csv", ScanArgsCSV::default())?
+        .collect()?;
     
-    // Create adaptive ARIMA strategy
+    // Create ARIMA strategy with adaptive features
     let config = ArimaStrategyConfig {
         model_selection: true,      // Auto-select optimal parameters
         dynamic_threshold: true,    // Volatility-based thresholds
         regime_detection: true,     // Market regime awareness
-        outlier_detection: true,    // Data cleaning
-        adaptive_refit: true,       // Performance-based refitting
         ..ArimaStrategyConfig::default()
     };
     
     let mut strategy = ArimaStrategy::new(config);
     
     // Generate trading signals
-    let signals = strategy.generate_signals(&data, "close", "timestamp")?;
+    let signals = strategy.generate_signals(&df, "close", "timestamp")?;
     
-    println!("Forecasting Results:");
-    println!("Generated {} adaptive signals", signals.len());
-    
+    println!("Generated {} signals", signals.len());
     for signal in signals.iter().take(5) {
-        println!("Signal: {:?} | Strength: {:.3} | Price: {:.2}", 
-                signal.signal_type, signal.strength, signal.price);
-    }
-    
-    // Check current market regime
-    if let Some(regime) = strategy.get_current_regime() {
-        println!("Current market regime: {:?}", regime);
+        println!("Signal: {:?}", signal);
     }
     
     Ok(())
-}
-
-fn generate_sample_market_data() -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let now = Utc::now();
-    let timestamps: Vec<DateTime<Utc>> = (0..100)
-        .map(|i| now - Duration::days(100 - i))
-        .collect();
-    
-    let mut prices = Vec::new();
-    let mut base_price = 100.0;
-    
-    for i in 0..100 {
-        // Add trend and noise
-        let trend = i as f64 * 0.1;
-        let noise = (i as f64 * 0.5).sin() * 2.0 + rand::random::<f64>() - 0.5;
-        base_price = 100.0 + trend + noise;
-        prices.push(base_price);
-    }
-    
-    let df = df! {
-        "timestamp" => timestamps,
-        "open" => prices.iter().map(|&p| p * 0.995).collect::<Vec<_>>(),
-        "high" => prices.iter().map(|&p| p * 1.01).collect::<Vec<_>>(),
-        "low" => prices.iter().map(|&p| p * 0.99).collect::<Vec<_>>(),
-        "close" => prices,
-        "volume" => vec![1000; 100],
-    }?;
-    
-    Ok(df)
 }
 ```
 
-### 3. Strategy Backtesting
+### Multi-Factor Strategy
 
 ```rust
-use nyxs_owl::strategy_lib::backtest::*;
-use polars::prelude::*;
+use nyxs_owl::technical_strategies::multi_factor::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load historical data
-    let data = LazyFrame::scan_csv("examples/csv/AAPL_daily_ohlcv.csv", ScanArgsCSV::default())?
-        .select([
-            col("timestamp"),
-            col("open"),
-            col("high"), 
-            col("low"),
-            col("close"),
-            col("volume"),
-        ])
-        .collect()?;
-    
-    // Generate simple moving average signals
-    let signals = generate_sma_signals(&data)?;
-    
-    // Configure backtest
-    let config = BacktestConfig {
-        initial_capital: 100_000.0,
-        commission: 0.001,        // 0.1% commission
-        slippage: 0.0005,        // 0.05% slippage
-        position_size: 1.0,      // 100% of capital
+    // Create multi-factor strategy configuration
+    let config = MultiFactorConfig {
+        factors: vec![
+            FactorConfig {
+                name: "RSI".to_string(),
+                indicator_type: IndicatorType::RSI { period: 14 },
+                parameters: HashMap::new(),
+                weight: 0.3,
+            },
+            FactorConfig {
+                name: "MACD".to_string(),
+                indicator_type: IndicatorType::MACD { fast: 12, slow: 26, signal: 9 },
+                parameters: HashMap::new(),
+                weight: 0.4,
+            },
+            FactorConfig {
+                name: "Bollinger".to_string(),
+                indicator_type: IndicatorType::BollingerBands { period: 20, std_dev: 2.0 },
+                parameters: HashMap::new(),
+                weight: 0.3,
+            },
+        ],
+        weights: vec![0.3, 0.4, 0.3],
+        signal_threshold: 0.02,
+        min_confidence: 0.7,
     };
     
-    // Run backtest
-    let results = run_backtest(&data, &signals, &config)?;
+    let mut strategy = MultiFactorStrategy::new(config)?;
     
-    // Display results
-    println!("=== Backtest Results ===");
-    println!("Total Return: {:.2}%", results.total_return * 100.0);
-    println!("Sharpe Ratio: {:.2}", results.sharpe_ratio);
-    println!("Max Drawdown: {:.2}%", results.max_drawdown * 100.0);
-    println!("Win Rate: {:.2}%", results.win_rate * 100.0);
-    println!("Total Trades: {}", results.total_trades);
-    println!("Profit Factor: {:.2}", results.profit_factor);
+    // Load and process data
+    let df = LazyFrame::scan_csv("data/AAPL_daily.csv", ScanArgsCSV::default())?
+        .collect()?;
+    
+    let signals = strategy.generate_signals(&df)?;
+    println!("Generated {} multi-factor signals", signals.len());
     
     Ok(())
-}
-
-fn generate_sma_signals(data: &DataFrame) -> Result<Series, Box<dyn std::error::Error>> {
-    // Simple SMA crossover strategy
-    let closes = data.column("close")?.f64()?;
-    let mut signals = Vec::new();
-    
-    let mut sma_fast = nyxs_owl::trade_math::moving_averages::SimpleMovingAverage::new(10)?;
-    let mut sma_slow = nyxs_owl::trade_math::moving_averages::SimpleMovingAverage::new(30)?;
-    
-    for close in closes.into_no_null_iter() {
-        sma_fast.update(close)?;
-        sma_slow.update(close)?;
-        
-        let signal = match (sma_fast.value(), sma_slow.value()) {
-            (Some(fast), Some(slow)) if fast > slow => 1,  // Buy
-            (Some(fast), Some(slow)) if fast < slow => -1, // Sell
-            _ => 0, // Hold
-        };
-        
-        signals.push(signal);
-    }
-    
-    Ok(Series::new("signal".into(), signals))
 }
 ```
 
 ## Core Modules
 
-### Technical Analysis (`trade_math`)
+### Trade Math Module
 
-#### Moving Averages
+The core technical analysis module providing 125+ indicators:
 
 ```rust
-use nyxs_owl::trade_math::moving_averages::*;
+use nyxs_owl::trade_math::*;
 
-// Simple Moving Average
-let mut sma = SimpleMovingAverage::new(20)?;
-sma.update(100.0)?;
-println!("SMA: {:.2}", sma.value().unwrap_or(0.0));
+// Moving Averages
+let mut sma = moving_averages::SimpleMovingAverage::new(20)?;
+let mut ema = moving_averages::ExponentialMovingAverage::new(20)?;
+let mut vwap = moving_averages::VolumeWeightedAveragePrice::new()?;
 
-// Exponential Moving Average
-let mut ema = ExponentialMovingAverage::new(12)?;
-ema.update(100.0)?;
-println!("EMA: {:.2}", ema.value().unwrap_or(0.0));
+// Oscillators
+let mut rsi = oscillators::RelativeStrengthIndex::new(14)?;
+let mut macd = oscillators::MACD::new(12, 26, 9)?;
+let mut stoch = oscillators::StochasticOscillator::new(14, 3)?;
 
-// Volume Weighted Average Price
-let mut vwap = VolumeWeightedAveragePrice::new();
-vwap.update(100.0, 1000.0)?; // price, volume
-println!("VWAP: {:.2}", vwap.value().unwrap_or(0.0));
+// Volatility Indicators
+let mut bb = volatility::BollingerBands::new(20, 2.0)?;
+let mut atr = volatility::AverageTrueRange::new(14)?;
+
+// Volume Indicators
+let mut obv = volume::OnBalanceVolume::new()?;
+let mut vwap_vol = volume::VolumeWeightedAveragePrice::new()?;
 ```
 
-#### Oscillators
+### Technical Strategies Module
+
+Advanced strategy implementations with unified configuration:
 
 ```rust
-use nyxs_owl::trade_math::oscillators::*;
+use nyxs_owl::technical_strategies::*;
 
-// RSI
-let mut rsi = RelativeStrengthIndex::new(14)?;
-rsi.update(100.0)?;
-if let Some(rsi_value) = rsi.value() {
-    println!("RSI: {:.2}", rsi_value);
-    if rsi_value > 70.0 {
-        println!("Overbought condition");
-    } else if rsi_value < 30.0 {
-        println!("Oversold condition");
-    }
-}
+// Enhanced RSI Strategy
+let rsi_config = EnhancedRSIConfig {
+    period: 14,
+    oversold_threshold: 30.0,
+    overbought_threshold: 70.0,
+    divergence_lookback: 20,
+    volume_confirmation: true,
+};
+let mut rsi_strategy = EnhancedRSIStrategy::new(rsi_config)?;
 
-// MACD
-let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9)?;
-macd.update(100.0)?;
-if let Some((macd_line, signal_line)) = macd.value() {
-    println!("MACD: {:.4}, Signal: {:.4}", macd_line, signal_line);
-    let histogram = macd_line - signal_line;
-    println!("Histogram: {:.4}", histogram);
-}
+// Multi-Factor Strategy
+let multi_config = MultiFactorConfig::default();
+let mut multi_strategy = MultiFactorStrategy::new(multi_config)?;
+
+// VWAP Strategy
+let vwap_config = VWAPStrategyConfig::default();
+let mut vwap_strategy = VWAPStrategy::new(vwap_config)?;
 ```
 
-#### Volatility Indicators
+### Forecasting Module
+
+Time series forecasting with OxiDiviner 1.2.0 integration:
 
 ```rust
-use nyxs_owl::trade_math::volatility::*;
+use nyxs_owl::forecasting::strategies::*;
 
-// Bollinger Bands
-let mut bb = BollingerBands::new(20, 2.0)?;
-bb.update(100.0)?;
-if let Some((upper, middle, lower)) = bb.value() {
-    println!("BB Upper: {:.2}, Middle: {:.2}, Lower: {:.2}", upper, middle, lower);
-    
-    let current_price = 100.0;
-    if current_price > upper {
-        println!("Price above upper band - potential sell signal");
-    } else if current_price < lower {
-        println!("Price below lower band - potential buy signal");
-    }
-}
-
-// Average True Range
-let mut atr = AverageTrueRange::new(14)?;
-atr.update(100.0, 102.0, 98.0)?; // high, low, close
-if let Some(atr_value) = atr.value() {
-    println!("ATR: {:.2} - Volatility measure", atr_value);
-}
-```
-
-### Forecasting (`forecasting`)
-
-#### Enhanced ARIMA Strategy
-
-```rust
-use nyxs_owl::forecasting::strategies::arima_strategy::{ArimaStrategy, ArimaStrategyConfig};
-
-let config = ArimaStrategyConfig {
-    // Adaptive features
-    model_selection: true,          // Automatic order selection
-    dynamic_threshold: true,        // Volatility-based thresholds
-    regime_detection: true,         // Market regime detection
-    outlier_detection: true,        // Data preprocessing
-    adaptive_refit: true,          // Performance-based refitting
-    
-    // Traditional parameters (fallback)
-    p: 1, d: 1, q: 1,
-    threshold: 0.02,
-    min_data_points: 50,
-    
-    // Advanced configuration
-    volatility_lookback: 30,
-    volatility_multiplier: 2.0,
-    performance_window: 100,
-    refit_threshold: 0.3,
-    
+// ARIMA Strategy
+let arima_config = ArimaStrategyConfig {
+    model_selection: true,
+    dynamic_threshold: true,
+    regime_detection: true,
     ..ArimaStrategyConfig::default()
 };
+let mut arima_strategy = ArimaStrategy::new(arima_config);
 
-let mut strategy = ArimaStrategy::new(config);
-```
-
-#### Ensemble Strategy
-
-```rust
-use nyxs_owl::forecasting::strategies::adaptive_ensemble::{
-    AdaptiveEnsemble, AdaptiveEnsembleConfig, ModelType
-};
-
-let config = AdaptiveEnsembleConfig {
-    models: vec![
-        ModelType::ARIMA,
-        ModelType::ExponentialSmoothing,
-        ModelType::KalmanFilter,
-    ],
+// Ensemble Strategy
+let ensemble_config = AdaptiveEnsembleConfig {
+    models: vec![ModelType::ARIMA, ModelType::ExponentialSmoothing],
     adaptive_weighting: true,
-    regime_detection: true,
-    quality_monitoring: true,
-    performance_window: 50,
-    signal_threshold: 0.02,
-    min_confidence: 0.7,
     ..AdaptiveEnsembleConfig::default()
 };
+let mut ensemble_strategy = AdaptiveEnsemble::new(ensemble_config);
 
-let mut ensemble = AdaptiveEnsemble::new(config);
+// GARCH Strategy
+let garch_config = GarchStrategyConfig {
+    auto_order_selection: true,
+    volatility_targeting: true,
+    ..GarchStrategyConfig::default()
+};
+let mut garch_strategy = GarchStrategy::new(garch_config);
 ```
 
 ## Data Integration
 
 ### Loading Market Data
 
-#### From CSV Files
+```rust
+use polars::prelude::*;
+
+// Load CSV data
+let df = LazyFrame::scan_csv("data/AAPL_daily.csv", ScanArgsCSV::default())?
+    .collect()?;
+
+// Load Parquet data (more efficient)
+let df = LazyFrame::scan_parquet("data/AAPL_daily.parquet", ScanArgsParquet::default())?
+    .collect()?;
+
+// Load from database
+let df = LazyFrame::scan_ipc("data/AAPL_daily.arrow", ScanArgsIpc::default())?
+    .collect()?;
+```
+
+### Data Preprocessing
 
 ```rust
 use polars::prelude::*;
 
-// Load OHLCV data
-let df = LazyFrame::scan_csv("data/AAPL_daily.csv", ScanArgsCSV::default())?
-    .with_columns([
-        col("timestamp").str().strptime(
-            DataType::Datetime(TimeUnit::Milliseconds, None),
-            StrptimeOptions::default(),
-            lit("timestamp")
-        ),
-        col("close").cast(DataType::Float64),
-        col("volume").cast(DataType::Float64),
-    ])
-    .collect()?;
-
-println!("Loaded {} rows of data", df.height());
-```
-
-#### From APIs (Example with Alpha Vantage)
-
-```rust
-use reqwest;
-use serde_json::Value;
-
-async fn fetch_stock_data(symbol: &str, api_key: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let url = format!(
-        "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={}&apikey={}",
-        symbol, api_key
-    );
-    
-    let response: Value = reqwest::get(&url).await?.json().await?;
-    
-    let time_series = response["Time Series (Daily)"].as_object()
-        .ok_or("Invalid API response")?;
-    
-    let mut timestamps = Vec::new();
-    let mut opens = Vec::new();
-    let mut highs = Vec::new();
-    let mut lows = Vec::new();
-    let mut closes = Vec::new();
-    let mut volumes = Vec::new();
-    
-    for (date, data) in time_series {
-        timestamps.push(date.clone());
-        opens.push(data["1. open"].as_str().unwrap().parse::<f64>()?);
-        highs.push(data["2. high"].as_str().unwrap().parse::<f64>()?);
-        lows.push(data["3. low"].as_str().unwrap().parse::<f64>()?);
-        closes.push(data["4. close"].as_str().unwrap().parse::<f64>()?);
-        volumes.push(data["5. volume"].as_str().unwrap().parse::<i64>()?);
-    }
-    
-    let df = df! {
-        "timestamp" => timestamps,
-        "open" => opens,
-        "high" => highs,
-        "low" => lows,
-        "close" => closes,
-        "volume" => volumes,
-    }?;
-    
-    Ok(df)
+fn preprocess_market_data(df: &DataFrame) -> Result<DataFrame, NyxsOwlError> {
+    df.clone()
+        .lazy()
+        // Handle missing values
+        .with_columns([
+            col("close").fill_null(col("close").forward_fill()),
+            col("volume").fill_null(lit(0)),
+        ])
+        // Add technical features
+        .with_columns([
+            col("close").pct_change(1).alias("returns"),
+            col("close").rolling_std(RollingOptions::default().window_size(20)).alias("volatility"),
+        ])
+        // Filter out extreme outliers
+        .filter(col("returns").abs().lt(lit(0.2)))
+        .collect()
+        .map_err(|e| NyxsOwlError::DataError(e.to_string()))
 }
 ```
 
-#### Real-time Data Processing
+### Real-time Data Streaming
 
 ```rust
-use tokio;
-use tokio::time::{interval, Duration};
+use tokio::sync::mpsc;
+use std::time::Duration;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut strategy = create_strategy()?;
-    let mut interval = interval(Duration::from_secs(1));
-    
-    loop {
-        interval.tick().await;
+async fn stream_market_data(
+    mut receiver: mpsc::Receiver<MarketTick>,
+    mut strategy: Box<dyn TechnicalStrategy>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    while let Some(tick) = receiver.recv().await {
+        // Update strategy with new tick
+        strategy.update_indicators(tick.price, Some(tick.volume))?;
         
-        // Fetch latest price (example)
-        let latest_price = fetch_latest_price("AAPL").await?;
-        
-        // Update strategy
-        strategy.update_indicators(latest_price, None)?;
-        
-        // Check for signals
-        let mock_df = create_single_price_dataframe(latest_price)?;
-        let signals = strategy.generate_signals(&mock_df)?;
-        
-        if !signals.is_empty() {
-            println!("New signals generated: {:?}", signals);
-            process_signals(signals).await?;
+        // Generate signals if conditions are met
+        if let Some(signal) = strategy.check_signals()? {
+            println!("Signal generated: {:?}", signal);
         }
+        
+        // Rate limiting
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
-}
-
-async fn fetch_latest_price(symbol: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    // Implementation depends on your data provider
-    // This is a mock implementation
-    Ok(100.0 + rand::random::<f64>() * 10.0 - 5.0)
+    
+    Ok(())
 }
 ```
 
 ## Strategy Development
 
-### Custom Strategy Implementation
+### Creating Custom Strategies
 
 ```rust
 use nyxs_owl::trade_math::*;
-use polars::prelude::*;
-use std::collections::HashMap;
-
-pub struct CustomStrategy {
-    sma_short: SimpleMovingAverage,
-    sma_long: SimpleMovingAverage,
-    rsi: RelativeStrengthIndex,
-    config: CustomConfig,
-}
+use nyxs_owl::technical_strategies::*;
 
 #[derive(Debug, Clone)]
-pub struct CustomConfig {
-    pub sma_short_period: usize,
-    pub sma_long_period: usize,
-    pub rsi_period: usize,
-    pub rsi_overbought: f64,
-    pub rsi_oversold: f64,
+pub struct CustomStrategyConfig {
+    pub lookback_period: usize,
+    pub threshold: f64,
+    pub use_volume: bool,
 }
 
-impl Default for CustomConfig {
+impl Default for CustomStrategyConfig {
     fn default() -> Self {
         Self {
-            sma_short_period: 10,
-            sma_long_period: 30,
-            rsi_period: 14,
-            rsi_overbought: 70.0,
-            rsi_oversold: 30.0,
+            lookback_period: 20,
+            threshold: 0.02,
+            use_volume: true,
         }
     }
 }
 
-impl CustomStrategy {
-    pub fn new(config: CustomConfig) -> Result<Self, Box<dyn std::error::Error>> {
+pub struct CustomStrategy {
+    config: CustomStrategyConfig,
+    sma: SimpleMovingAverage,
+    rsi: RelativeStrengthIndex,
+    price_history: Vec<f64>,
+    volume_history: Vec<f64>,
+}
+
+impl TechnicalStrategy for CustomStrategy {
+    type Config = CustomStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
         Ok(Self {
-            sma_short: SimpleMovingAverage::new(config.sma_short_period)?,
-            sma_long: SimpleMovingAverage::new(config.sma_long_period)?,
-            rsi: RelativeStrengthIndex::new(config.rsi_period)?,
+            sma: SimpleMovingAverage::new(config.lookback_period)?,
+            rsi: RelativeStrengthIndex::new(14)?,
+            price_history: Vec::new(),
+            volume_history: Vec::new(),
             config,
         })
     }
     
-    pub fn update(&mut self, price: f64) -> Result<(), Box<dyn std::error::Error>> {
-        self.sma_short.update(price)?;
-        self.sma_long.update(price)?;
-        self.rsi.update(price)?;
-        Ok(())
-    }
-    
-    pub fn generate_signal(&self) -> Option<TradingSignal> {
-        let sma_short = self.sma_short.value()?;
-        let sma_long = self.sma_long.value()?;
-        let rsi = self.rsi.value()?;
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
         
-        // Strategy logic: SMA crossover + RSI confirmation
-        if sma_short > sma_long && rsi < self.config.rsi_overbought {
-            Some(TradingSignal::Buy)
-        } else if sma_short < sma_long && rsi > self.config.rsi_oversold {
-            Some(TradingSignal::Sell)
-        } else {
-            Some(TradingSignal::Hold)
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum TradingSignal {
-    Buy,
-    Sell,
-    Hold,
-}
-```
-
-### Multi-Timeframe Analysis
-
-```rust
-use std::collections::BTreeMap;
-
-pub struct MultiTimeframeStrategy {
-    strategies: BTreeMap<String, CustomStrategy>,
-    timeframes: Vec<String>,
-}
-
-impl MultiTimeframeStrategy {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let mut strategies = BTreeMap::new();
+        let prices = df.column("close")?.f64()?.into_no_null_iter();
+        let volumes = df.column("volume")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
         
-        // Different configurations for different timeframes
-        strategies.insert("1m".to_string(), CustomStrategy::new(CustomConfig {
-            sma_short_period: 5,
-            sma_long_period: 15,
-            rsi_period: 7,
-            ..CustomConfig::default()
-        })?);
-        
-        strategies.insert("5m".to_string(), CustomStrategy::new(CustomConfig {
-            sma_short_period: 10,
-            sma_long_period: 30,
-            rsi_period: 14,
-            ..CustomConfig::default()
-        })?);
-        
-        strategies.insert("1h".to_string(), CustomStrategy::new(CustomConfig {
-            sma_short_period: 20,
-            sma_long_period: 50,
-            rsi_period: 21,
-            ..CustomConfig::default()
-        })?);
-        
-        Ok(Self {
-            strategies,
-            timeframes: vec!["1m".to_string(), "5m".to_string(), "1h".to_string()],
-        })
-    }
-    
-    pub fn analyze_all_timeframes(&mut self, price_data: HashMap<String, f64>) -> HashMap<String, TradingSignal> {
-        let mut signals = HashMap::new();
-        
-        for timeframe in &self.timeframes {
-            if let (Some(strategy), Some(&price)) = (
-                self.strategies.get_mut(timeframe),
-                price_data.get(timeframe)
-            ) {
-                if strategy.update(price).is_ok() {
-                    if let Some(signal) = strategy.generate_signal() {
-                        signals.insert(timeframe.clone(), signal);
-                    }
+        for (((price, volume), timestamp), i) in prices.zip(volumes).zip(timestamps).enumerate() {
+            // Update indicators
+            self.sma.update(price)?;
+            self.rsi.update(price)?;
+            
+            // Store history
+            self.price_history.push(price);
+            self.volume_history.push(volume);
+            
+            // Maintain history size
+            if self.price_history.len() > self.config.lookback_period {
+                self.price_history.remove(0);
+                self.volume_history.remove(0);
+            }
+            
+            // Generate signals when we have enough data
+            if i >= self.config.lookback_period {
+                if let Some(signal) = self.evaluate_signals(price, volume, timestamp)? {
+                    signals.push(signal);
                 }
             }
         }
         
-        signals
+        Ok(signals)
     }
     
-    pub fn get_consensus_signal(&mut self, price_data: HashMap<String, f64>) -> TradingSignal {
-        let signals = self.analyze_all_timeframes(price_data);
+    fn update_indicators(&mut self, price: f64, volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        self.sma.update(price)?;
+        self.rsi.update(price)?;
         
-        let buy_count = signals.values().filter(|&s| matches!(s, TradingSignal::Buy)).count();
-        let sell_count = signals.values().filter(|&s| matches!(s, TradingSignal::Sell)).count();
+        self.price_history.push(price);
+        if let Some(vol) = volume {
+            self.volume_history.push(vol);
+        }
         
-        match (buy_count, sell_count) {
-            (b, s) if b > s && b >= 2 => TradingSignal::Buy,
-            (b, s) if s > b && s >= 2 => TradingSignal::Sell,
-            _ => TradingSignal::Hold,
+        // Maintain history size
+        if self.price_history.len() > self.config.lookback_period {
+            self.price_history.remove(0);
+            self.volume_history.remove(0);
+        }
+        
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "Custom_Strategy"
+    }
+}
+
+impl CustomStrategy {
+    fn evaluate_signals(
+        &self,
+        price: f64,
+        volume: f64,
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        
+        // Get indicator values
+        let sma_value = self.sma.value().unwrap_or(price);
+        let rsi_value = self.rsi.value().unwrap_or(50.0);
+        
+        // Calculate signal strength
+        let price_vs_sma = (price - sma_value) / sma_value;
+        let rsi_signal = if rsi_value < 30.0 { 1.0 } else if rsi_value > 70.0 { -1.0 } else { 0.0 };
+        
+        // Volume confirmation
+        let volume_signal = if self.config.use_volume {
+            let avg_volume = self.volume_history.iter().sum::<f64>() / self.volume_history.len() as f64;
+            if volume > avg_volume * 1.5 { 1.0 } else { 0.5 }
+        } else {
+            1.0
+        };
+        
+        // Combined signal
+        let combined_signal = price_vs_sma * rsi_signal * volume_signal;
+        
+        if combined_signal.abs() > self.config.threshold {
+            let signal_type = if combined_signal > 0.0 { SignalType::Buy } else { SignalType::Sell };
+            
+            let mut metadata = HashMap::new();
+            metadata.insert("sma".to_string(), sma_value);
+            metadata.insert("rsi".to_string(), rsi_value);
+            metadata.insert("volume_ratio".to_string(), volume_signal);
+            
+            Ok(Some(Signal {
+                timestamp: datetime,
+                signal_type,
+                strength: combined_signal.abs(),
+                price,
+                metadata,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+}
+```
+
+### Strategy Configuration Management
+
+```rust
+use std::env;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategySettings {
+    pub lookback_period: usize,
+    pub threshold: f64,
+    pub use_volume: bool,
+    pub risk_level: RiskLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RiskLevel {
+    Conservative,
+    Moderate,
+    Aggressive,
+}
+
+impl StrategySettings {
+    pub fn from_env() -> Self {
+        Self {
+            lookback_period: env::var("LOOKBACK_PERIOD")
+                .unwrap_or_else(|_| "20".to_string())
+                .parse()
+                .unwrap_or(20),
+            threshold: env::var("SIGNAL_THRESHOLD")
+                .unwrap_or_else(|_| "0.02".to_string())
+                .parse()
+                .unwrap_or(0.02),
+            use_volume: env::var("USE_VOLUME")
+                .unwrap_or_else(|_| "true".to_string())
+                .parse()
+                .unwrap_or(true),
+            risk_level: env::var("RISK_LEVEL")
+                .unwrap_or_else(|_| "moderate".to_string())
+                .parse()
+                .unwrap_or(RiskLevel::Moderate),
+        }
+    }
+    
+    pub fn to_config(&self) -> CustomStrategyConfig {
+        let multiplier = match self.risk_level {
+            RiskLevel::Conservative => 1.5,
+            RiskLevel::Moderate => 1.0,
+            RiskLevel::Aggressive => 0.7,
+        };
+        
+        CustomStrategyConfig {
+            lookback_period: self.lookback_period,
+            threshold: self.threshold * multiplier,
+            use_volume: self.use_volume,
         }
     }
 }
@@ -804,563 +702,393 @@ impl MultiTimeframeStrategy {
 
 ## Backtesting
 
-### Comprehensive Backtesting Example
+### Basic Backtesting Framework
 
 ```rust
-use nyxs_owl::strategy_lib::backtest::*;
+use nyxs_owl::forecasting::backtest::*;
 use polars::prelude::*;
-use chrono::{DateTime, Utc};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load and prepare data
-    let data = prepare_backtest_data("AAPL")?;
+pub struct BacktestResult {
+    pub total_return: f64,
+    pub sharpe_ratio: f64,
+    pub max_drawdown: f64,
+    pub win_rate: f64,
+    pub total_trades: usize,
+    pub signals: Vec<Signal>,
+}
+
+fn run_backtest(
+    strategy: &mut dyn TechnicalStrategy,
+    df: &DataFrame,
+    initial_capital: f64,
+) -> Result<BacktestResult, NyxsOwlError> {
+    let signals = strategy.generate_signals(df)?;
     
-    // Run multiple strategy tests
-    let strategies = vec![
-        ("SMA_10_30", generate_sma_signals(&data, 10, 30)?),
-        ("SMA_20_50", generate_sma_signals(&data, 20, 50)?),
-        ("RSI_14", generate_rsi_signals(&data, 14)?),
-    ];
+    let mut portfolio_value = initial_capital;
+    let mut max_portfolio_value = initial_capital;
+    let mut max_drawdown = 0.0;
+    let mut winning_trades = 0;
+    let mut total_trades = 0;
     
-    let configs = vec![
-        BacktestConfig {
-            initial_capital: 100_000.0,
-            commission: 0.001,
-            slippage: 0.0005,
-            position_size: 1.0,
-        },
-        BacktestConfig {
-            initial_capital: 100_000.0,
-            commission: 0.002,
-            slippage: 0.001,
-            position_size: 0.5,
-        },
-    ];
+    let prices = df.column("close")?.f64()?.into_no_null_iter().collect::<Vec<_>>();
     
-    println!("Strategy Comparison:");
-    println!("{:<15} {:<10} {:<12} {:<12} {:<10} {:<10}", 
-             "Strategy", "Config", "Return %", "Sharpe", "Max DD %", "Trades");
-    println!("{}", "-".repeat(80));
-    
-    for (strategy_name, signals) in strategies {
-        for (i, config) in configs.iter().enumerate() {
-            let results = run_backtest(&data, &signals, config)?;
-            
-            println!("{:<15} {:<10} {:<12.2} {:<12.2} {:<10.2} {:<10}", 
-                     strategy_name,
-                     format!("Config{}", i + 1),
-                     results.total_return * 100.0,
-                     results.sharpe_ratio,
-                     results.max_drawdown * 100.0,
-                     results.total_trades
-            );
+    for signal in &signals {
+        total_trades += 1;
+        
+        // Simple position sizing (1% of portfolio per trade)
+        let position_size = portfolio_value * 0.01 * signal.strength;
+        
+        // Calculate trade result (simplified)
+        let trade_return = if matches!(signal.signal_type, SignalType::Buy) {
+            // Assume 1% gain for buy signals
+            0.01
+        } else {
+            // Assume 1% loss for sell signals
+            -0.01
+        };
+        
+        let trade_pnl = position_size * trade_return;
+        portfolio_value += trade_pnl;
+        
+        if trade_pnl > 0.0 {
+            winning_trades += 1;
+        }
+        
+        // Update max drawdown
+        if portfolio_value > max_portfolio_value {
+            max_portfolio_value = portfolio_value;
+        }
+        
+        let current_drawdown = (max_portfolio_value - portfolio_value) / max_portfolio_value;
+        if current_drawdown > max_drawdown {
+            max_drawdown = current_drawdown;
         }
     }
     
-    Ok(())
-}
-
-fn prepare_backtest_data(symbol: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let df = LazyFrame::scan_csv(&format!("examples/csv/{}_daily_ohlcv.csv", symbol), ScanArgsCSV::default())?
-        .with_columns([
-            col("timestamp").cast(DataType::Datetime(TimeUnit::Milliseconds, None)),
-            col("close").cast(DataType::Float64),
-            col("volume").cast(DataType::Float64),
-        ])
-        .sort("timestamp", SortMultipleOptions::default())
-        .collect()?;
+    let total_return = (portfolio_value - initial_capital) / initial_capital;
+    let win_rate = winning_trades as f64 / total_trades as f64;
     
-    println!("Loaded {} rows for {}", df.height(), symbol);
-    Ok(df)
-}
-
-fn generate_rsi_signals(data: &DataFrame, period: usize) -> Result<Series, Box<dyn std::error::Error>> {
-    let closes = data.column("close")?.f64()?;
-    let mut signals = Vec::new();
-    let mut rsi = nyxs_owl::trade_math::oscillators::RelativeStrengthIndex::new(period)?;
+    // Simplified Sharpe ratio calculation
+    let sharpe_ratio = if total_return > 0.0 { total_return / max_drawdown.max(0.01) } else { 0.0 };
     
-    for close in closes.into_no_null_iter() {
-        rsi.update(close)?;
-        
-        let signal = match rsi.value() {
-            Some(r) if r < 30.0 => 1,  // Buy when oversold
-            Some(r) if r > 70.0 => -1, // Sell when overbought
-            _ => 0, // Hold
-        };
-        
-        signals.push(signal);
-    }
-    
-    Ok(Series::new("signal".into(), signals))
+    Ok(BacktestResult {
+        total_return,
+        sharpe_ratio,
+        max_drawdown,
+        win_rate,
+        total_trades,
+        signals,
+    })
 }
 ```
 
-### Walk-Forward Analysis
+### Performance Analysis
 
 ```rust
-use chrono::{Duration, DateTime, Utc};
-
-pub struct WalkForwardTester {
-    train_period_days: i64,
-    test_period_days: i64,
-    step_days: i64,
-}
-
-impl WalkForwardTester {
-    pub fn new(train_days: i64, test_days: i64, step_days: i64) -> Self {
-        Self {
-            train_period_days: train_days,
-            test_period_days: test_days,
-            step_days: step_days,
-        }
-    }
+fn analyze_backtest_results(results: &[BacktestResult]) {
+    let avg_return: f64 = results.iter().map(|r| r.total_return).sum::<f64>() / results.len() as f64;
+    let avg_sharpe: f64 = results.iter().map(|r| r.sharpe_ratio).sum::<f64>() / results.len() as f64;
+    let avg_drawdown: f64 = results.iter().map(|r| r.max_drawdown).sum::<f64>() / results.len() as f64;
     
-    pub fn run_walk_forward_test(
-        &self,
-        data: &DataFrame,
-        strategy_generator: fn(&DataFrame) -> Result<Series, Box<dyn std::error::Error>>,
-    ) -> Result<Vec<BacktestResults>, Box<dyn std::error::Error>> {
-        let timestamps = data.column("timestamp")?.datetime()?;
-        let start_date = DateTime::from_timestamp_millis(timestamps.min().unwrap()).unwrap();
-        let end_date = DateTime::from_timestamp_millis(timestamps.max().unwrap()).unwrap();
-        
-        let mut results = Vec::new();
-        let mut current_date = start_date + Duration::days(self.train_period_days);
-        
-        while current_date + Duration::days(self.test_period_days) <= end_date {
-            // Define train and test periods
-            let train_start = current_date - Duration::days(self.train_period_days);
-            let train_end = current_date;
-            let test_start = current_date;
-            let test_end = current_date + Duration::days(self.test_period_days);
-            
-            // Filter data for training period
-            let train_data = data.clone().lazy()
-                .filter(
-                    col("timestamp").gt_eq(lit(train_start.timestamp_millis())).and(
-                        col("timestamp").lt(lit(train_end.timestamp_millis()))
-                    )
-                )
-                .collect()?;
-            
-            // Filter data for testing period
-            let test_data = data.clone().lazy()
-                .filter(
-                    col("timestamp").gt_eq(lit(test_start.timestamp_millis())).and(
-                        col("timestamp").lt(lit(test_end.timestamp_millis()))
-                    )
-                )
-                .collect()?;
-            
-            if train_data.height() > 50 && test_data.height() > 10 {
-                // Generate strategy on training data
-                let signals = strategy_generator(&train_data)?;
-                
-                // Apply signals to test data (simplified)
-                let test_signals = Series::new("signal".into(), vec![0; test_data.height()]);
-                
-                // Run backtest on test period
-                let config = BacktestConfig::default();
-                let period_results = run_backtest(&test_data, &test_signals, &config)?;
-                
-                results.push(period_results);
-            }
-            
-            current_date += Duration::days(self.step_days);
-        }
-        
-        Ok(results)
-    }
+    println!("Backtest Analysis:");
+    println!("  Average Return: {:.2}%", avg_return * 100.0);
+    println!("  Average Sharpe Ratio: {:.2}", avg_sharpe);
+    println!("  Average Max Drawdown: {:.2}%", avg_drawdown * 100.0);
+    println!("  Number of Tests: {}", results.len());
 }
 ```
 
 ## Production Deployment
 
-### Real-time Trading System
+### Configuration Management
 
 ```rust
-use tokio;
-use tokio::time::{interval, Duration};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::fs;
+use serde_json;
 
-pub struct TradingSystem {
-    strategy: Arc<Mutex<CustomStrategy>>,
-    position_manager: Arc<Mutex<PositionManager>>,
-    risk_manager: Arc<Mutex<RiskManager>>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductionConfig {
+    pub database_url: String,
+    pub api_key: String,
+    pub risk_limits: RiskLimits,
+    pub strategy_configs: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Position {
-    pub symbol: String,
-    pub quantity: f64,
-    pub entry_price: f64,
-    pub current_price: f64,
-    pub unrealized_pnl: f64,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RiskLimits {
+    pub max_position_size: f64,
+    pub max_daily_loss: f64,
+    pub max_drawdown: f64,
 }
 
-pub struct PositionManager {
-    positions: HashMap<String, Position>,
-    cash_balance: f64,
+impl ProductionConfig {
+    pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let config_str = fs::read_to_string("config/production.json")?;
+        let config: ProductionConfig = serde_json::from_str(&config_str)?;
+        Ok(config)
+    }
+}
+```
+
+### Logging and Monitoring
+
+```rust
+use log::{info, warn, error};
+use std::time::Instant;
+
+pub struct StrategyMonitor {
+    strategy_name: String,
+    start_time: Instant,
+    signal_count: usize,
+    error_count: usize,
 }
 
-impl PositionManager {
-    pub fn new(initial_cash: f64) -> Self {
+impl StrategyMonitor {
+    pub fn new(strategy_name: String) -> Self {
+        info!("Starting strategy monitor for: {}", strategy_name);
         Self {
-            positions: HashMap::new(),
-            cash_balance: initial_cash,
+            strategy_name,
+            start_time: Instant::now(),
+            signal_count: 0,
+            error_count: 0,
         }
     }
     
-    pub fn execute_order(&mut self, symbol: &str, quantity: f64, price: f64) -> Result<(), Box<dyn std::error::Error>> {
-        let cost = quantity * price;
-        
-        if quantity > 0.0 {
-            // Buy order
-            if self.cash_balance >= cost {
-                self.cash_balance -= cost;
-                let position = self.positions.entry(symbol.to_string()).or_insert(Position {
-                    symbol: symbol.to_string(),
-                    quantity: 0.0,
-                    entry_price: price,
-                    current_price: price,
-                    unrealized_pnl: 0.0,
-                });
-                position.quantity += quantity;
-                position.entry_price = (position.entry_price * (position.quantity - quantity) + price * quantity) / position.quantity;
-            } else {
-                return Err("Insufficient cash balance".into());
-            }
-        } else {
-            // Sell order
-            if let Some(position) = self.positions.get_mut(symbol) {
-                if position.quantity >= quantity.abs() {
-                    position.quantity -= quantity.abs();
-                    self.cash_balance += quantity.abs() * price;
-                    
-                    if position.quantity == 0.0 {
-                        self.positions.remove(symbol);
-                    }
-                } else {
-                    return Err("Insufficient position size".into());
-                }
-            } else {
-                return Err("No position to sell".into());
-            }
-        }
-        
-        Ok(())
+    pub fn record_signal(&mut self) {
+        self.signal_count += 1;
+        info!("Signal generated by {}: #{}", self.strategy_name, self.signal_count);
     }
     
-    pub fn update_position_prices(&mut self, symbol: &str, current_price: f64) {
-        if let Some(position) = self.positions.get_mut(symbol) {
-            position.current_price = current_price;
-            position.unrealized_pnl = (current_price - position.entry_price) * position.quantity;
-        }
+    pub fn record_error(&mut self, error: &str) {
+        self.error_count += 1;
+        error!("Error in {}: {}", self.strategy_name, error);
     }
     
-    pub fn get_total_portfolio_value(&self) -> f64 {
-        let position_value: f64 = self.positions.values()
-            .map(|pos| pos.quantity * pos.current_price)
-            .sum();
+    pub fn report_status(&self) {
+        let elapsed = self.start_time.elapsed();
+        let signals_per_sec = self.signal_count as f64 / elapsed.as_secs_f64();
         
-        self.cash_balance + position_value
+        info!("Strategy Status Report:");
+        info!("  Strategy: {}", self.strategy_name);
+        info!("  Runtime: {:?}", elapsed);
+        info!("  Signals Generated: {}", self.signal_count);
+        info!("  Signals/Second: {:.2}", signals_per_sec);
+        info!("  Errors: {}", self.error_count);
     }
 }
+```
 
-impl TradingSystem {
-    pub async fn run(&self, symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-        let mut interval = interval(Duration::from_secs(1));
-        
-        loop {
-            interval.tick().await;
-            
-            for symbol in &symbols {
-                // Fetch latest market data
-                let latest_price = fetch_market_data(symbol).await?;
-                
-                // Update strategy
-                {
-                    let mut strategy = self.strategy.lock().await;
-                    strategy.update(latest_price)?;
-                }
-                
-                // Generate trading signal
-                let signal = {
-                    let strategy = self.strategy.lock().await;
-                    strategy.generate_signal()
-                };
-                
-                // Risk check and position management
-                if let Some(signal) = signal {
-                    let order_size = self.calculate_position_size(symbol, &signal).await?;
-                    
-                    // Execute order
-                    {
-                        let mut position_manager = self.position_manager.lock().await;
-                        match signal {
-                            TradingSignal::Buy => {
-                                position_manager.execute_order(symbol, order_size, latest_price)?;
-                                println!("Executed BUY order: {} shares of {} at ${:.2}", 
-                                        order_size, symbol, latest_price);
-                            },
-                            TradingSignal::Sell => {
-                                position_manager.execute_order(symbol, -order_size, latest_price)?;
-                                println!("Executed SELL order: {} shares of {} at ${:.2}", 
-                                        order_size, symbol, latest_price);
-                            },
-                            TradingSignal::Hold => {
-                                // No action
-                            }
-                        }
-                        
-                        // Update position with current price
-                        position_manager.update_position_prices(symbol, latest_price);
-                    }
-                }
+### Error Handling and Recovery
+
+```rust
+use std::time::Duration;
+use tokio::time::sleep;
+
+async fn robust_strategy_execution(
+    mut strategy: Box<dyn TechnicalStrategy>,
+    data_stream: mpsc::Receiver<MarketTick>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut retry_count = 0;
+    const MAX_RETRIES: usize = 3;
+    
+    loop {
+        match execute_strategy_cycle(&mut strategy, &data_stream).await {
+            Ok(_) => {
+                retry_count = 0; // Reset retry count on success
             }
-            
-            // Print portfolio status every minute
-            if tokio::time::Instant::now().elapsed().as_secs() % 60 == 0 {
-                self.print_portfolio_status().await;
+            Err(e) => {
+                retry_count += 1;
+                error!("Strategy execution error: {}", e);
+                
+                if retry_count >= MAX_RETRIES {
+                    error!("Max retries exceeded, shutting down strategy");
+                    break;
+                }
+                
+                warn!("Retrying in 5 seconds... (attempt {}/{})", retry_count, MAX_RETRIES);
+                sleep(Duration::from_secs(5)).await;
             }
         }
     }
     
-    async fn calculate_position_size(&self, symbol: &str, signal: &TradingSignal) -> Result<f64, Box<dyn std::error::Error>> {
-        let position_manager = self.position_manager.lock().await;
-        let total_value = position_manager.get_total_portfolio_value();
-        
-        // Simple position sizing: 10% of portfolio value
-        let position_value = total_value * 0.1;
-        let latest_price = fetch_market_data(symbol).await?;
-        
-        Ok(position_value / latest_price)
-    }
-    
-    async fn print_portfolio_status(&self) {
-        let position_manager = self.position_manager.lock().await;
-        println!("=== Portfolio Status ===");
-        println!("Cash Balance: ${:.2}", position_manager.cash_balance);
-        println!("Total Portfolio Value: ${:.2}", position_manager.get_total_portfolio_value());
-        
-        for (symbol, position) in &position_manager.positions {
-            println!("{}: {} shares @ ${:.2} (P&L: ${:.2})", 
-                    symbol, position.quantity, position.current_price, position.unrealized_pnl);
-        }
-    }
+    Ok(())
 }
 
-async fn fetch_market_data(symbol: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    // Mock implementation - replace with actual market data feed
-    Ok(100.0 + rand::random::<f64>() * 10.0 - 5.0)
+async fn execute_strategy_cycle(
+    strategy: &mut Box<dyn TechnicalStrategy>,
+    data_stream: &mpsc::Receiver<MarketTick>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Strategy execution logic
+    while let Some(tick) = data_stream.recv().await {
+        strategy.update_indicators(tick.price, Some(tick.volume))?;
+        
+        // Additional processing...
+    }
+    
+    Ok(())
 }
 ```
 
 ## Advanced Features
 
-### Performance Optimization
+### SIMD Acceleration
 
 ```rust
 use nyxs_owl::performance_utils::*;
 
-// SIMD acceleration for bulk calculations
-fn optimized_sma_calculation(prices: &[f64], window: usize) -> Vec<f64> {
-    let simd_calculator = SIMDCalculator::new();
-    simd_calculator.moving_average_bulk(prices, window)
-}
+// Enable SIMD optimizations for mathematical operations
+let simd_calculator = SIMDCalculator::new();
 
-// Memory-optimized streaming calculations
-fn streaming_analysis(price_stream: impl Iterator<Item = f64>) -> Result<(), Box<dyn std::error::Error>> {
-    let memory_pool = MemoryPool::new(1024 * 1024); // 1MB pool
-    let mut indicators = StreamingIndicatorSet::new_with_pool(&memory_pool);
+// SIMD-accelerated moving average calculation
+let prices: Vec<f64> = (0..1000).map(|i| 100.0 + i as f64 * 0.1).collect();
+let sma_values = simd_calculator.moving_average(&prices, 20)?;
+
+println!("SIMD-accelerated SMA calculation completed");
+```
+
+### Async Parallel Processing
+
+```rust
+use nyxs_owl::async_parallel::*;
+use tokio;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let processor = AsyncParallelProcessor::new(4)?; // 4 worker threads
     
-    for price in price_stream {
-        let results = indicators.update_all(price)?;
-        
-        // Process results without allocating
-        if results.has_signals() {
-            process_signals_zero_alloc(&results)?;
-        }
-    }
+    // Process multiple assets in parallel
+    let assets = vec!["AAPL", "GOOGL", "MSFT", "TSLA"];
+    let data_frames: Vec<DataFrame> = assets.iter()
+        .map(|asset| load_asset_data(asset))
+        .collect();
+    
+    let results = processor.process_parallel(data_frames, |df| {
+        // Strategy processing logic
+        let mut strategy = ArimaStrategy::new(ArimaStrategyConfig::default());
+        strategy.generate_signals(&df, "close", "timestamp")
+    }).await?;
+    
+    println!("Processed {} assets in parallel", results.len());
     
     Ok(())
 }
 ```
 
-### Async Processing
+### Memory Optimization
 
 ```rust
-use tokio;
-use futures::future::join_all;
+use nyxs_owl::memory_optimized::*;
 
-async fn parallel_strategy_execution(symbols: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-    let tasks: Vec<_> = symbols.into_iter().map(|symbol| {
-        tokio::spawn(async move {
-            let mut strategy = create_strategy_for_symbol(&symbol).await?;
-            let data = fetch_historical_data(&symbol).await?;
-            let signals = strategy.generate_signals(&data)?;
-            
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((symbol, signals))
-        })
-    }).collect();
-    
-    let results = join_all(tasks).await;
-    
-    for result in results {
-        match result {
-            Ok(Ok((symbol, signals))) => {
-                println!("Generated {} signals for {}", signals.len(), symbol);
-                process_signals_async(symbol, signals).await?;
-            },
-            Ok(Err(e)) => eprintln!("Strategy error: {}", e),
-            Err(e) => eprintln!("Task error: {}", e),
-        }
-    }
-    
-    Ok(())
-}
+// Use memory pools for frequent allocations
+let memory_pool = MemoryPool::new(1024 * 1024); // 1MB pool
+
+// Cache-optimized time series storage
+let time_series = CacheOptimizedTimeSeries::new(prices, timestamps);
+
+// Memory-efficient circular buffers
+let circular_buffer = CacheOptimizedCircularBuffer::new(1000);
 ```
 
 ## Troubleshooting
 
-### Common Issues and Solutions
+### Common Issues
 
-#### 1. Data Loading Issues
+1. **Compilation Errors**
+   ```bash
+   # Clean and rebuild
+   cargo clean
+   cargo build --release
+   
+   # Check feature flags
+   cargo build --features="trading-math,forecasting"
+   ```
 
-```rust
-// Problem: CSV parsing errors
-// Solution: Explicit schema definition
-fn load_csv_with_schema(file_path: &str) -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let schema = Schema::from_iter(vec![
-        ("timestamp".to_string(), DataType::Utf8),
-        ("open".to_string(), DataType::Float64),
-        ("high".to_string(), DataType::Float64),
-        ("low".to_string(), DataType::Float64),
-        ("close".to_string(), DataType::Float64),
-        ("volume".to_string(), DataType::Int64),
-    ]);
-    
-    let df = LazyFrame::scan_csv(file_path, ScanArgsCSV {
-        has_header: true,
-        schema: Some(Arc::new(schema)),
-        ..ScanArgsCSV::default()
-    })?
-    .with_columns([
-        col("timestamp").str().strptime(
-            DataType::Datetime(TimeUnit::Milliseconds, None),
-            StrptimeOptions::default(),
-            lit("timestamp")
-        ),
-    ])
-    .collect()?;
-    
-    Ok(df)
-}
-```
+2. **Memory Issues**
+   ```bash
+   # Reduce memory usage
+   export CARGO_BUILD_JOBS=1
+   export RUST_TEST_THREADS=1
+   cargo test --no-default-features --features="trading-math"
+   ```
 
-#### 2. Insufficient Data Errors
+3. **Performance Issues**
+   ```rust
+   // Enable performance optimizations
+   let config = ArimaStrategyConfig {
+       enable_parallel_processing: true,
+       max_concurrent_forecasts: num_cpus::get(),
+       ..ArimaStrategyConfig::default()
+   };
+   ```
 
-```rust
-// Problem: Not enough data for indicators
-// Solution: Data validation
-fn validate_data_sufficiency(df: &DataFrame, min_required: usize) -> Result<(), Box<dyn std::error::Error>> {
-    if df.height() < min_required {
-        return Err(format!("Insufficient data: {} rows, need at least {}", 
-                          df.height(), min_required).into());
-    }
-    
-    // Check for missing values
-    let close_col = df.column("close")?;
-    let null_count = close_col.null_count();
-    if null_count > 0 {
-        eprintln!("Warning: {} missing values in close prices", null_count);
-    }
-    
-    Ok(())
-}
-```
+4. **Data Loading Issues**
+   ```rust
+   // Validate data before processing
+   fn validate_dataframe(df: &DataFrame) -> Result<(), NyxsOwlError> {
+       let required_columns = vec!["close", "timestamp"];
+       for col in required_columns {
+           if !df.get_column_names().contains(&col) {
+               return Err(NyxsOwlError::DataError(
+                   format!("Required column '{}' not found", col)
+               ));
+           }
+       }
+       
+       if df.height() < 50 {
+           return Err(NyxsOwlError::DataError("Insufficient data points".to_string()));
+       }
+       
+       Ok(())
+   }
+   ```
 
-#### 3. Performance Issues
+### Debugging Strategies
 
 ```rust
-// Problem: Slow backtesting
-// Solution: Batch processing and optimization
-fn optimized_backtest(data: &DataFrame, strategy: &mut dyn Strategy) -> Result<BacktestResults, Box<dyn std::error::Error>> {
-    // Pre-allocate vectors
-    let data_len = data.height();
-    let mut signals = Vec::with_capacity(data_len);
-    let mut prices = Vec::with_capacity(data_len);
-    
-    // Batch process data
-    let closes = data.column("close")?.f64()?;
-    let timestamps = data.column("timestamp")?.datetime()?;
-    
-    // Use chunked processing for large datasets
-    const CHUNK_SIZE: usize = 1000;
-    for chunk in closes.into_no_null_iter().collect::<Vec<_>>().chunks(CHUNK_SIZE) {
-        let chunk_signals = strategy.process_chunk(chunk)?;
-        signals.extend(chunk_signals);
-    }
-    
-    // Run backtest calculation
-    calculate_backtest_metrics(&signals, &prices)
-}
-```
+use log::{debug, trace};
 
-### Debug Mode and Logging
-
-```rust
-use log::{info, warn, error, debug};
-
-// Enable detailed logging for debugging
-fn setup_logging() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
-        .init();
-}
-
-// Example strategy with logging
-impl CustomStrategy {
-    pub fn generate_signal_with_logging(&self) -> Option<TradingSignal> {
-        let sma_short = self.sma_short.value();
-        let sma_long = self.sma_long.value();
-        let rsi = self.rsi.value();
+impl TechnicalStrategy for DebugStrategy {
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        debug!("Generating signals for {} data points", df.height());
         
-        debug!("SMA Short: {:?}, SMA Long: {:?}, RSI: {:?}", sma_short, sma_long, rsi);
+        let signals = self.internal_generate_signals(df)?;
         
-        match (sma_short, sma_long, rsi) {
-            (Some(short), Some(long), Some(rsi_val)) => {
-                if short > long && rsi_val < self.config.rsi_overbought {
-                    info!("BUY signal generated: SMA crossover with RSI confirmation");
-                    Some(TradingSignal::Buy)
-                } else if short < long && rsi_val > self.config.rsi_oversold {
-                    info!("SELL signal generated: SMA crossover with RSI confirmation");
-                    Some(TradingSignal::Sell)
-                } else {
-                    debug!("HOLD: Conditions not met for signal generation");
-                    Some(TradingSignal::Hold)
-                }
-            },
-            _ => {
-                warn!("Insufficient indicator data for signal generation");
-                None
-            }
+        trace!("Generated {} signals", signals.len());
+        for (i, signal) in signals.iter().enumerate() {
+            trace!("Signal {}: {:?}", i, signal);
         }
+        
+        Ok(signals)
     }
 }
 ```
 
-## Conclusion
+### Performance Profiling
 
-NyxsOwl provides a comprehensive framework for quantitative finance and algorithmic trading in Rust. This guide covers the essential usage patterns from basic technical analysis to production deployment.
+```rust
+use std::time::Instant;
 
-**Key Features Covered**:
-- ✅ Technical Analysis with 40+ indicators
-- ✅ Advanced Forecasting with OxiDiviner 1.2.0
-- ✅ Strategy Development Framework
-- ✅ Comprehensive Backtesting
-- ✅ Real-time Trading Systems
-- ✅ Performance Optimization
-- ✅ Production Deployment Patterns
+fn profile_strategy_performance(
+    strategy: &mut dyn TechnicalStrategy,
+    df: &DataFrame,
+) -> Result<f64, NyxsOwlError> {
+    let start = Instant::now();
+    
+    let signals = strategy.generate_signals(df)?;
+    
+    let duration = start.elapsed();
+    let throughput = df.height() as f64 / duration.as_secs_f64();
+    
+    println!("Performance Profile:");
+    println!("  Data points: {}", df.height());
+    println!("  Execution time: {:?}", duration);
+    println!("  Throughput: {:.2} rows/sec", throughput);
+    println!("  Signals generated: {}", signals.len());
+    
+    Ok(throughput)
+}
+```
 
-For more specific implementation details, refer to the forecasting and technical indicator strategy implementation guides. 
+---
+
+*Last updated: December 2024 | Version: 0.7.4 | Status: Production Ready* 

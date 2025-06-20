@@ -22,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-nyxs_owl = { version = "0.5.0", features = ["forecasting"] }
+nyxs_owl = { version = "0.7.4", features = ["forecasting"] }
 oxidiviner = { version = "1.2.0", features = ["adaptive"] }
 polars = { version = "0.47.0", features = ["lazy", "csv", "temporal"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -199,7 +199,7 @@ For more implementation details, see the complete technical documentation and ex
 **Best for**: Trend and seasonal patterns, smooth forecasting
 
 ```rust
-use nyxs_owl::forecasting::strategies::exponential_smoothing_strategy::{
+use nyxs_owl::forecasting::strategies::exponential_smoothing::{
     ExponentialSmoothingStrategy, ExponentialSmoothingConfig
 };
 
@@ -449,80 +449,80 @@ impl StrategyPortfolio {
         }
     }
     
-    pub fn add_strategy(&mut self, name: String, strategy: Box<dyn ForecastingStrategy>, weight: f64) {
+    pub fn add_strategy(
+        &mut self,
+        name: String,
+        strategy: Box<dyn ForecastingStrategy>,
+        weight: f64,
+    ) {
         self.strategies.insert(name.clone(), strategy);
         self.weights.insert(name, weight);
     }
     
     pub fn generate_portfolio_signals(
-        &mut self,
-        df: &DataFrame,
-        price_col: &str,
-        timestamp_col: &str,
+        &self,
+        data: &DataFrame,
     ) -> Result<Vec<Signal>, NyxsOwlError> {
-        let mut weighted_signals = Vec::new();
+        let mut portfolio_signals = Vec::new();
         
-        for (name, strategy) in &mut self.strategies {
-            let signals = strategy.generate_signals(df, price_col, timestamp_col)?;
+        for (name, strategy) in &self.strategies {
             let weight = self.weights.get(name).unwrap_or(&1.0);
+            let signals = strategy.generate_signals(data)?;
             
-            for mut signal in signals {
-                signal.strength *= weight;
-                weighted_signals.push(signal);
+            // Apply weight to signal strength
+            for signal in signals {
+                let weighted_signal = Signal {
+                    strength: signal.strength * weight,
+                    ..signal
+                };
+                portfolio_signals.push(weighted_signal);
             }
         }
         
-        // Combine and aggregate signals
-        self.aggregate_signals(weighted_signals)
-    }
-    
-    fn aggregate_signals(&self, signals: Vec<Signal>) -> Result<Vec<Signal>, NyxsOwlError> {
-        // Implementation for combining weighted signals
-        // Group by timestamp, aggregate strengths, determine final signal
-        todo!("Implement signal aggregation logic")
+        Ok(portfolio_signals)
     }
 }
 ```
 
 ## Performance Optimization
 
-### Memory-Optimized Implementation
+### Memory Management
 
 ```rust
-use nyxs_owl::memory_optimized::*;
-
-// Use memory pools for frequent allocations
-let memory_pool = MemoryPool::new(1024 * 1024); // 1MB pool
-
-// SIMD-accelerated calculations
-let simd_calculator = SIMDCalculator::new();
-let moving_avg = simd_calculator.moving_average(&prices, 20)?;
-
-// Cache-friendly data structures
-let time_series = CacheOptimizedTimeSeries::new(prices, timestamps);
+// Memory-optimized strategy configuration
+let config = ArimaStrategyConfig {
+    // Reduce memory footprint
+    min_data_points: 50,           // Smaller lookback window
+    performance_window: 100,       // Reduced performance tracking
+    volatility_lookback: 20,       // Shorter volatility window
+    
+    // Enable memory optimizations
+    enable_parallel_processing: false,  // Disable for memory-constrained environments
+    parallel_ensemble: false,           // Single-threaded processing
+    
+    ..ArimaStrategyConfig::default()
+};
 ```
 
 ### Async Processing
 
 ```rust
-use nyxs_owl::async_parallel::*;
 use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ArimaStrategyConfig {
+        enable_parallel_processing: true,
+        max_concurrent_forecasts: 4,
+        ..ArimaStrategyConfig::default()
+    };
+    
     let mut strategy = ArimaStrategy::new(config);
     
     // Async signal generation
-    let signals = strategy.generate_signals_async(&df, "close", "timestamp").await?;
-    
-    // Parallel processing of multiple assets
-    let assets = vec!["AAPL", "GOOGL", "MSFT", "TSLA"];
-    let signal_futures: Vec<_> = assets.iter().map(|asset| {
-        let asset_df = load_asset_data(asset);
-        strategy.generate_signals_async(&asset_df, "close", "timestamp")
-    }).collect();
-    
-    let all_signals = futures::future::join_all(signal_futures).await;
+    let signals = tokio::spawn(async move {
+        strategy.generate_signals(&df, "close", "timestamp").await
+    }).await??;
     
     Ok(())
 }
@@ -530,142 +530,91 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Best Practices
 
-### 1. Data Preparation
+### 1. Configuration Management
 
 ```rust
-fn prepare_market_data(df: &DataFrame) -> Result<DataFrame, NyxsOwlError> {
-    df.clone()
-        .lazy()
-        // Remove weekends and holidays
-        .filter(col("is_trading_day").eq(lit(true)))
-        // Handle missing values
-        .with_columns([
-            col("close").fill_null(col("close").forward_fill()),
-            col("volume").fill_null(lit(0)),
-        ])
-        // Add technical features
-        .with_columns([
-            col("close").pct_change(1).alias("returns"),
-            col("close").rolling_std(RollingOptions::default().window_size(20)).alias("volatility"),
-        ])
-        // Remove outliers (optional - strategies can handle this)
-        .filter(col("returns").abs().lt(lit(0.2))) // Remove >20% single-day moves
-        .collect()
-        .map_err(|e| NyxsOwlError::DataError(e.to_string()))
+// Use environment-based configuration
+fn load_strategy_config() -> ArimaStrategyConfig {
+    let threshold = env::var("SIGNAL_THRESHOLD")
+        .unwrap_or_else(|_| "0.02".to_string())
+        .parse::<f64>()
+        .unwrap_or(0.02);
+    
+    ArimaStrategyConfig {
+        threshold,
+        min_data_points: 50,
+        ..ArimaStrategyConfig::default()
+    }
 }
 ```
 
-### 2. Strategy Validation
+### 2. Error Handling
 
 ```rust
-fn validate_strategy(strategy: &mut dyn ForecastingStrategy, df: &DataFrame) -> Result<(), NyxsOwlError> {
-    // Ensure minimum data requirements
-    if df.height() < 100 {
-        return Err(NyxsOwlError::DataError("Insufficient data for validation".to_string()));
+use nyxs_owl::simple_types::NyxsOwlError;
+
+fn robust_signal_generation(
+    strategy: &mut ArimaStrategy,
+    data: &DataFrame,
+) -> Result<Vec<Signal>, NyxsOwlError> {
+    // Validate data first
+    strategy.validate_data(data)?;
+    
+    // Generate signals with error handling
+    match strategy.generate_signals(data, "close", "timestamp") {
+        Ok(signals) => Ok(signals),
+        Err(NyxsOwlError::DataError(msg)) => {
+            log::warn!("Data error: {}", msg);
+            Ok(Vec::new()) // Return empty signals
+        },
+        Err(e) => Err(e), // Propagate other errors
     }
+}
+```
+
+### 3. Performance Monitoring
+
+```rust
+use std::time::Instant;
+
+fn monitor_strategy_performance(
+    strategy: &mut ArimaStrategy,
+    data: &DataFrame,
+) -> Result<f64, NyxsOwlError> {
+    let start = Instant::now();
     
-    // Split data for validation
-    let split_point = (df.height() as f64 * 0.8) as usize;
-    let train_df = df.slice(0, split_point);
-    let test_df = df.slice(split_point, df.height() - split_point);
+    let signals = strategy.generate_signals(data, "close", "timestamp")?;
     
-    // Generate signals on training data
-    let train_signals = strategy.generate_signals(&train_df, "close", "timestamp")?;
+    let duration = start.elapsed();
+    let throughput = data.height() as f64 / duration.as_secs_f64();
     
-    // Test on validation data
-    let test_signals = strategy.generate_signals(&test_df, "close", "timestamp")?;
+    log::info!("Generated {} signals in {:?} ({:.2} rows/sec)", 
+               signals.len(), duration, throughput);
     
-    // Validate signal quality
-    if train_signals.is_empty() || test_signals.is_empty() {
-        return Err(NyxsOwlError::StrategyError("Strategy generated no signals".to_string()));
+    Ok(throughput)
+}
+```
+
+### 4. Adaptive Parameter Tuning
+
+```rust
+fn adaptive_parameter_tuning(
+    strategy: &mut ArimaStrategy,
+    performance_history: &[f64],
+) -> Result<(), NyxsOwlError> {
+    let avg_performance = performance_history.iter().sum::<f64>() / performance_history.len() as f64;
+    
+    if avg_performance < 0.6 {
+        // Performance is degrading, adjust parameters
+        strategy.adjust_threshold(strategy.config().threshold * 1.2)?;
+        strategy.enable_adaptive_refit()?;
+        log::info!("Adjusted strategy parameters due to performance degradation");
     }
-    
-    println!("Validation passed: {} train signals, {} test signals", 
-             train_signals.len(), test_signals.len());
     
     Ok(())
 }
 ```
 
-### 3. Error Handling
+---
 
-```rust
-use nyxs_owl::error::NyxsOwlError;
-
-fn robust_signal_generation(
-    strategy: &mut dyn ForecastingStrategy,
-    df: &DataFrame,
-    price_col: &str,
-    timestamp_col: &str,
-) -> Result<Vec<Signal>, NyxsOwlError> {
-    match strategy.generate_signals(df, price_col, timestamp_col) {
-        Ok(signals) => Ok(signals),
-        Err(NyxsOwlError::DataError(msg)) => {
-            eprintln!("Data error: {}. Attempting data cleaning...", msg);
-            let cleaned_df = prepare_market_data(df)?;
-            strategy.generate_signals(&cleaned_df, price_col, timestamp_col)
-        },
-        Err(NyxsOwlError::ModelError(msg)) => {
-            eprintln!("Model error: {}. Resetting strategy...", msg);
-            strategy.reset()?;
-            strategy.generate_signals(df, price_col, timestamp_col)
-        },
-        Err(e) => Err(e),
-    }
-}
-```
-
-### 4. Performance Monitoring
-
-```rust
-use std::time::Instant;
-
-struct PerformanceMonitor {
-    start_time: Instant,
-    signal_count: usize,
-    error_count: usize,
-}
-
-impl PerformanceMonitor {
-    fn new() -> Self {
-        Self {
-            start_time: Instant::now(),
-            signal_count: 0,
-            error_count: 0,
-        }
-    }
-    
-    fn record_signals(&mut self, count: usize) {
-        self.signal_count += count;
-    }
-    
-    fn record_error(&mut self) {
-        self.error_count += 1;
-    }
-    
-    fn report(&self) {
-        let elapsed = self.start_time.elapsed();
-        let signals_per_sec = self.signal_count as f64 / elapsed.as_secs_f64();
-        
-        println!("Performance Report:");
-        println!("  Elapsed time: {:?}", elapsed);
-        println!("  Total signals: {}", self.signal_count);
-        println!("  Signals/sec: {:.2}", signals_per_sec);
-        println!("  Error rate: {:.2}%", 
-                 (self.error_count as f64 / self.signal_count as f64) * 100.0);
-    }
-}
-```
-
-## Conclusion
-
-NyxsOwl's forecasting strategies provide production-ready implementations with advanced adaptive features through OxiDiviner 1.2.0. The combination of traditional quantitative methods with modern adaptive techniques enables robust performance across different market conditions.
-
-**Key Takeaways**:
-- Use adaptive features for improved performance in changing markets
-- Combine multiple strategies for robust forecasting
-- Monitor strategy performance and adapt configurations as needed
-- Follow best practices for data preparation and error handling
-- Leverage performance optimizations for production deployments
-
-For more examples and advanced usage patterns, see the `examples/` directory and the backtesting integration guide. 
+*Last updated: December 2024 | Version: 0.7.4 | Status: Production Ready* 

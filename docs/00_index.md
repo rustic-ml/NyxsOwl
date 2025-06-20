@@ -56,7 +56,7 @@ Start with the [Usage Guide](03_usage_guide.md) for installation and basic examp
 
 ## 📊 What's Covered
 
-### ✅ Complete Implementation (v0.7.2 + Memory Optimized)
+### ✅ Complete Implementation (v0.7.4 + Memory Optimized)
 - **7 Forecasting Strategies** with adaptive features
 - **125+ Technical Indicators** with comprehensive test coverage
 - **Memory-Optimized Backtesting** framework
@@ -118,4 +118,4 @@ let mut strategy = ArimaStrategy::new(config);
 
 ---
 
-*Last updated: December 2024 | Version: 0.7.2 + Memory Optimized | Status: Production Ready* 
+*Last updated: December 2024 | Version: 0.7.4 + Memory Optimized | Status: Production Ready* 
