@@ -2,10 +2,8 @@
 //! Parabolic SAR (PSAR) Strategy using ta-lib-in-rust.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
-use crate::technical_strategies::{Strategy, StrategyConfig};
 use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, Float64Type, PolarsResult, Series};
+use polars::prelude::{DataFrame, Float64Type};
 use ta_lib_in_rust::indicators::trend::calculate_psar;
 
 /// Generates trading signals based on Parabolic SAR (PSAR) flips.
@@ -107,7 +105,8 @@ pub fn psar_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, AnyValue, PolarsError};
+    use polars::error::PolarsResult;
+    use polars::prelude::{df, PolarsError};
 
     fn create_psar_test_df(len: usize) -> PolarsResult<DataFrame> {
         let mut highs: Vec<f64> = Vec::with_capacity(len);

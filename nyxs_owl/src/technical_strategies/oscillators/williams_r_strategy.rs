@@ -113,7 +113,7 @@ impl WilliamsRStrategy {
     fn generate_signals(&self, williams_r: &[f64]) -> Vec<TechnicalSignal> {
         let mut signals = Vec::new();
 
-        for (i, &wr_value) in williams_r.iter().enumerate() {
+        for (_i, &wr_value) in williams_r.iter().enumerate() {
             if wr_value.is_nan() {
                 signals.push(TechnicalSignal::new(Signal::Hold));
                 continue;

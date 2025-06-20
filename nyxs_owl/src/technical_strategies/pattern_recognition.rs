@@ -108,8 +108,8 @@ impl CandlestickPatternStrategy {
         let curr_close = close.get(index).unwrap_or(0.0);
 
         let prev_open = open.get(index - 1).unwrap_or(0.0);
-        let prev_high = high.get(index - 1).unwrap_or(0.0);
-        let prev_low = low.get(index - 1).unwrap_or(0.0);
+        let _prev_high = high.get(index - 1).unwrap_or(0.0);
+        let _prev_low = low.get(index - 1).unwrap_or(0.0);
         let prev_close = close.get(index - 1).unwrap_or(0.0);
 
         // Detect bullish engulfing pattern
@@ -158,7 +158,7 @@ impl CandlestickPatternStrategy {
         let prev_bearish = prev_close < prev_open;
         // Current candle is bullish (green) and engulfs previous
         let curr_bullish = curr_close > curr_open;
-        let engulfs = curr_open < prev_close && curr_close > prev_open;
+        let engulfs = curr_open < prev_close && curr_close > prev_close;
 
         prev_bearish && curr_bullish && engulfs
     }
@@ -174,7 +174,7 @@ impl CandlestickPatternStrategy {
         let prev_bullish = prev_close > prev_open;
         // Current candle is bearish (red) and engulfs previous
         let curr_bearish = curr_close < curr_open;
-        let engulfs = curr_open > prev_close && curr_close < prev_open;
+        let engulfs = curr_open > prev_close && curr_close < prev_close;
 
         prev_bullish && curr_bearish && engulfs
     }
@@ -265,7 +265,7 @@ mod tests {
         // Previous: bearish candle (open > close)
         // Current: bullish candle that engulfs previous
         assert!(strategy.is_bullish_engulfing(102.0, 100.0, 99.0, 103.0));
-        assert!(!strategy.is_bullish_engulfing(100.0, 102.0, 99.0, 103.0)); // Previous not bearish
+        assert!(!strategy.is_bullish_engulfing(100.0, 99.0, 99.0, 103.0)); // Previous not bearish
     }
 
     #[test]

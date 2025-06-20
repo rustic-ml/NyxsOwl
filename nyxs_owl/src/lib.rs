@@ -43,7 +43,7 @@ pub mod prelude {
     //! types and functions with a single `use nyxs_owl::prelude::*;` statement.
 
     // Re-export common types and new simplified types
-    pub use crate::simple_types::{NyxsOwlError, Price, Result, Signal, SignalData, PositionType};
+    pub use crate::simple_types::{NyxsOwlError, PositionType, Price, Result, Signal, SignalData};
 
     // Re-export enhanced Ichimoku functionality
     pub use crate::technical_strategies::trend::{
@@ -52,7 +52,8 @@ pub mod prelude {
 
     // Re-export enhanced RSI functionality
     pub use crate::technical_strategies::momentum::{
-        enhanced_rsi_signals, enhanced_rsi_signals_with_config, EnhancedRsiConfig, EnhancedRsiStrategy,
+        enhanced_rsi_signals, enhanced_rsi_signals_with_config, EnhancedRsiConfig,
+        EnhancedRsiStrategy,
     };
 
     // Re-export technical strategy framework
@@ -63,8 +64,7 @@ pub mod prelude {
     // Re-export forecasting specific items if any become necessary for prelude
     #[cfg(feature = "forecasting")]
     pub use crate::forecasting::{
-        ConfigValue as ForecastConfigValue,
-        Strategy as ForecastStrategy,
+        ConfigValue as ForecastConfigValue, Strategy as ForecastStrategy,
         StrategyConfig as ForecastStrategyConfig,
     };
 }

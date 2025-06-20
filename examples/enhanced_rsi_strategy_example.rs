@@ -11,7 +11,9 @@
 //! - Real-time streaming updates support
 
 use nyxs_owl::prelude::*;
-use nyxs_owl::technical_strategies::momentum::{enhanced_rsi_signals, enhanced_rsi_signals_with_config, EnhancedRsiConfig, EnhancedRsiStrategy};
+use nyxs_owl::technical_strategies::momentum::{
+    enhanced_rsi_signals, enhanced_rsi_signals_with_config, EnhancedRsiConfig, EnhancedRsiStrategy,
+};
 use nyxs_owl::technical_strategies::{Strategy, StrategyConfig, TechnicalStrategy};
 use polars::prelude::*;
 use std::error::Error;
@@ -24,7 +26,10 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
 
     // Create sample market data with realistic price movements
     let sample_data = create_sample_data();
-    println!("📊 Created sample data with {} data points", sample_data.height());
+    println!(
+        "📊 Created sample data with {} data points",
+        sample_data.height()
+    );
 
     // Example 1: Basic Enhanced RSI Strategy with default parameters
     println!("\n1️⃣ Basic Enhanced RSI Strategy (Default Parameters)");
@@ -65,9 +70,9 @@ fn create_sample_data() -> DataFrame {
         // Add some realistic price movement with trend and noise
         let noise = (i as f64 * 0.1).sin() * 2.0 + (i as f64 * 0.05).cos() * 1.5;
         let daily_change = trend + noise * 0.3;
-        
+
         base_price *= 1.0 + daily_change / 100.0;
-        
+
         // Occasionally reverse the trend to create interesting patterns
         if i % 50 == 0 && i > 0 {
             trend = -trend * 0.8;
@@ -88,7 +93,8 @@ fn create_sample_data() -> DataFrame {
         "high" => highs,
         "low" => lows,
         "volume" => volumes
-    }.expect("Failed to create sample data")
+    }
+    .expect("Failed to create sample data")
 }
 
 /// Example 1: Basic Enhanced RSI Strategy with default parameters
@@ -97,14 +103,14 @@ fn basic_enhanced_rsi_example(data: &DataFrame) -> std::result::Result<(), Box<d
 
     // Simple usage with default parameters
     let signals = enhanced_rsi_signals(data)?;
-    
+
     println!("   📈 Generated {} signals", signals.len());
-    
+
     // Count signal types
     let buy_signals = signals.iter().filter(|s| s.signal == Signal::Buy).count();
     let sell_signals = signals.iter().filter(|s| s.signal == Signal::Sell).count();
     let hold_signals = signals.iter().filter(|s| s.signal == Signal::Hold).count();
-    
+
     println!("   🟢 Buy signals: {}", buy_signals);
     println!("   🔴 Sell signals: {}", sell_signals);
     println!("   ⚪ Hold signals: {}", hold_signals);
@@ -112,8 +118,10 @@ fn basic_enhanced_rsi_example(data: &DataFrame) -> std::result::Result<(), Box<d
     // Show first few signals with metadata
     println!("   📋 First 5 signals:");
     for (i, signal) in signals.iter().take(5).enumerate() {
-        println!("      {}: {:?} (strength: {:.2}, confidence: {:.2})", 
-                 i, signal.signal, signal.strength, signal.confidence);
+        println!(
+            "      {}: {:?} (strength: {:.2}, confidence: {:.2})",
+            i, signal.signal, signal.strength, signal.confidence
+        );
         if let Some(primary_rsi) = signal.metadata.get("primary_rsi") {
             println!("         Primary RSI: {:.2}", primary_rsi);
         }
@@ -128,20 +136,25 @@ fn custom_parameters_example(data: &DataFrame) -> std::result::Result<(), Box<dy
 
     // Custom parameters for more sensitive signals
     let signals = enhanced_rsi_signals_with_config(data, 10, 20, 25.0, 75.0)?;
-    
+
     println!("   📈 Generated {} signals", signals.len());
-    
+
     // Analyze signal strength distribution
-    let high_confidence_signals = signals.iter()
-        .filter(|s| s.confidence > 0.7)
-        .count();
-    
-    let medium_confidence_signals = signals.iter()
+    let high_confidence_signals = signals.iter().filter(|s| s.confidence > 0.7).count();
+
+    let medium_confidence_signals = signals
+        .iter()
         .filter(|s| s.confidence > 0.5 && s.confidence <= 0.7)
         .count();
-    
-    println!("   🎯 High confidence signals (>0.7): {}", high_confidence_signals);
-    println!("   📊 Medium confidence signals (0.5-0.7): {}", medium_confidence_signals);
+
+    println!(
+        "   🎯 High confidence signals (>0.7): {}",
+        high_confidence_signals
+    );
+    println!(
+        "   📊 Medium confidence signals (0.5-0.7): {}",
+        medium_confidence_signals
+    );
 
     Ok(())
 }
@@ -173,7 +186,7 @@ fn advanced_configuration_example(data: &DataFrame) -> std::result::Result<(), B
     };
 
     let strategy = EnhancedRsiStrategy::with_enhanced_config(config, enhanced_config);
-    
+
     // Validate parameters
     strategy.validate_parameters()?;
     println!("   ✅ Parameters validated successfully");
@@ -208,36 +221,44 @@ fn advanced_configuration_example(data: &DataFrame) -> std::result::Result<(), B
 fn signal_analysis_example(data: &DataFrame) -> std::result::Result<(), Box<dyn Error>> {
     println!("   Analyzing and filtering signals by quality");
 
-    let strategy = EnhancedRsiStrategy::new(StrategyConfig::new()
-        .with_parameter("min_signal_strength", 0.5));
+    let strategy =
+        EnhancedRsiStrategy::new(StrategyConfig::new().with_parameter("min_signal_strength", 0.5));
 
     let all_signals = strategy.generate_enhanced_signals(data)?;
-    
+
     // Filter signals by different criteria
-    let high_quality_signals: Vec<_> = all_signals.iter()
-        .filter(|s| s.confidence > 0.8)
-        .collect();
-    
-    let medium_quality_signals: Vec<_> = all_signals.iter()
+    let high_quality_signals: Vec<_> = all_signals.iter().filter(|s| s.confidence > 0.8).collect();
+
+    let medium_quality_signals: Vec<_> = all_signals
+        .iter()
         .filter(|s| s.confidence > 0.6 && s.confidence <= 0.8)
         .collect();
 
-    let strong_signals: Vec<_> = all_signals.iter()
-        .filter(|s| s.strength > 0.7)
-        .collect();
+    let strong_signals: Vec<_> = all_signals.iter().filter(|s| s.strength > 0.7).collect();
 
     println!("   📊 Signal Quality Analysis:");
     println!("      Total signals: {}", all_signals.len());
-    println!("      High quality (confidence > 0.8): {}", high_quality_signals.len());
-    println!("      Medium quality (confidence 0.6-0.8): {}", medium_quality_signals.len());
-    println!("      Strong signals (strength > 0.7): {}", strong_signals.len());
+    println!(
+        "      High quality (confidence > 0.8): {}",
+        high_quality_signals.len()
+    );
+    println!(
+        "      Medium quality (confidence 0.6-0.8): {}",
+        medium_quality_signals.len()
+    );
+    println!(
+        "      Strong signals (strength > 0.7): {}",
+        strong_signals.len()
+    );
 
     // Analyze buy vs sell signal quality
-    let quality_buy_signals = high_quality_signals.iter()
+    let quality_buy_signals = high_quality_signals
+        .iter()
         .filter(|s| s.signal == Signal::Buy)
         .count();
-    
-    let quality_sell_signals = high_quality_signals.iter()
+
+    let quality_sell_signals = high_quality_signals
+        .iter()
         .filter(|s| s.signal == Signal::Sell)
         .count();
 
@@ -254,16 +275,16 @@ fn real_world_example(data: &DataFrame) -> std::result::Result<(), Box<dyn Error
 
     // Configuration suitable for day trading
     let day_trading_config = StrategyConfig::new()
-        .with_parameter("primary_period", 9i64)     // Faster RSI
-        .with_parameter("secondary_period", 14i64)  // Standard RSI for confirmation
+        .with_parameter("primary_period", 9i64) // Faster RSI
+        .with_parameter("secondary_period", 14i64) // Standard RSI for confirmation
         .with_parameter("oversold_threshold", 20.0) // More aggressive thresholds
         .with_parameter("overbought_threshold", 80.0)
         .with_parameter("dynamic_thresholds", true) // Adapt to volatility
         .with_parameter("min_signal_strength", 0.75) // High quality signals only
-        .with_parameter("trend_filtering", true);   // Avoid counter-trend trades
+        .with_parameter("trend_filtering", true); // Avoid counter-trend trades
 
     let strategy = EnhancedRsiStrategy::new(day_trading_config);
-    
+
     println!("   📋 Strategy Configuration:");
     println!("      Name: {}", strategy.name());
     println!("      Description: {}", strategy.description());
@@ -272,47 +293,57 @@ fn real_world_example(data: &DataFrame) -> std::result::Result<(), Box<dyn Error
 
     // Generate signals
     let signals = strategy.generate_enhanced_signals(data)?;
-    
+
     // Simulate a simple trading scenario
     let mut position = 0; // 0 = no position, 1 = long, -1 = short
     let mut trades = 0;
     let mut last_signal_index = 0;
 
     println!("   💼 Simulated Trading Scenario:");
-    
+
     for (i, signal) in signals.iter().enumerate() {
-        if signal.signal != Signal::Hold && i > last_signal_index + 5 { // Avoid rapid trading
+        if signal.signal != Signal::Hold && i > last_signal_index + 5 {
+            // Avoid rapid trading
             match (position, signal.signal) {
                 (0, Signal::Buy) => {
                     position = 1;
                     trades += 1;
-                    println!("      Trade {}: OPEN LONG at index {} (confidence: {:.2})", 
-                             trades, i, signal.confidence);
+                    println!(
+                        "      Trade {}: OPEN LONG at index {} (confidence: {:.2})",
+                        trades, i, signal.confidence
+                    );
                     last_signal_index = i;
                 }
                 (0, Signal::Sell) => {
                     position = -1;
                     trades += 1;
-                    println!("      Trade {}: OPEN SHORT at index {} (confidence: {:.2})", 
-                             trades, i, signal.confidence);
+                    println!(
+                        "      Trade {}: OPEN SHORT at index {} (confidence: {:.2})",
+                        trades, i, signal.confidence
+                    );
                     last_signal_index = i;
                 }
                 (1, Signal::Sell) => {
                     position = 0;
-                    println!("      Trade {}: CLOSE LONG at index {} (confidence: {:.2})", 
-                             trades, i, signal.confidence);
+                    println!(
+                        "      Trade {}: CLOSE LONG at index {} (confidence: {:.2})",
+                        trades, i, signal.confidence
+                    );
                     last_signal_index = i;
                 }
                 (-1, Signal::Buy) => {
                     position = 0;
-                    println!("      Trade {}: CLOSE SHORT at index {} (confidence: {:.2})", 
-                             trades, i, signal.confidence);
+                    println!(
+                        "      Trade {}: CLOSE SHORT at index {} (confidence: {:.2})",
+                        trades, i, signal.confidence
+                    );
                     last_signal_index = i;
                 }
                 _ => {} // No action needed
             }
-            
-            if trades >= 5 { // Limit output for readability
+
+            if trades >= 5 {
+                // Limit output for readability
                 break;
             }
         }
@@ -368,4 +399,4 @@ mod tests {
         let result = real_world_example(&data);
         assert!(result.is_ok());
     }
-} 
+}

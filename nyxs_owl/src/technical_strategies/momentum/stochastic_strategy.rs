@@ -2,9 +2,9 @@
 //! Stochastic Oscillator Strategy using local trade_math module.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
+use crate::technical_strategies::{Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy};
 use crate::trade_math::momentum::calculate_stochastic;
-use polars::prelude::DataFrame;
-use polars::prelude::*;
+use polars::prelude::{DataFrame, Series};
 
 /// Generates trading signals based on Stochastic Oscillator.
 ///
@@ -123,7 +123,7 @@ pub fn stochastic_signals(
             d_values.get(i - 1).and_then(|&x| x),
         ) {
             let current_k_above = current_k > current_d;
-            let prev_k_above = prev_k > prev_d;
+            let _prev_k_above = prev_k > prev_d;
 
             // Detect crossovers in specific zones
             if let Some(was_above) = previous_k_above_d {

@@ -1,11 +1,9 @@
 // nyxs_owl/src/technical_strategies/trend/aroon_strategy.rs
-//! Aroon Indicator Crossover Strategy using local trade_math module.
+//! Aroon Indicator Strategy using local trade_math module.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
-use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::trade_math::trend::calculate_aroon;
-use polars::prelude::{DataFrame, Float64Type, PolarsResult, Series};
+use polars::prelude::DataFrame;
 
 /// Generates trading signals based on Aroon Up and Aroon Down crossovers.
 ///
@@ -58,12 +56,12 @@ pub fn aroon_signals(
 
     // Use the new calculate_aroon function from trade_math
     let (aroon_up_series, aroon_down_series) = calculate_aroon(
-        high_prices_series
-            .as_series()
-            .ok_or_else(|| NyxsOwlError::DataError("Failed to convert high column to series".into()))?,
-        low_prices_series
-            .as_series()
-            .ok_or_else(|| NyxsOwlError::DataError("Failed to convert low column to series".into()))?,
+        high_prices_series.as_series().ok_or_else(|| {
+            NyxsOwlError::DataError("Failed to convert high column to series".into())
+        })?,
+        low_prices_series.as_series().ok_or_else(|| {
+            NyxsOwlError::DataError("Failed to convert low column to series".into())
+        })?,
         period,
     )
     .map_err(|e| {
@@ -118,7 +116,8 @@ pub fn aroon_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, AnyValue, PolarsError};
+    use polars::error::PolarsResult;
+    use polars::prelude::{df, PolarsError};
 
     fn create_test_df_aroon(len: usize) -> PolarsResult<DataFrame> {
         let highs: Vec<f64> = (0..len)
@@ -201,7 +200,7 @@ mod tests {
                     if let Ok((up, down)) = calculate_aroon(
                         high_s.as_series().unwrap(),
                         low_s.as_series().unwrap(),
-                        period
+                        period,
                     ) {
                         println!("Aroon Up: {:?}", up.f64().unwrap().to_vec());
                         println!("Aroon Down: {:?}", down.f64().unwrap().to_vec());

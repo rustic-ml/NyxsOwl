@@ -2,12 +2,10 @@
 //! Enhanced Ichimoku Cloud Strategy with advanced 2025 features.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
-use crate::technical_strategies::{Strategy, StrategyConfig};
 use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, Float64Type, PolarsResult, Series};
-use ta_lib_in_rust::indicators::trend::calculate_ichimoku_cloud;
+use polars::prelude::{DataFrame, Float64Type};
 use std::collections::HashMap;
+use ta_lib_in_rust::indicators::trend::calculate_ichimoku_cloud;
 
 /// Market regime classification for adaptive Ichimoku parameters
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -640,12 +638,12 @@ pub fn ichimoku_kumo_breakout_signals(
     // Actual data for Senkou A/B starts effectively after `kijun_period` from calculation start.
     // Max of all periods involved in calculation + displacement (kijun_period for Senkou A/B)
     let first_valid_idx = (senkou_b_period.max(kijun_period) + kijun_period).max(1);
-    
+
     // Final guard: if not enough data, return all Hold signals
     if first_valid_idx >= data_len || data_len < 2 {
         return Ok(signals);
     }
-    
+
     for i in first_valid_idx..data_len {
         let current_tenkan_opt = tenkan_ca.get(i);
         let prev_tenkan_opt = tenkan_ca.get(i - 1);
@@ -703,14 +701,17 @@ pub fn ichimoku_kumo_breakout_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polars::error::PolarsResult;
     use polars::prelude::{df, AnyValue, PolarsError};
 
     // Helper to create a DataFrame with somewhat realistic HLC prices
     fn create_ichimoku_test_df(len: usize) -> PolarsResult<DataFrame> {
         if len == 0 {
-            return Err(PolarsError::ComputeError("Length must be at least 1".into()));
+            return Err(PolarsError::ComputeError(
+                "Length must be at least 1".into(),
+            ));
         }
-        
+
         let mut highs: Vec<f64> = Vec::with_capacity(len);
         let mut lows: Vec<f64> = Vec::with_capacity(len);
         let mut closes: Vec<f64> = Vec::with_capacity(len);
@@ -745,14 +746,22 @@ mod tests {
         // Ensure we don't pass 0 or negative values to create_ichimoku_test_df
         let df_too_short_len = (min_required_len - 1).max(1); // At least 1
         let df_too_short = create_ichimoku_test_df(df_too_short_len).unwrap();
-        println!("DF too short: len = {}, required = {}", df_too_short.height(), min_required_len);
+        println!(
+            "DF too short: len = {}, required = {}",
+            df_too_short.height(),
+            min_required_len
+        );
         assert!(
             ichimoku_kumo_breakout_signals(&df_too_short, "high", "low", "close", t, k, s_b)
                 .is_err()
         );
 
         let df_ok = create_ichimoku_test_df(min_required_len + 1).unwrap();
-        println!("DF ok: len = {}, required = {}", df_ok.height(), min_required_len);
+        println!(
+            "DF ok: len = {}, required = {}",
+            df_ok.height(),
+            min_required_len
+        );
         assert!(ichimoku_kumo_breakout_signals(&df_ok, "high", "low", "close", t, k, s_b).is_ok());
     }
 
@@ -797,7 +806,10 @@ mod tests {
                     // Allow all Hold signals if the test data doesn't generate crossovers
                     if !(has_buy_signal || has_sell_signal) {
                         println!("Ichimoku test: No signals generated. This may be due to test data not triggering crossovers.");
-                        println!("Tenkan: {}, Kijun: {}, Senkou B: {}", tenkan_p, kijun_p, senkou_b_p);
+                        println!(
+                            "Tenkan: {}, Kijun: {}, Senkou B: {}",
+                            tenkan_p, kijun_p, senkou_b_p
+                        );
                         println!("This is acceptable for synthetic test data.");
                     }
                     // Remove the strict assertion - allow all Hold signals for synthetic data

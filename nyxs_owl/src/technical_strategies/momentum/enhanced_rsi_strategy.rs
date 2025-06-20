@@ -10,10 +10,10 @@
 //! - Streaming updates support for real-time processing
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::trade_math::momentum::calculate_rsi;
 use crate::technical_strategies::{Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy};
+use crate::trade_math::momentum::calculate_rsi;
+use polars::prelude::{DataFrame, NamedFrom, Series};
 // Remove unused imports
-use polars::prelude::*;
 use std::collections::HashMap;
 
 /// Enhanced RSI Strategy Configuration
@@ -78,7 +78,10 @@ pub struct EnhancedRsiStrategy {
 
 impl EnhancedRsiStrategy {
     /// Create a new Enhanced RSI Strategy with custom configuration
-    pub fn with_enhanced_config(config: StrategyConfig, enhanced_config: EnhancedRsiConfig) -> Self {
+    pub fn with_enhanced_config(
+        config: StrategyConfig,
+        enhanced_config: EnhancedRsiConfig,
+    ) -> Self {
         Self {
             config,
             enhanced_config,
@@ -89,35 +92,36 @@ impl EnhancedRsiStrategy {
     fn extract_enhanced_config(config: &StrategyConfig) -> Result<EnhancedRsiConfig> {
         let mut enhanced_config = EnhancedRsiConfig::default();
 
-        if let Some(period) = config.get_int("primary_period") {
+        // Use if let Ok(...) to handle Result<T, _> API
+        if let Ok(period) = config.get_int("primary_period") {
             enhanced_config.primary_period = period as usize;
         }
 
-        if let Some(period) = config.get_int("secondary_period") {
+        if let Ok(period) = config.get_int("secondary_period") {
             enhanced_config.secondary_period = period as usize;
         }
 
-        if let Some(threshold) = config.get_float("oversold_threshold") {
+        if let Ok(threshold) = config.get_float("oversold_threshold") {
             enhanced_config.oversold_threshold = threshold;
         }
 
-        if let Some(threshold) = config.get_float("overbought_threshold") {
+        if let Ok(threshold) = config.get_float("overbought_threshold") {
             enhanced_config.overbought_threshold = threshold;
         }
 
-        if let Some(dynamic) = config.get_bool("dynamic_thresholds") {
+        if let Ok(dynamic) = config.get_bool("dynamic_thresholds") {
             enhanced_config.dynamic_thresholds = dynamic;
         }
 
-        if let Some(strength) = config.get_float("min_signal_strength") {
+        if let Ok(strength) = config.get_float("min_signal_strength") {
             enhanced_config.min_signal_strength = strength;
         }
 
-        if let Some(filtering) = config.get_bool("trend_filtering") {
+        if let Ok(filtering) = config.get_bool("trend_filtering") {
             enhanced_config.trend_filtering = filtering;
         }
 
-        if let Some(lookback) = config.get_int("trend_lookback") {
+        if let Ok(lookback) = config.get_int("trend_lookback") {
             enhanced_config.trend_lookback = lookback as usize;
         }
 
@@ -127,15 +131,17 @@ impl EnhancedRsiStrategy {
     /// Calculate dynamic thresholds based on market volatility
     fn calculate_dynamic_thresholds(&self, rsi_values: &[f64]) -> Result<(f64, f64)> {
         if rsi_values.len() < 20 {
-            return Ok((self.enhanced_config.oversold_threshold, self.enhanced_config.overbought_threshold));
+            return Ok((
+                self.enhanced_config.oversold_threshold,
+                self.enhanced_config.overbought_threshold,
+            ));
         }
 
         // Calculate RSI volatility over the last 20 periods
         let recent_rsi = &rsi_values[rsi_values.len().saturating_sub(20)..];
         let mean = recent_rsi.iter().sum::<f64>() / recent_rsi.len() as f64;
-        let variance = recent_rsi.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / recent_rsi.len() as f64;
+        let variance =
+            recent_rsi.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / recent_rsi.len() as f64;
         let std_dev = variance.sqrt();
 
         // Adjust thresholds based on volatility
@@ -205,16 +211,20 @@ impl EnhancedRsiStrategy {
 
 impl Strategy for EnhancedRsiStrategy {
     fn new(config: StrategyConfig) -> Self {
-        let enhanced_config = Self::extract_enhanced_config(&config)
-            .unwrap_or_else(|_| EnhancedRsiConfig::default());
-        Self { config, enhanced_config }
+        let enhanced_config =
+            Self::extract_enhanced_config(&config).unwrap_or_else(|_| EnhancedRsiConfig::default());
+        Self {
+            config,
+            enhanced_config,
+        }
     }
 
     fn generate_signals(&self, data: &DataFrame) -> Result<Series> {
         self.validate_data(data)?;
 
         let enhanced_signals = self.generate_enhanced_signals(data)?;
-        let signals: Vec<i32> = enhanced_signals.into_iter()
+        let signals: Vec<i32> = enhanced_signals
+            .into_iter()
             .map(|ts| ts.signal.to_int())
             .collect();
 
@@ -238,7 +248,10 @@ impl Strategy for EnhancedRsiStrategy {
     }
 
     fn min_data_points(&self) -> usize {
-        self.enhanced_config.secondary_period.max(self.enhanced_config.trend_lookback) + 10
+        self.enhanced_config
+            .secondary_period
+            .max(self.enhanced_config.trend_lookback)
+            + 10
     }
 }
 
@@ -246,30 +259,39 @@ impl TechnicalStrategy for EnhancedRsiStrategy {
     fn generate_enhanced_signals(&self, data: &DataFrame) -> Result<Vec<TechnicalSignal>> {
         self.validate_data(data)?;
 
-        // Extract price data  
-        let close_column = data.column("close")
+        // Extract price data
+        let close_column = data
+            .column("close")
             .map_err(|e| NyxsOwlError::DataError(format!("Missing close column: {}", e)))?;
-        let close_series = close_column.as_series()
-            .ok_or_else(|| NyxsOwlError::DataError("Cannot convert column to series".to_string()))?;
+        let close_series = close_column.as_series().ok_or_else(|| {
+            NyxsOwlError::DataError("Cannot convert column to series".to_string())
+        })?;
 
         // Calculate RSI values
         let primary_rsi = calculate_rsi(close_series, self.enhanced_config.primary_period)?;
         let secondary_rsi = calculate_rsi(close_series, self.enhanced_config.secondary_period)?;
 
         // Extract price values for trend analysis
-        let prices: Vec<f64> = close_series.f64()
+        let prices: Vec<f64> = close_series
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(format!("Failed to extract prices: {}", e)))?
             .into_no_null_iter()
             .collect();
 
         // Convert RSI series to vectors
-        let primary_rsi_values: Vec<f64> = primary_rsi.f64()
-            .map_err(|e| NyxsOwlError::IndicatorError(format!("Primary RSI conversion failed: {}", e)))?
+        let primary_rsi_values: Vec<f64> = primary_rsi
+            .f64()
+            .map_err(|e| {
+                NyxsOwlError::IndicatorError(format!("Primary RSI conversion failed: {}", e))
+            })?
             .into_no_null_iter()
             .collect();
 
-        let secondary_rsi_values: Vec<f64> = secondary_rsi.f64()
-            .map_err(|e| NyxsOwlError::IndicatorError(format!("Secondary RSI conversion failed: {}", e)))?
+        let secondary_rsi_values: Vec<f64> = secondary_rsi
+            .f64()
+            .map_err(|e| {
+                NyxsOwlError::IndicatorError(format!("Secondary RSI conversion failed: {}", e))
+            })?
             .into_no_null_iter()
             .collect();
 
@@ -284,7 +306,10 @@ impl TechnicalStrategy for EnhancedRsiStrategy {
             let (oversold, overbought) = if self.enhanced_config.dynamic_thresholds {
                 self.calculate_dynamic_thresholds(&primary_rsi_values[..=i])?
             } else {
-                (self.enhanced_config.oversold_threshold, self.enhanced_config.overbought_threshold)
+                (
+                    self.enhanced_config.oversold_threshold,
+                    self.enhanced_config.overbought_threshold,
+                )
             };
 
             // Analyze trend if enabled
@@ -315,7 +340,12 @@ impl TechnicalStrategy for EnhancedRsiStrategy {
 
             // Calculate confidence and signal strength
             let confidence = self.calculate_confidence(
-                primary_value, secondary_value, oversold, overbought, trend_strength, signal
+                primary_value,
+                secondary_value,
+                oversold,
+                overbought,
+                trend_strength,
+                signal,
             );
 
             // Only generate signal if confidence meets minimum threshold
@@ -347,13 +377,15 @@ impl TechnicalStrategy for EnhancedRsiStrategy {
     }
 
     fn get_indicator_values(&self, data: &DataFrame) -> Result<HashMap<String, Series>> {
-        let close_column = data.column("close")
+        let close_column = data
+            .column("close")
             .map_err(|e| NyxsOwlError::DataError(format!("Missing close column: {}", e)))?;
-        let close_series = close_column.as_series()
-            .ok_or_else(|| NyxsOwlError::DataError("Cannot convert column to series".to_string()))?;
+        let close_series = close_column.as_series().ok_or_else(|| {
+            NyxsOwlError::DataError("Cannot convert column to series".to_string())
+        })?;
 
         let mut indicators = HashMap::new();
-        
+
         let primary_rsi = calculate_rsi(close_series, self.enhanced_config.primary_period)?;
         let secondary_rsi = calculate_rsi(close_series, self.enhanced_config.secondary_period)?;
 
@@ -375,30 +407,38 @@ impl TechnicalStrategy for EnhancedRsiStrategy {
     fn validate_parameters(&self) -> Result<()> {
         // Validate periods
         if self.enhanced_config.primary_period == 0 {
-            return Err(NyxsOwlError::InvalidParameter("Primary period must be greater than 0".to_string()));
+            return Err(NyxsOwlError::InvalidParameter(
+                "Primary period must be greater than 0".to_string(),
+            ));
         }
 
         if self.enhanced_config.secondary_period == 0 {
-            return Err(NyxsOwlError::InvalidParameter("Secondary period must be greater than 0".to_string()));
+            return Err(NyxsOwlError::InvalidParameter(
+                "Secondary period must be greater than 0".to_string(),
+            ));
         }
 
         // Validate thresholds
         if self.enhanced_config.oversold_threshold >= self.enhanced_config.overbought_threshold {
             return Err(NyxsOwlError::InvalidParameter(
-                "Oversold threshold must be less than overbought threshold".to_string()
+                "Oversold threshold must be less than overbought threshold".to_string(),
             ));
         }
 
-        if self.enhanced_config.oversold_threshold < 0.0 || self.enhanced_config.overbought_threshold > 100.0 {
+        if self.enhanced_config.oversold_threshold < 0.0
+            || self.enhanced_config.overbought_threshold > 100.0
+        {
             return Err(NyxsOwlError::InvalidParameter(
-                "RSI thresholds must be between 0 and 100".to_string()
+                "RSI thresholds must be between 0 and 100".to_string(),
             ));
         }
 
         // Validate signal strength
-        if self.enhanced_config.min_signal_strength < 0.0 || self.enhanced_config.min_signal_strength > 1.0 {
+        if self.enhanced_config.min_signal_strength < 0.0
+            || self.enhanced_config.min_signal_strength > 1.0
+        {
             return Err(NyxsOwlError::InvalidParameter(
-                "Minimum signal strength must be between 0.0 and 1.0".to_string()
+                "Minimum signal strength must be between 0.0 and 1.0".to_string(),
             ));
         }
 
@@ -443,7 +483,8 @@ mod tests {
 
         df! {
             "close" => prices
-        }.unwrap()
+        }
+        .unwrap()
     }
 
     #[test]
@@ -460,8 +501,7 @@ mod tests {
 
     #[test]
     fn test_parameter_validation() {
-        let config = StrategyConfig::new()
-            .with_parameter("primary_period", 0i64); // Invalid
+        let config = StrategyConfig::new().with_parameter("primary_period", 0i64); // Invalid
 
         let strategy = EnhancedRsiStrategy::new(config);
         assert!(strategy.validate_parameters().is_err());
@@ -475,10 +515,10 @@ mod tests {
 
         let signals = strategy.generate_enhanced_signals(&data);
         assert!(signals.is_ok());
-        
+
         let signals = signals.unwrap();
         assert!(!signals.is_empty());
-        
+
         // Check that signals have metadata
         if let Some(first_signal) = signals.first() {
             assert!(first_signal.metadata.contains_key("primary_rsi"));
@@ -489,10 +529,10 @@ mod tests {
     #[test]
     fn test_convenience_functions() {
         let data = create_test_data();
-        
+
         let signals = enhanced_rsi_signals(&data);
         assert!(signals.is_ok());
-        
+
         let custom_signals = enhanced_rsi_signals_with_config(&data, 10, 20, 25.0, 75.0);
         assert!(custom_signals.is_ok());
     }
@@ -501,7 +541,7 @@ mod tests {
     fn test_required_columns() {
         let config = StrategyConfig::new();
         let strategy = EnhancedRsiStrategy::new(config);
-        
+
         let required = strategy.required_columns();
         assert_eq!(required, vec!["close"]);
     }
@@ -510,8 +550,288 @@ mod tests {
     fn test_min_data_points() {
         let config = StrategyConfig::new();
         let strategy = EnhancedRsiStrategy::new(config);
-        
+
         let min_points = strategy.min_data_points();
         assert!(min_points > 0);
+    }
+
+    #[test]
+    fn test_parameter_validation_valid_values() {
+        let config = StrategyConfig::new()
+            .with_parameter("primary_period", 14i64)
+            .with_parameter("secondary_period", 21i64)
+            .with_parameter("oversold_threshold", 30.0)
+            .with_parameter("overbought_threshold", 70.0)
+            .with_parameter("min_signal_strength", 0.6);
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        assert!(strategy.validate_parameters().is_ok());
+    }
+
+    #[test]
+    fn test_parameter_validation_invalid_primary_period() {
+        let config = StrategyConfig::new()
+            .with_parameter("primary_period", 0i64); // Invalid: zero
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        let result = strategy.validate_parameters();
+        assert!(result.is_err());
+        
+        if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("Primary period must be greater than 0"));
+        } else {
+            panic!("Expected InvalidParameter error");
+        }
+    }
+
+    #[test]
+    fn test_parameter_validation_invalid_secondary_period() {
+        let config = StrategyConfig::new()
+            .with_parameter("secondary_period", 0i64); // Invalid: zero
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        let result = strategy.validate_parameters();
+        assert!(result.is_err());
+        
+        if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("Secondary period must be greater than 0"));
+        } else {
+            panic!("Expected InvalidParameter error");
+        }
+    }
+
+    #[test]
+    fn test_parameter_validation_invalid_thresholds() {
+        let config = StrategyConfig::new()
+            .with_parameter("oversold_threshold", 80.0)
+            .with_parameter("overbought_threshold", 70.0); // Invalid: oversold >= overbought
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        let result = strategy.validate_parameters();
+        assert!(result.is_err());
+        
+        if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("Oversold threshold must be less than overbought threshold"));
+        } else {
+            panic!("Expected InvalidParameter error");
+        }
+    }
+
+    #[test]
+    fn test_parameter_validation_invalid_rsi_thresholds() {
+        let config = StrategyConfig::new()
+            .with_parameter("oversold_threshold", -10.0); // Invalid: < 0
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        let result = strategy.validate_parameters();
+        assert!(result.is_err());
+        
+        if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("RSI thresholds must be between 0 and 100"));
+        } else {
+            panic!("Expected InvalidParameter error");
+        }
+    }
+
+    #[test]
+    fn test_parameter_validation_invalid_signal_strength() {
+        let config = StrategyConfig::new()
+            .with_parameter("min_signal_strength", 1.5); // Invalid: > 1.0
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        let result = strategy.validate_parameters();
+        assert!(result.is_err());
+        
+        if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
+            assert!(msg.contains("Minimum signal strength must be between 0.0 and 1.0"));
+        } else {
+            panic!("Expected InvalidParameter error");
+        }
+    }
+
+    #[test]
+    fn test_parameter_validation_edge_cases() {
+        // Test edge case values
+        let config = StrategyConfig::new()
+            .with_parameter("oversold_threshold", 0.0) // Valid edge case
+            .with_parameter("overbought_threshold", 100.0) // Valid edge case
+            .with_parameter("min_signal_strength", 0.0); // Valid edge case
+
+        let strategy = EnhancedRsiStrategy::new(config);
+        assert!(strategy.validate_parameters().is_ok());
+    }
+
+    #[test]
+    fn test_extract_enhanced_config() {
+        let config = StrategyConfig::new()
+            .with_parameter("primary_period", 10i64)
+            .with_parameter("secondary_period", 20i64)
+            .with_parameter("oversold_threshold", 25.0)
+            .with_parameter("overbought_threshold", 75.0)
+            .with_parameter("dynamic_thresholds", true)
+            .with_parameter("min_signal_strength", 0.7)
+            .with_parameter("trend_filtering", false)
+            .with_parameter("trend_lookback", 30i64);
+
+        let enhanced_config = EnhancedRsiStrategy::extract_enhanced_config(&config).unwrap();
+        
+        assert_eq!(enhanced_config.primary_period, 10);
+        assert_eq!(enhanced_config.secondary_period, 20);
+        assert_eq!(enhanced_config.oversold_threshold, 25.0);
+        assert_eq!(enhanced_config.overbought_threshold, 75.0);
+        assert_eq!(enhanced_config.dynamic_thresholds, true);
+        assert_eq!(enhanced_config.min_signal_strength, 0.7);
+        assert_eq!(enhanced_config.trend_filtering, false);
+        assert_eq!(enhanced_config.trend_lookback, 30);
+    }
+
+    #[test]
+    fn test_calculate_dynamic_thresholds() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        
+        // Test with insufficient data
+        let rsi_values = vec![50.0, 55.0, 45.0]; // Less than 20 values
+        let result = strategy.calculate_dynamic_thresholds(&rsi_values).unwrap();
+        assert_eq!(result.0, 30.0); // Default oversold
+        assert_eq!(result.1, 70.0); // Default overbought
+        
+        // Test with sufficient data
+        let rsi_values: Vec<f64> = (0..25).map(|i| 50.0 + (i as f64 * 0.5).sin() * 10.0).collect();
+        let result = strategy.calculate_dynamic_thresholds(&rsi_values).unwrap();
+        assert!(result.0 >= 10.0); // Should be adjusted but >= min
+        assert!(result.1 <= 90.0); // Should be adjusted but <= max
+    }
+
+    #[test]
+    fn test_analyze_trend() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        
+        // Test with insufficient data
+        let prices = vec![100.0, 101.0, 102.0]; // Less than trend_lookback
+        let result = strategy.analyze_trend(&prices).unwrap();
+        assert_eq!(result, 0.0); // Neutral trend
+        
+        // Test with sufficient data
+        let prices: Vec<f64> = (0..60).map(|i| 100.0 + i as f64 * 0.1).collect(); // Uptrend
+        let result = strategy.analyze_trend(&prices).unwrap();
+        assert!(result > 0.0); // Should be positive for uptrend
+    }
+
+    #[test]
+    fn test_calculate_confidence() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        
+        // Test buy signal confidence
+        let confidence = strategy.calculate_confidence(25.0, 30.0, 30.0, 70.0, 0.1, Signal::Buy);
+        assert!(confidence > 0.0 && confidence <= 1.0);
+        
+        // Test sell signal confidence
+        let confidence = strategy.calculate_confidence(75.0, 80.0, 30.0, 70.0, -0.1, Signal::Sell);
+        assert!(confidence > 0.0 && confidence <= 1.0);
+        
+        // Test hold signal confidence - the actual calculation includes RSI agreement and trend alignment
+        let confidence = strategy.calculate_confidence(50.0, 55.0, 30.0, 70.0, 0.0, Signal::Hold);
+        assert!(confidence > 0.0 && confidence <= 1.0); // Just check it's in valid range
+    }
+
+    #[test]
+    fn test_generate_signals() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        let data = create_test_data();
+
+        let result = strategy.generate_signals(&data);
+        assert!(result.is_ok());
+
+        let signals = result.unwrap();
+        assert_eq!(signals.len(), data.height());
+        assert_eq!(signals.name(), "signal");
+    }
+
+    #[test]
+    fn test_get_indicator_values() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        let data = create_test_data();
+
+        let result = strategy.get_indicator_values(&data);
+        assert!(result.is_ok());
+
+        let indicators = result.unwrap();
+        assert!(indicators.contains_key("primary_rsi"));
+        assert!(indicators.contains_key("secondary_rsi"));
+        
+        let primary_rsi = indicators.get("primary_rsi").unwrap();
+        let secondary_rsi = indicators.get("secondary_rsi").unwrap();
+        
+        assert_eq!(primary_rsi.len(), data.height());
+        assert_eq!(secondary_rsi.len(), data.height());
+    }
+
+    #[test]
+    fn test_get_performance_metrics() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+        let data = create_test_data();
+        let signals = vec![TechnicalSignal::new(Signal::Hold)];
+
+        let result = strategy.get_performance_metrics(&data, &signals);
+        assert!(result.is_ok());
+
+        let metrics = result.unwrap();
+        assert_eq!(metrics.total_return, 0.0); // Default value
+    }
+
+    #[test]
+    fn test_strategy_trait_methods() {
+        let config = StrategyConfig::new();
+        let strategy = EnhancedRsiStrategy::new(config);
+
+        assert_eq!(strategy.name(), "EnhancedRSI");
+        assert_eq!(strategy.description(), "Enhanced RSI strategy with dual RSI confirmation, dynamic thresholds, and trend filtering");
+        assert_eq!(strategy.required_columns(), vec!["close"]);
+        let _ = strategy.config(); // Just ensure this method is callable
+    }
+
+    #[test]
+    fn test_with_enhanced_config() {
+        let config = StrategyConfig::new();
+        let enhanced_config = EnhancedRsiConfig {
+            primary_period: 10,
+            secondary_period: 20,
+            oversold_threshold: 25.0,
+            overbought_threshold: 75.0,
+            dynamic_thresholds: true,
+            min_signal_strength: 0.7,
+            trend_filtering: false,
+            trend_lookback: 30,
+        };
+
+        let strategy = EnhancedRsiStrategy::with_enhanced_config(config, enhanced_config.clone());
+        assert_eq!(strategy.enhanced_config.primary_period, 10);
+        assert_eq!(strategy.enhanced_config.secondary_period, 20);
+        assert_eq!(strategy.enhanced_config.oversold_threshold, 25.0);
+        assert_eq!(strategy.enhanced_config.overbought_threshold, 75.0);
+        assert_eq!(strategy.enhanced_config.dynamic_thresholds, true);
+        assert_eq!(strategy.enhanced_config.min_signal_strength, 0.7);
+        assert_eq!(strategy.enhanced_config.trend_filtering, false);
+        assert_eq!(strategy.enhanced_config.trend_lookback, 30);
+    }
+
+    #[test]
+    fn test_enhanced_config_default() {
+        let default_config = EnhancedRsiConfig::default();
+        
+        assert_eq!(default_config.primary_period, 14);
+        assert_eq!(default_config.secondary_period, 21);
+        assert_eq!(default_config.oversold_threshold, 30.0);
+        assert_eq!(default_config.overbought_threshold, 70.0);
+        assert_eq!(default_config.dynamic_thresholds, true);
+        assert_eq!(default_config.min_signal_strength, 0.6);
+        assert_eq!(default_config.trend_filtering, true);
+        assert_eq!(default_config.trend_lookback, 50);
     }
 }

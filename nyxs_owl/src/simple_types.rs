@@ -191,7 +191,10 @@ mod tests {
         assert_eq!(signal_data.signal, Signal::Buy);
         assert_eq!(signal_data.position_type, PositionType::Long);
         assert_eq!(signal_data.confidence, 0.8);
-        assert_eq!(signal_data.metadata.as_ref().unwrap().get("rsi"), Some(&75.0));
+        assert_eq!(
+            signal_data.metadata.as_ref().unwrap().get("rsi"),
+            Some(&75.0)
+        );
     }
 
     #[test]
@@ -202,4 +205,4 @@ mod tests {
         let signal_data = SignalData::new(Signal::Buy).with_confidence(-0.5);
         assert_eq!(signal_data.confidence, 0.0);
     }
-} 
+}

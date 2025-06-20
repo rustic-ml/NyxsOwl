@@ -56,8 +56,8 @@ impl TechnicalStrategy for VWAPStrategy {
 
         let close = data.column("close")?;
         let volume = data.column("volume")?;
-        let high = data.column("high")?;
-        let low = data.column("low")?;
+        let _high = data.column("high")?;
+        let _low = data.column("low")?;
 
         // Calculate VWAP
         let vwap = calculate_vwap(data)?;

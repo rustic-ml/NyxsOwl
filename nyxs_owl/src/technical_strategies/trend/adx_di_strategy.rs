@@ -2,9 +2,7 @@
 //! ADX and +/-DI Crossover Strategy using local trade_math module.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
-use crate::technical_strategies::{Strategy, StrategyConfig};
-use polars::prelude::{DataFrame, PolarsResult};
+use polars::prelude::DataFrame;
 // Changed import to local trade_math module
 use crate::trade_math::trend::calculate_adx_di;
 
@@ -136,7 +134,8 @@ pub fn adx_di_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::{df, AnyValue, PolarsError};
+    use polars::error::PolarsResult;
+    use polars::prelude::{df, PolarsError};
 
     fn create_test_df_adx(len: usize) -> PolarsResult<DataFrame> {
         let mut highs: Vec<f64> = Vec::with_capacity(len);
@@ -222,7 +221,7 @@ mod tests {
                         high_s.as_series().unwrap(),
                         low_s.as_series().unwrap(),
                         close_s.as_series().unwrap(),
-                        period
+                        period,
                     ) {
                         println!("ADX: {:?}", adx.f64().unwrap().to_vec());
                         println!("+DI: {:?}", p_di.f64().unwrap().to_vec());

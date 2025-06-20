@@ -2,11 +2,9 @@
 //! Vortex Indicator (VI) Crossover Strategy using ta-lib-in-rust.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
-use crate::technical_strategies::{Strategy, StrategyConfig};
+use crate::trade_math::trend::calculate_vortex;
 use polars::chunked_array::ChunkedArray;
-use polars::prelude::{DataFrame, Float64Type, PolarsResult, Series};
-use ta_lib_in_rust::indicators::trend::calculate_vortex;
+use polars::prelude::{DataFrame, Float64Type};
 
 /// Generates trading signals based on Vortex Indicator (VI+ and VI-) crossovers.
 ///
@@ -53,7 +51,25 @@ pub fn vortex_signals(
     }
 
     // calculate_vortex should return a tuple of (VI_Plus_Series, VI_Minus_Series)
-    let vortex_result = calculate_vortex(df, high_col, low_col, close_col, period);
+    let high_series = df
+        .column(high_col)
+        .map_err(|_| NyxsOwlError::DataError(format!("High column '{}' not found.", high_col)))?
+        .as_series()
+        .ok_or_else(|| NyxsOwlError::DataError("Failed to convert high column to series".into()))?;
+    let low_series = df
+        .column(low_col)
+        .map_err(|_| NyxsOwlError::DataError(format!("Low column '{}' not found.", low_col)))?
+        .as_series()
+        .ok_or_else(|| NyxsOwlError::DataError("Failed to convert low column to series".into()))?;
+    let close_series = df
+        .column(close_col)
+        .map_err(|_| NyxsOwlError::DataError(format!("Close column '{}' not found.", close_col)))?
+        .as_series()
+        .ok_or_else(|| {
+            NyxsOwlError::DataError("Failed to convert close column to series".into())
+        })?;
+
+    let vortex_result = calculate_vortex(&high_series, &low_series, &close_series, period);
     let (vi_plus_series, vi_minus_series) = vortex_result.map_err(|e| {
         NyxsOwlError::StrategyError(format!("Failed to calculate Vortex Indicator: {:?}", e))
     })?;
@@ -93,6 +109,7 @@ pub fn vortex_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polars::error::PolarsResult;
     use polars::prelude::{df, PolarsError};
 
     fn create_vortex_test_df(len: usize) -> PolarsResult<DataFrame> {

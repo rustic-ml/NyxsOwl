@@ -11,9 +11,9 @@ use std::fmt;
 
 // Import TechnicalSignal for use in tests
 #[cfg(test)]
-use crate::technical_strategies::TechnicalSignal;
-#[cfg(test)]
 use crate::simple_types::Signal as SimpleSignal;
+#[cfg(test)]
+use crate::technical_strategies::TechnicalSignal;
 
 /// Main result type for NyxsOwl operations
 pub type NyxsOwlResult<T> = Result<T, NyxsOwlError>;

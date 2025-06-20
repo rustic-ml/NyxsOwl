@@ -89,7 +89,7 @@ pub fn macd_signals(
             signal_values.get(i - 1).and_then(|&x| x),
         ) {
             let current_macd_above = current_macd > current_signal;
-            let prev_macd_above = prev_macd > prev_signal;
+            let _prev_macd_above = prev_macd > prev_signal;
 
             // Detect crossovers
             if let Some(was_above) = previous_macd_above_signal {
