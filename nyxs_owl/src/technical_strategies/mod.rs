@@ -63,6 +63,88 @@ pub use crate::common::{ConfigValue, StrategyConfig};
 #[cfg(not(feature = "forecasting"))]
 use crate::simple_types::NyxsOwlError;
 
+// Unified trait for StrategyConfig that works with both common and forecasting modules
+/// Trait for extracting configuration values safely from strategy configurations
+///
+/// This trait provides a unified interface for accessing configuration values
+/// regardless of whether the forecasting feature is enabled or not.
+pub trait ConfigExtractor {
+    /// Safely extract an integer value from configuration
+    ///
+    /// # Arguments
+    /// * `key` - Configuration key to look up
+    ///
+    /// # Returns
+    /// The integer value if found and valid, None otherwise
+    fn get_int_safe(&self, key: &str) -> Option<i64>;
+
+    /// Safely extract a float value from configuration
+    ///
+    /// # Arguments
+    /// * `key` - Configuration key to look up
+    ///
+    /// # Returns
+    /// The float value if found and valid, None otherwise
+    fn get_float_safe(&self, key: &str) -> Option<f64>;
+
+    /// Safely extract a boolean value from configuration
+    ///
+    /// # Arguments
+    /// * `key` - Configuration key to look up
+    ///
+    /// # Returns
+    /// The boolean value if found and valid, None otherwise
+    fn get_bool_safe(&self, key: &str) -> Option<bool>;
+
+    /// Safely extract a string value from configuration
+    ///
+    /// # Arguments
+    /// * `key` - Configuration key to look up
+    ///
+    /// # Returns
+    /// The string value if found and valid, None otherwise
+    fn get_string_safe(&self, key: &str) -> Option<&str>;
+}
+
+// Implement for both StrategyConfig types
+#[cfg(feature = "forecasting")]
+impl ConfigExtractor for StrategyConfig {
+    fn get_int_safe(&self, key: &str) -> Option<i64> {
+        self.get_int(key).ok()
+    }
+
+    fn get_float_safe(&self, key: &str) -> Option<f64> {
+        self.get_float(key).ok()
+    }
+
+    fn get_bool_safe(&self, key: &str) -> Option<bool> {
+        self.get_bool(key).ok()
+    }
+
+    fn get_string_safe(&self, key: &str) -> Option<&str> {
+        self.get_string(key).ok()
+    }
+}
+
+#[cfg(not(feature = "forecasting"))]
+impl ConfigExtractor for StrategyConfig {
+    fn get_int_safe(&self, key: &str) -> Option<i64> {
+        self.get_int(key)
+    }
+
+    fn get_float_safe(&self, key: &str) -> Option<f64> {
+        self.get_float(key)
+    }
+
+    fn get_bool_safe(&self, key: &str) -> Option<bool> {
+        self.get_bool(key)
+    }
+
+    fn get_string_safe(&self, key: &str) -> Option<&str> {
+        self.get_string(key)
+    }
+}
+
 // Define a simplified Strategy trait for technical strategies (when forecasting is not available)
 #[cfg(not(feature = "forecasting"))]
 pub trait Strategy {
@@ -181,15 +263,21 @@ pub trait TechnicalStrategy: Strategy {
     fn validate_parameters(&self) -> NyxsOwlResult<()>;
 }
 
-/// Performance metrics for technical strategies
-#[derive(Debug, Clone)]
+/// Performance metrics for a trading strategy
 pub struct PerformanceMetrics {
+    /// Total return percentage from the strategy
     pub total_return: f64,
+    /// Sharpe ratio measuring risk-adjusted returns
     pub sharpe_ratio: f64,
+    /// Maximum drawdown experienced
     pub max_drawdown: f64,
+    /// Win rate as a percentage of profitable trades
     pub win_rate: f64,
+    /// Total number of trades executed
     pub total_trades: usize,
+    /// Average return per trade
     pub avg_trade_return: f64,
+    /// Strategy volatility measure
     pub volatility: f64,
 }
 
@@ -226,7 +314,7 @@ pub struct TechnicalPerformance {
     pub volatility: f64,
 }
 
-/// Signal filtering and enhancement utilities
+/// Utility struct for filtering and enhancing trading signals
 pub struct SignalFilter;
 
 impl SignalFilter {
@@ -374,7 +462,6 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
 
     #[test]
     fn test_technical_signal_creation() {

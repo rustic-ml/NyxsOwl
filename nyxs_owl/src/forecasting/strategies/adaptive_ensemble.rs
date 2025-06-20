@@ -59,25 +59,37 @@ impl Default for AdaptiveEnsembleConfig {
 /// Market regime types
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MarketRegime {
+    /// Trending market with clear directional movement
     Trending,
+    /// Mean reverting market with price oscillations
     MeanReverting,
+    /// High volatility market with large price swings
     HighVolatility,
+    /// Low volatility market with small price movements
     LowVolatility,
+    /// Sideways market with no clear trend
     Sideways,
 }
 
 /// Model performance tracking
 #[derive(Debug, Clone)]
 pub struct ModelPerformance {
+    /// Name of the forecasting model
     pub model_name: String,
+    /// Historical accuracy scores for the model
     pub accuracy_scores: Vec<f64>,
+    /// Recent performance metric (rolling average)
     pub recent_performance: f64,
+    /// Performance metrics by market regime
     pub regime_performance: HashMap<MarketRegime, f64>,
+    /// Historical confidence scores for the model
     pub confidence_scores: Vec<f64>,
+    /// Timestamp of last performance update
     pub last_updated: usize,
 }
 
 impl ModelPerformance {
+    /// Create a new ModelPerformance instance for the given model
     pub fn new(model_name: String) -> Self {
         Self {
             model_name,
@@ -89,6 +101,7 @@ impl ModelPerformance {
         }
     }
 
+    /// Update the model's performance metrics with new data
     pub fn update_performance(
         &mut self,
         accuracy: f64,
@@ -119,6 +132,7 @@ impl ModelPerformance {
         }
     }
 
+    /// Get the performance metric for a specific market regime
     pub fn get_regime_performance(&self, regime: &MarketRegime) -> f64 {
         self.regime_performance.get(regime).copied().unwrap_or(0.5)
     }
@@ -127,19 +141,28 @@ impl ModelPerformance {
 /// Enhanced forecast with metadata
 #[derive(Debug, Clone)]
 pub struct EnhancedForecast {
+    /// Forecasted value
     pub value: f64,
+    /// Confidence level of the forecast (0.0 to 1.0)
     pub confidence: f64,
+    /// Name of the model that generated this forecast
     pub model_name: String,
 }
 
 /// Base ensemble strategy configuration (from existing code)
 #[derive(Debug, Clone)]
 pub struct EnsembleStrategyConfig {
+    /// Threshold for signal generation
     pub signal_threshold: f64,
+    /// Minimum number of data points required
     pub min_data_points: usize,
+    /// Minimum confidence level for signal generation
     pub min_confidence: f64,
+    /// Whether to use ARIMA model in ensemble
     pub use_arima: bool,
+    /// Whether to use exponential smoothing in ensemble
     pub use_exponential_smoothing: bool,
+    /// Whether to use Kalman filter in ensemble
     pub use_kalman: bool,
 }
 
@@ -165,6 +188,10 @@ pub struct AdaptiveEnsembleStrategy {
 }
 
 impl AdaptiveEnsembleStrategy {
+    /// Create a new Adaptive Ensemble strategy with the given configuration
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for the adaptive ensemble strategy
     pub fn new(config: AdaptiveEnsembleConfig) -> Self {
         let mut model_weights = HashMap::new();
         model_weights.insert("ARIMA".to_string(), 1.0);

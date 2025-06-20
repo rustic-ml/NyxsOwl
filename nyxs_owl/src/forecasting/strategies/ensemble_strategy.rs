@@ -92,6 +92,14 @@ impl Default for EnsembleStrategyConfig {
 
 impl EnsembleStrategyConfig {
     /// Create a new ensemble strategy configuration
+    ///
+    /// # Arguments
+    /// * `method` - The ensemble aggregation method to use
+    /// * `signal_threshold` - Threshold for signal generation (0.0 to 1.0)
+    /// * `min_data_points` - Minimum number of data points required
+    ///
+    /// # Returns
+    /// A new `EnsembleStrategyConfig` instance or an error if parameters are invalid
     pub fn new(
         method: EnsembleMethod,
         signal_threshold: f64,
@@ -136,6 +144,8 @@ impl EnsembleStrategyConfig {
     }
 
     /// Create conservative ensemble configuration
+    ///
+    /// Returns a conservative configuration with higher thresholds and more stringent requirements
     pub fn conservative() -> Self {
         Self {
             method: EnsembleMethod::Median,
@@ -155,6 +165,8 @@ impl EnsembleStrategyConfig {
     }
 
     /// Create aggressive ensemble configuration
+    ///
+    /// Returns an aggressive configuration with lower thresholds for more frequent signals
     pub fn aggressive() -> Self {
         Self {
             method: EnsembleMethod::BestModel,
@@ -174,6 +186,8 @@ impl EnsembleStrategyConfig {
     }
 
     /// Create balanced ensemble configuration
+    ///
+    /// Returns a balanced configuration with weighted average method and moderate thresholds
     pub fn balanced() -> Self {
         let weights = vec![0.4, 0.35, 0.25]; // ARIMA, ES, Kalman weights
         Self {
@@ -197,11 +211,22 @@ pub struct EnsembleStrategy {
 
 impl EnsembleStrategy {
     /// Create a new ensemble strategy
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for the ensemble strategy
     pub fn new(config: EnsembleStrategyConfig) -> Self {
         Self { config }
     }
 
     /// Generate trading signals using ensemble of models
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns
+    /// * `price_column` - Name of the price column
+    /// * `timestamp_column` - Name of the timestamp column
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame
     pub fn generate_signals(
         &self,
         df: &DataFrame,
@@ -481,7 +506,7 @@ impl EnsembleStrategy {
         // For now, use simple round-robin selection
         // In practice, this would evaluate recent performance of each model
         let models: Vec<_> = signals_map.keys().collect();
-        let window_size = self.config.performance_window.min(final_signals.len());
+        let _window_size = self.config.performance_window.min(final_signals.len());
 
         for i in 0..final_signals.len() {
             let best_model_idx = i % models.len(); // Simple rotation for now
@@ -545,13 +570,13 @@ impl EnsembleStrategy {
         }
 
         // Calculate performance-based adjustments using recent agreement patterns
-        let lookback_window = self.config.performance_window.min(final_signals.len());
-        if lookback_window > 10 {
+        let _window_size = self.config.performance_window.min(final_signals.len());
+        if _window_size > 10 {
             self.calculate_stacking_weights(
                 signals_map,
                 &models,
                 &mut model_weights,
-                lookback_window,
+                _window_size,
             )?;
         }
 

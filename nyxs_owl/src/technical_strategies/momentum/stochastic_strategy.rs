@@ -2,70 +2,97 @@
 //! Stochastic Oscillator Strategy using local trade_math module.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::technical_strategies::{Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy};
 use crate::trade_math::momentum::calculate_stochastic;
-use polars::prelude::{DataFrame, Series};
+use polars::prelude::*;
 
-/// Generates trading signals based on Stochastic Oscillator.
+/// Configuration for Stochastic strategy parameters
+#[derive(Debug, Clone)]
+pub struct StochasticConfig {
+    /// The column name for high prices.
+    pub high_column: String,
+    /// The column name for low prices.
+    pub low_column: String,
+    /// The column name for close prices.
+    pub close_column: String,
+    /// The period for %K calculation (typically 14).
+    pub k_period: usize,
+    /// The period for %D smoothing (typically 3).
+    pub d_period: usize,
+    /// The oversold threshold (typically 20).
+    pub oversold_threshold: f64,
+    /// The overbought threshold (typically 80).
+    pub overbought_threshold: f64,
+}
+
+impl Default for StochasticConfig {
+    fn default() -> Self {
+        Self {
+            high_column: "high".to_string(),
+            low_column: "low".to_string(),
+            close_column: "close".to_string(),
+            k_period: 14,
+            d_period: 3,
+            oversold_threshold: 20.0,
+            overbought_threshold: 80.0,
+        }
+    }
+}
+
+/// Generate trading signals based on Stochastic Oscillator crossovers.
 ///
-/// Generates buy signals when %K line crosses above %D line in oversold area (< 20).
-/// Generates sell signals when %K line crosses below %D line in overbought area (> 80).
+/// This strategy looks for %K and %D line crossovers in oversold and overbought zones.
+/// Buy signals are generated when %K crosses above %D in the oversold zone.
+/// Sell signals are generated when %K crosses below %D in the overbought zone.
 ///
 /// # Arguments
-/// * `df` - A Polars DataFrame containing the OHLC data.
-/// * `high_column` - The name of the column in `df` that contains the high price data.
-/// * `low_column` - The name of the column in `df` that contains the low price data.
-/// * `close_column` - The name of the column in `df` that contains the close price data.
-/// * `k_period` - The period for %K calculation (typically 14).
-/// * `d_period` - The period for %D smoothing (typically 3).
-/// * `oversold_threshold` - The oversold threshold (typically 20).
-/// * `overbought_threshold` - The overbought threshold (typically 80).
+/// * `df` - DataFrame containing OHLC data.
+/// * `config` - Configuration containing all strategy parameters.
 ///
 /// # Returns
 /// A `Result` containing a `Vec<Signal>` or a `NyxsOwlError`.
-pub fn stochastic_signals(
-    df: &DataFrame,
-    high_column: &str,
-    low_column: &str,
-    close_column: &str,
-    k_period: usize,
-    d_period: usize,
-    oversold_threshold: f64,
-    overbought_threshold: f64,
-) -> Result<Vec<Signal>> {
+pub fn stochastic_signals(df: &DataFrame, config: &StochasticConfig) -> Result<Vec<Signal>> {
     // Validate parameters
-    if k_period == 0 || d_period == 0 {
+    if config.k_period == 0 || config.d_period == 0 {
         return Err(NyxsOwlError::InvalidParameter(
             "Stochastic periods must be greater than 0".to_string(),
         ));
     }
 
-    if oversold_threshold >= overbought_threshold {
+    if config.oversold_threshold >= config.overbought_threshold {
         return Err(NyxsOwlError::InvalidParameter(
             "Oversold threshold must be less than overbought threshold".to_string(),
         ));
     }
 
-    if oversold_threshold < 0.0 || overbought_threshold > 100.0 {
+    if config.oversold_threshold < 0.0 || config.overbought_threshold > 100.0 {
         return Err(NyxsOwlError::InvalidParameter(
             "Stochastic thresholds must be between 0 and 100".to_string(),
         ));
     }
 
     // Extract OHLC data
-    let high_series = df.column(high_column).map_err(|e| {
-        NyxsOwlError::DataError(format!("High column '{}' not found: {}", high_column, e))
+    let high_series = df.column(&config.high_column).map_err(|e| {
+        NyxsOwlError::DataError(format!(
+            "High column '{}' not found: {}",
+            config.high_column, e
+        ))
     })?;
 
-    let low_series = df.column(low_column).map_err(|e| {
-        NyxsOwlError::DataError(format!("Low column '{}' not found: {}", low_column, e))
+    let low_series = df.column(&config.low_column).map_err(|e| {
+        NyxsOwlError::DataError(format!(
+            "Low column '{}' not found: {}",
+            config.low_column, e
+        ))
     })?;
 
-    let close_series = df.column(close_column).map_err(|e| {
-        NyxsOwlError::DataError(format!("Close column '{}' not found: {}", close_column, e))
+    let close_series = df.column(&config.close_column).map_err(|e| {
+        NyxsOwlError::DataError(format!(
+            "Close column '{}' not found: {}",
+            config.close_column, e
+        ))
     })?;
 
-    let min_data_len = k_period + d_period;
+    let min_data_len = config.k_period + config.d_period;
     if high_series.len() < min_data_len {
         return Err(NyxsOwlError::MissingData(format!(
             "Insufficient data: {} rows, need at least {} for Stochastic strategy",
@@ -93,8 +120,8 @@ pub fn stochastic_signals(
         high_series_clone,
         low_series_clone,
         close_series_clone,
-        k_period,
-        d_period,
+        config.k_period,
+        config.d_period,
     )
     .map_err(|e| NyxsOwlError::IndicatorError(format!("Stochastic calculation failed: {}", e)))?;
 
@@ -127,10 +154,10 @@ pub fn stochastic_signals(
 
             // Detect crossovers in specific zones
             if let Some(was_above) = previous_k_above_d {
-                if !was_above && current_k_above && current_k < oversold_threshold {
+                if !was_above && current_k_above && current_k < config.oversold_threshold {
                     // %K crossed above %D in oversold zone -> Buy signal
                     signals[i] = Signal::Buy;
-                } else if was_above && !current_k_above && current_k > overbought_threshold {
+                } else if was_above && !current_k_above && current_k > config.overbought_threshold {
                     // %K crossed below %D in overbought zone -> Sell signal
                     signals[i] = Signal::Sell;
                 }
@@ -178,7 +205,14 @@ mod tests {
     #[test]
     fn test_stochastic_strategy_basic_functionality() {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
-        let result = stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 80.0);
+        let config = StochasticConfig {
+            k_period: 14,
+            d_period: 3,
+            oversold_threshold: 20.0,
+            overbought_threshold: 80.0,
+            ..Default::default()
+        };
+        let result = stochastic_signals(&df, &config);
         assert!(result.is_ok());
 
         let signals = result.unwrap();
@@ -193,12 +227,23 @@ mod tests {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
 
         // Zero periods
+        let config_zero_k = StochasticConfig {
+            k_period: 0,
+            d_period: 3,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "close", 0, 3, 20.0, 80.0),
+            stochastic_signals(&df, &config_zero_k),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
+
+        let config_zero_d = StochasticConfig {
+            k_period: 14,
+            d_period: 0,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "close", 14, 0, 20.0, 80.0),
+            stochastic_signals(&df, &config_zero_d),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
     }
@@ -208,16 +253,33 @@ mod tests {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
 
         // Invalid threshold ranges
+        let config_invalid_order = StochasticConfig {
+            oversold_threshold: 80.0,
+            overbought_threshold: 20.0,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "close", 14, 3, 80.0, 20.0),
+            stochastic_signals(&df, &config_invalid_order),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
+
+        let config_negative = StochasticConfig {
+            oversold_threshold: -10.0,
+            overbought_threshold: 80.0,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "close", 14, 3, -10.0, 80.0),
+            stochastic_signals(&df, &config_negative),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
+
+        let config_too_high = StochasticConfig {
+            oversold_threshold: 20.0,
+            overbought_threshold: 110.0,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 110.0),
+            stochastic_signals(&df, &config_too_high),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
     }
@@ -229,31 +291,18 @@ mod tests {
         let required_len = k_period + d_period;
 
         let df_too_short = create_test_df_for_stochastic_strategy(required_len - 1).unwrap();
+        let config = StochasticConfig {
+            k_period,
+            d_period,
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(
-                &df_too_short,
-                "high",
-                "low",
-                "close",
-                k_period,
-                d_period,
-                20.0,
-                80.0
-            ),
+            stochastic_signals(&df_too_short, &config),
             Err(NyxsOwlError::MissingData(_))
         ));
 
         let df_just_enough = create_test_df_for_stochastic_strategy(required_len).unwrap();
-        let result = stochastic_signals(
-            &df_just_enough,
-            "high",
-            "low",
-            "close",
-            k_period,
-            d_period,
-            20.0,
-            80.0,
-        );
+        let result = stochastic_signals(&df_just_enough, &config);
         assert!(result.is_ok());
     }
 
@@ -261,16 +310,30 @@ mod tests {
     fn test_stochastic_strategy_column_not_found() {
         let df = create_test_df_for_stochastic_strategy(50).unwrap();
 
+        let config_invalid_high = StochasticConfig {
+            high_column: "non_existent".to_string(),
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "non_existent", "low", "close", 14, 3, 20.0, 80.0),
+            stochastic_signals(&df, &config_invalid_high),
             Err(NyxsOwlError::DataError(_))
         ));
+
+        let config_invalid_low = StochasticConfig {
+            low_column: "non_existent".to_string(),
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "non_existent", "close", 14, 3, 20.0, 80.0),
+            stochastic_signals(&df, &config_invalid_low),
             Err(NyxsOwlError::DataError(_))
         ));
+
+        let config_invalid_close = StochasticConfig {
+            close_column: "non_existent".to_string(),
+            ..Default::default()
+        };
         assert!(matches!(
-            stochastic_signals(&df, "high", "low", "non_existent", 14, 3, 20.0, 80.0),
+            stochastic_signals(&df, &config_invalid_close),
             Err(NyxsOwlError::DataError(_))
         ));
     }
@@ -278,7 +341,14 @@ mod tests {
     #[test]
     fn test_stochastic_strategy_signals_generation() {
         let df = create_test_df_for_stochastic_strategy(100).unwrap();
-        let result = stochastic_signals(&df, "high", "low", "close", 14, 3, 20.0, 80.0);
+        let config = StochasticConfig {
+            k_period: 14,
+            d_period: 3,
+            oversold_threshold: 20.0,
+            overbought_threshold: 80.0,
+            ..Default::default()
+        };
+        let result = stochastic_signals(&df, &config);
         assert!(result.is_ok());
 
         let signals = result.unwrap();

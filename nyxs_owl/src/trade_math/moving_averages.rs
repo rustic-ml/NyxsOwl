@@ -157,7 +157,7 @@ pub fn calculate_wma(series: &Series, period: usize) -> PolarsResult<Series> {
     let sum_of_weights = (period * (period + 1)) as f64 / 2.0;
     let mut wma_values: Vec<Option<f64>> = vec![None; len];
 
-    for i in (period - 1)..len {
+    for (i, wma_value) in wma_values.iter_mut().enumerate().skip(period - 1) {
         let window = ca.slice(i as i64 - (period as i64 - 1), period);
         let mut weighted_sum = 0.0;
         let mut current_weight = period as f64;
@@ -174,9 +174,9 @@ pub fn calculate_wma(series: &Series, period: usize) -> PolarsResult<Series> {
         }
 
         if all_some {
-            wma_values[i] = Some(weighted_sum / sum_of_weights);
+            *wma_value = Some(weighted_sum / sum_of_weights);
         } else {
-            wma_values[i] = None; // If any value in window is None, WMA is None
+            *wma_value = None; // If any value in window is None, WMA is None
         }
     }
 
@@ -222,8 +222,8 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
     let tp_vol_ca = tp_times_volume_series.f64()?;
     let mut cumulative_tp_vol_values = Vec::with_capacity(tp_vol_ca.len());
     let mut cum_sum = 0.0;
-    for i in 0..tp_vol_ca.len() {
-        if let Some(val) = tp_vol_ca.get(i) {
+    for val in tp_vol_ca.iter() {
+        if let Some(val) = val {
             cum_sum += val;
             cumulative_tp_vol_values.push(Some(cum_sum));
         } else {
@@ -236,8 +236,8 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
     let vol_ca = volume_series.f64()?;
     let mut cumulative_vol_values = Vec::with_capacity(vol_ca.len());
     let mut cum_vol = 0.0;
-    for i in 0..vol_ca.len() {
-        if let Some(val) = vol_ca.get(i) {
+    for val in vol_ca.iter() {
+        if let Some(val) = val {
             cum_vol += val;
             cumulative_vol_values.push(Some(cum_vol));
         } else {
@@ -266,7 +266,6 @@ pub fn calculate_vwap(df: &DataFrame) -> PolarsResult<Series> {
 mod tests {
     use super::*;
     use polars::prelude::AnyValue;
-    use polars::prelude::*;
 
     fn create_test_series(name: &str, data: Vec<Option<f64>>) -> Series {
         Series::new(name.into(), data)

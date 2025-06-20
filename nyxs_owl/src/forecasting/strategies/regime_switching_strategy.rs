@@ -359,6 +359,14 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Generate trading signals based on regime-switching analysis
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns.
+    /// * `price_column` - Name of the price column.
+    /// * `timestamp_column` - Name of the timestamp column.
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame.
     pub fn generate_signals(
         &self,
         df: &DataFrame,
@@ -446,28 +454,18 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Detect market regimes using the specified model
-    fn detect_regimes(&self, prices: &[f64], returns: &[f64]) -> Result<RegimeDetection> {
+    fn detect_regimes(&self, _prices: &[f64], returns: &[f64]) -> Result<RegimeDetection> {
         match &self.config.model_type {
-            RegimeSwitchingType::MarkovSwitching => {
-                self.markov_switching_detection(prices, returns)
-            }
-            RegimeSwitchingType::HigherOrder(order) => {
-                self.higher_order_detection(prices, returns, *order)
-            }
-            RegimeSwitchingType::DurationDependent => {
-                self.duration_dependent_detection(prices, returns)
-            }
-            RegimeSwitchingType::Multivariate => self.multivariate_detection(prices, returns),
-            RegimeSwitchingType::Threshold => self.threshold_detection(prices, returns),
+            RegimeSwitchingType::MarkovSwitching => self.markov_switching_detection(returns),
+            RegimeSwitchingType::HigherOrder(order) => self.higher_order_detection(returns, *order),
+            RegimeSwitchingType::DurationDependent => self.duration_dependent_detection(returns),
+            RegimeSwitchingType::Multivariate => self.multivariate_detection(returns),
+            RegimeSwitchingType::Threshold => self.threshold_detection(returns),
         }
     }
 
     /// Basic Markov switching regime detection
-    fn markov_switching_detection(
-        &self,
-        prices: &[f64],
-        returns: &[f64],
-    ) -> Result<RegimeDetection> {
+    fn markov_switching_detection(&self, returns: &[f64]) -> Result<RegimeDetection> {
         let mut regimes = Vec::new();
         let mut regime_probabilities = Vec::new();
         let mut regime_durations = Vec::new();
@@ -479,7 +477,7 @@ impl RegimeSwitchingStrategy {
         let mut current_regime = MarketRegime::Sideways;
         let mut current_duration = 0;
 
-        for (i, (&ret, &vol)) in rolling_returns
+        for (_i, (&ret, &vol)) in rolling_returns
             .iter()
             .zip(rolling_volatilities.iter())
             .enumerate()
@@ -545,14 +543,9 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Higher-order Markov model considering sequence of past regimes
-    fn higher_order_detection(
-        &self,
-        prices: &[f64],
-        returns: &[f64],
-        order: usize,
-    ) -> Result<RegimeDetection> {
+    fn higher_order_detection(&self, returns: &[f64], order: usize) -> Result<RegimeDetection> {
         // Start with basic detection
-        let mut basic_detection = self.markov_switching_detection(prices, returns)?;
+        let mut basic_detection = self.markov_switching_detection(returns)?;
 
         // Apply higher-order smoothing
         let smoothed_regimes =
@@ -563,12 +556,8 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Duration-dependent regime detection
-    fn duration_dependent_detection(
-        &self,
-        prices: &[f64],
-        returns: &[f64],
-    ) -> Result<RegimeDetection> {
-        let mut detection = self.markov_switching_detection(prices, returns)?;
+    fn duration_dependent_detection(&self, returns: &[f64]) -> Result<RegimeDetection> {
+        let mut detection = self.markov_switching_detection(returns)?;
 
         // Adjust regime probabilities based on duration
         for (i, duration) in detection.regime_durations.iter().enumerate() {
@@ -585,12 +574,12 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Multivariate regime detection (simplified for single asset)
-    fn multivariate_detection(&self, prices: &[f64], returns: &[f64]) -> Result<RegimeDetection> {
+    fn multivariate_detection(&self, returns: &[f64]) -> Result<RegimeDetection> {
         // For single asset, use enhanced detection with price momentum
-        let mut detection = self.markov_switching_detection(prices, returns)?;
+        let mut detection = self.markov_switching_detection(returns)?;
 
         // Add price momentum to regime classification
-        let momentum = self.calculate_momentum(prices, 10)?;
+        let momentum = self.calculate_momentum(returns, 10)?;
 
         for (i, &mom) in momentum.iter().enumerate() {
             if i < detection.regimes.len() {
@@ -618,7 +607,7 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Threshold-based regime detection
-    fn threshold_detection(&self, _prices: &[f64], returns: &[f64]) -> Result<RegimeDetection> {
+    fn threshold_detection(&self, returns: &[f64]) -> Result<RegimeDetection> {
         let mut regimes = Vec::new();
         let mut regime_probabilities = Vec::new();
         let mut regime_durations = Vec::new();
@@ -826,14 +815,14 @@ impl RegimeSwitchingStrategy {
     }
 
     /// Calculate momentum indicator
-    fn calculate_momentum(&self, prices: &[f64], window: usize) -> Result<Vec<f64>> {
+    fn calculate_momentum(&self, returns: &[f64], window: usize) -> Result<Vec<f64>> {
         let mut momentum = Vec::new();
 
-        for i in 0..prices.len() {
+        for i in 0..returns.len() {
             if i >= window {
-                let current_price = prices[i];
-                let past_price = prices[i - window];
-                let mom = (current_price - past_price) / past_price;
+                let current_return = returns[i];
+                let past_return = returns[i - window];
+                let mom = (current_return - past_return) / past_return;
                 momentum.push(mom);
             } else {
                 momentum.push(0.0);
@@ -886,7 +875,6 @@ impl RegimeSwitchingStrategy {
             {
                 let signal = self.generate_signal_for_regime(
                     i,
-                    prices,
                     returns,
                     regime_strategy,
                     &regime_detection.regime_probabilities[i],
@@ -902,12 +890,11 @@ impl RegimeSwitchingStrategy {
     fn generate_signal_for_regime(
         &self,
         index: usize,
-        prices: &[f64],
         returns: &[f64],
         regime_strategy: &RegimeStrategy,
         regime_probs: &[f64],
     ) -> Result<Signal> {
-        if index == 0 || index >= prices.len() {
+        if index == 0 || index >= returns.len() {
             return Ok(Signal::Hold);
         }
 
@@ -917,15 +904,15 @@ impl RegimeSwitchingStrategy {
             return Ok(Signal::Hold);
         }
 
-        let current_price = prices[index];
-        let prev_price = prices[index - 1];
-        let price_change = (current_price - prev_price) / prev_price;
+        let current_return = returns[index];
+        let prev_return = returns[index - 1];
+        let return_change = (current_return - prev_return) / prev_return;
 
         let signal = if regime_strategy.use_trend_following {
             // Trend following logic
-            if price_change > regime_strategy.signal_threshold {
+            if return_change > regime_strategy.signal_threshold {
                 Signal::Buy
-            } else if price_change < -regime_strategy.signal_threshold {
+            } else if return_change < -regime_strategy.signal_threshold {
                 Signal::Sell
             } else {
                 Signal::Hold

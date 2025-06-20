@@ -113,7 +113,7 @@ impl WilliamsRStrategy {
     fn generate_signals(&self, williams_r: &[f64]) -> Vec<TechnicalSignal> {
         let mut signals = Vec::new();
 
-        for (_i, &wr_value) in williams_r.iter().enumerate() {
+        for &wr_value in williams_r.iter() {
             if wr_value.is_nan() {
                 signals.push(TechnicalSignal::new(Signal::Hold));
                 continue;
@@ -377,18 +377,30 @@ mod tests {
 
         let williams_r = strategy.calculate_williams_r(&data).unwrap();
 
-        // First few values should be NaN due to lookback period
-        assert!(williams_r[0].is_nan());
-        // For period 14, first valid value should be at index 13 (0-based)
-        // Values before that should be NaN
-        for i in 0..13 {
-            assert!(williams_r[i].is_nan(), "williams_r[{}] should be NaN", i);
+        // Debug: Print first few values
+        println!("First 15 Williams R values:");
+        for (i, &value) in williams_r.iter().take(15).enumerate() {
+            println!("  [{}]: {}", i, value);
         }
 
-        // Subsequent values should be between -100 and 0
-        for i in 14..williams_r.len() {
-            assert!(!williams_r[i].is_nan());
-            assert!(williams_r[i] >= -100.0 && williams_r[i] <= 0.0);
+        let period = strategy.config.period;
+        // First period-1 values should be NaN due to lookback period
+        for (i, value) in williams_r.iter().take(period - 1).enumerate() {
+            assert!(
+                value.is_nan(),
+                "Value at index {} should be NaN but is {}",
+                i,
+                value
+            );
+        }
+        // For period-1 and after, values should be in [-100, 0]
+        for (i, value) in williams_r.iter().skip(period - 1).enumerate() {
+            assert!(
+                *value <= 0.0 && *value >= -100.0,
+                "Value at index {} is out of range: {}",
+                i + period - 1,
+                value
+            );
         }
     }
 

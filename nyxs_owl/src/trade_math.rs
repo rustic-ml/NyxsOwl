@@ -15,12 +15,16 @@ pub mod trend;
 /// Volatility measurement and risk analysis functions
 pub mod volatility;
 
+/// Re-exported momentum indicator functions
 pub use momentum::{calculate_macd, calculate_rsi, calculate_stochastic};
+/// Re-exported moving average functions
 pub use moving_averages::{calculate_ema, calculate_sma, calculate_vwap, calculate_wma};
+/// Re-exported trend indicator functions
 pub use trend::{
     calculate_adx_di, calculate_adxr, calculate_aroon, calculate_aroon_oscillator,
     calculate_directional_movement_components, calculate_vortex,
 };
+/// Re-exported volatility indicator functions
 pub use volatility::{
     calculate_atr, calculate_bollinger_bands, calculate_ease_of_movement, calculate_obv,
     calculate_volume_price_trend,

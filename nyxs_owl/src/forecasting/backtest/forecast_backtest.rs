@@ -3,7 +3,6 @@
 //! This module provides backtesting capabilities specifically tailored for forecasting-based strategies.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use polars::prelude::*;
 
 /// Comprehensive backtest performance metrics
 #[derive(Debug, Clone)]
@@ -32,12 +31,19 @@ pub struct BacktestPerformance {
     pub profit_factor: f64,
 
     // Additional fields expected by examples
+    /// Annualized return over the backtest period
     pub annualized_return: f64,
+    /// Benchmark return for comparison
     pub benchmark_return: f64,
+    /// Strategy volatility (standard deviation of returns)
     pub volatility: f64,
+    /// Calmar ratio (annual return / maximum drawdown)
     pub calmar_ratio: f64,
+    /// Average return per trade
     pub avg_trade_return: f64,
+    /// Best single trade return
     pub best_trade: f64,
+    /// Worst single trade return
     pub worst_trade: f64,
 }
 
@@ -137,7 +143,7 @@ impl ForecastBacktester {
         &self,
         prices: &[f64],
         signals: &[Signal],
-        timestamps: Option<&[String]>,
+        _timestamps: Option<&[String]>,
     ) -> Result<BacktestPerformance> {
         if prices.len() != signals.len() {
             return Err(NyxsOwlError::BacktestError(

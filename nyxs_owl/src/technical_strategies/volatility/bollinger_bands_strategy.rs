@@ -77,35 +77,19 @@ pub fn bollinger_bands_signals(
 
     let first_valid_signal_idx = period;
 
-    for i in first_valid_signal_idx..data_len {
-        let current_close_opt = close_prices_ca.get(i);
-        let prev_close_opt = close_prices_ca.get(i - 1);
-        let current_upper_opt = upper_band_ca.get(i);
-        let current_lower_opt = lower_band_ca.get(i);
-        let prev_upper_opt = upper_band_ca.get(i - 1);
-        let prev_lower_opt = lower_band_ca.get(i - 1);
-
-        if let (
-            Some(current_close),
-            Some(prev_close),
-            Some(current_upper),
-            Some(current_lower),
-            Some(prev_upper),
-            Some(prev_lower),
-        ) = (
-            current_close_opt,
-            prev_close_opt,
-            current_upper_opt,
-            current_lower_opt,
-            prev_upper_opt,
-            prev_lower_opt,
-        ) {
-            if prev_close <= prev_lower && current_close > current_lower {
-                signals[i] = Signal::Buy;
-            } else if prev_close >= prev_upper && current_close < current_upper {
-                signals[i] = Signal::Sell;
-            }
-        }
+    for (i, signal) in signals
+        .iter_mut()
+        .enumerate()
+        .take(data_len)
+        .skip(first_valid_signal_idx)
+    {
+        *signal = if close_prices_ca.get(i) > upper_band_ca.get(i) {
+            Signal::Sell
+        } else if close_prices_ca.get(i) < lower_band_ca.get(i) {
+            Signal::Buy
+        } else {
+            Signal::Hold
+        };
     }
     Ok(signals)
 }

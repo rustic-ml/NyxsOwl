@@ -135,9 +135,7 @@ pub fn enhanced_ichimoku_signals(
             config.kijun_period,
             config.senkou_b_period,
         )
-        .map_err(|e| {
-            NyxsOwlError::StrategyError(format!("Ichimoku calculation failed: {:?}", e))
-        })?;
+        .map_err(|e| NyxsOwlError::StrategyError(e.to_string()))?;
 
     // 2. Market regime detection
     let market_regime = detect_market_regime(df)?;
@@ -217,7 +215,7 @@ pub fn enhanced_ichimoku_signals(
 
             // Multi-timeframe alignment (simplified for single timeframe data)
             let timeframe_alignment =
-                calculate_timeframe_alignment(&tenkan_ca, &kijun_ca, &close_ca, i, config);
+                calculate_timeframe_alignment(tenkan_ca, kijun_ca, close_ca, i, config);
 
             // Calculate final confidence score
             let confidence_score = calculate_confidence_score(
@@ -409,7 +407,7 @@ fn calculate_volume_confirmation(
     let volume_ratio = current_volume / avg_volume;
 
     // Scale to 0-100 where higher volume = higher confirmation
-    ((volume_ratio - 0.5) * 50.0 + 50.0).min(100.0).max(0.0)
+    ((volume_ratio - 0.5) * 50.0 + 50.0).clamp(0.0, 100.0)
 }
 
 /// Calculate timeframe alignment score
@@ -483,7 +481,7 @@ fn calculate_confidence_score(
         MarketRegime::Unknown => 1.0,
     };
 
-    (base_score * regime_multiplier).min(100.0).max(0.0)
+    (base_score * regime_multiplier).clamp(0.0, 100.0)
 }
 
 /// Calculate risk/reward ratio
@@ -612,9 +610,7 @@ pub fn ichimoku_kumo_breakout_signals(
         kijun_period,
         senkou_b_period,
     )
-    .map_err(|e| {
-        NyxsOwlError::StrategyError(format!("Failed to calculate Ichimoku Cloud: {:?}", e))
-    })?;
+    .map_err(|e| NyxsOwlError::StrategyError(e.to_string()))?;
 
     let tenkan_ca: &ChunkedArray<Float64Type> = tenkan_sen_series
         .f64()
@@ -644,7 +640,12 @@ pub fn ichimoku_kumo_breakout_signals(
         return Ok(signals);
     }
 
-    for i in first_valid_idx..data_len {
+    for (i, signal) in signals
+        .iter_mut()
+        .enumerate()
+        .take(data_len)
+        .skip(first_valid_idx)
+    {
         let current_tenkan_opt = tenkan_ca.get(i);
         let prev_tenkan_opt = tenkan_ca.get(i - 1);
         let current_kijun_opt = kijun_ca.get(i);
@@ -682,7 +683,7 @@ pub fn ichimoku_kumo_breakout_signals(
                 // Confirm crossover is above Kumo and price is above Kumo
                 if cur_kijun > kumo_top && cur_close > kumo_top {
                     // Crossover point (cur_kijun or cur_tenkan) is above kumo top
-                    signals[i] = Signal::Buy;
+                    *signal = Signal::Buy;
                 }
             }
             // Bearish Crossover: Tenkan crosses below Kijun
@@ -690,7 +691,7 @@ pub fn ichimoku_kumo_breakout_signals(
                 // Confirm crossover is below Kumo and price is below Kumo
                 if cur_kijun < kumo_bottom && cur_close < kumo_bottom {
                     // Crossover point is below kumo bottom
-                    signals[i] = Signal::Sell;
+                    *signal = Signal::Sell;
                 }
             }
         }
@@ -701,51 +702,49 @@ pub fn ichimoku_kumo_breakout_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::error::PolarsResult;
-    use polars::prelude::{df, AnyValue, PolarsError};
+    use polars::prelude::*;
 
     // Helper to create a DataFrame with somewhat realistic HLC prices
-    fn create_ichimoku_test_df(len: usize) -> PolarsResult<DataFrame> {
+    fn create_ichimoku_test_df(len: usize) -> std::result::Result<DataFrame, NyxsOwlError> {
         if len == 0 {
-            return Err(PolarsError::ComputeError(
+            return Err(NyxsOwlError::InvalidParameter(
                 "Length must be at least 1".into(),
             ));
         }
-
         let mut highs: Vec<f64> = Vec::with_capacity(len);
         let mut lows: Vec<f64> = Vec::with_capacity(len);
         let mut closes: Vec<f64> = Vec::with_capacity(len);
         for i in 0..len {
-            let base = 100.0 + (i as f64 * 0.2).sin() * 10.0 + (i as f64 * 0.05); // Sinusoidal + slight uptrend
+            let base = 100.0 + (i as f64 * 0.2).sin() * 10.0 + (i as f64 * 0.05);
             highs.push(base + 2.0 + (i % 3) as f64);
             lows.push(base - 2.0 - (i % 3) as f64);
-            closes.push(base + ((i % 5) as f64 - 2.0)); // Add some noise to close
+            closes.push(base + ((i % 5) as f64 - 2.0));
         }
         df! {
             "high" => highs,
             "low" => lows,
             "close" => closes
         }
+        .map_err(NyxsOwlError::PolarsError)
     }
 
     #[test]
-    fn test_ichimoku_invalid_periods() {
-        let df = create_ichimoku_test_df(200).unwrap(); // Needs substantial data
+    fn test_ichimoku_invalid_periods() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_ichimoku_test_df(200)?;
         assert!(ichimoku_kumo_breakout_signals(&df, "high", "low", "close", 0, 26, 52).is_err());
         assert!(ichimoku_kumo_breakout_signals(&df, "high", "low", "close", 9, 0, 52).is_err());
         assert!(ichimoku_kumo_breakout_signals(&df, "high", "low", "close", 9, 26, 0).is_err());
+        Ok(())
     }
 
     #[test]
-    fn test_ichimoku_insufficient_data() {
+    fn test_ichimoku_insufficient_data() -> std::result::Result<(), NyxsOwlError> {
         let t = 9;
         let k = 26;
         let s_b = 52;
-        let min_required_len = s_b.max(k) + k + 20; // Match function logic
-
-        // Ensure we don't pass 0 or negative values to create_ichimoku_test_df
-        let df_too_short_len = (min_required_len - 1).max(1); // At least 1
-        let df_too_short = create_ichimoku_test_df(df_too_short_len).unwrap();
+        let min_required_len = s_b.max(k) + k + 20;
+        let df_too_short_len = (min_required_len - 1).max(1);
+        let df_too_short = create_ichimoku_test_df(df_too_short_len)?;
         println!(
             "DF too short: len = {}, required = {}",
             df_too_short.height(),
@@ -755,31 +754,32 @@ mod tests {
             ichimoku_kumo_breakout_signals(&df_too_short, "high", "low", "close", t, k, s_b)
                 .is_err()
         );
-
-        let df_ok = create_ichimoku_test_df(min_required_len + 1).unwrap();
+        let df_ok = create_ichimoku_test_df(min_required_len + 1)?;
         println!(
             "DF ok: len = {}, required = {}",
             df_ok.height(),
             min_required_len
         );
         assert!(ichimoku_kumo_breakout_signals(&df_ok, "high", "low", "close", t, k, s_b).is_ok());
+        Ok(())
     }
 
     #[test]
-    fn test_ichimoku_missing_columns() {
-        let df_no_high = df! { "low" => vec![50.0; 100], "close" => vec![51.0; 100] }.unwrap();
+    fn test_ichimoku_missing_columns() -> std::result::Result<(), NyxsOwlError> {
+        let df_no_high = df! { "low" => vec![50.0; 100], "close" => vec![51.0; 100] }
+            .map_err(NyxsOwlError::PolarsError)?;
         assert!(
             ichimoku_kumo_breakout_signals(&df_no_high, "high", "low", "close", 9, 26, 52).is_err()
         );
+        Ok(())
     }
 
     #[test]
-    fn test_ichimoku_signals_conceptual() {
-        let df = create_ichimoku_test_df(250).unwrap(); // Ensure ample data
+    fn test_ichimoku_signals_conceptual() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_ichimoku_test_df(250)?;
         let tenkan_p = 9;
         let kijun_p = 26;
         let senkou_b_p = 52;
-
         match ichimoku_kumo_breakout_signals(
             &df, "high", "low", "close", tenkan_p, kijun_p, senkou_b_p,
         ) {
@@ -787,40 +787,21 @@ mod tests {
                 assert_eq!(signals.len(), df.height());
                 let has_buy_signal = signals.iter().any(|&s| s == Signal::Buy);
                 let has_sell_signal = signals.iter().any(|&s| s == Signal::Sell);
-
-                // Conceptual: with enough varied data, some signals should appear.
-                // Exact signals depend on ta-lib-in-rust's Ichimoku calculation details (especially displacement)
-                // and the strictness of the Kumo confirmation.
-                // println!("Ichimoku Signals: {:?}", signals.iter().enumerate().filter(|&(_,s)| *s != Signal::Hold).collect::<Vec<_>>());
-                // if let Ok((t, k, sa, sb, cs)) = calculate_ichimoku_cloud(&df, "high", "low", "close", tenkan_p, kijun_p, senkou_b_p) {
-                //     let display_len = signals.len() - (senkou_b_p.max(kijun_p) + kijun_p - 5).min(signals.len());
-                //     println!("Tenkan: {:?}", t.tail(Some(display_len)));
-                //     println!("Kijun: {:?}", k.tail(Some(display_len)));
-                //     println!("Senkou A: {:?}", sa.tail(Some(display_len)));
-                //     println!("Senkou B: {:?}", sb.tail(Some(display_len)));
-                //     println!("Close: {:?}", df.column("close").unwrap().tail(Some(display_len)));
-                // }
-
-                if df.height() > senkou_b_p.max(kijun_p) + kijun_p + 20 {
-                    // Check only if very ample data
-                    // Allow all Hold signals if the test data doesn't generate crossovers
-                    if !(has_buy_signal || has_sell_signal) {
-                        println!("Ichimoku test: No signals generated. This may be due to test data not triggering crossovers.");
-                        println!(
-                            "Tenkan: {}, Kijun: {}, Senkou B: {}",
-                            tenkan_p, kijun_p, senkou_b_p
-                        );
-                        println!("This is acceptable for synthetic test data.");
-                    }
-                    // Remove the strict assertion - allow all Hold signals for synthetic data
-                    // assert!(has_buy_signal || has_sell_signal,
-                    //     "Expected Ichimoku to generate some signals with this dataset. Current Kumo confirmation is strict.");
+                if df.height() > senkou_b_p.max(kijun_p) + kijun_p + 20
+                    && !(has_buy_signal || has_sell_signal)
+                {
+                    println!("Ichimoku test: No signals generated. This may be due to test data not triggering crossovers.");
+                    println!(
+                        "Tenkan: {}, Kijun: {}, Senkou B: {}",
+                        tenkan_p, kijun_p, senkou_b_p
+                    );
+                    println!("This is acceptable for synthetic test data.");
                 }
             }
             Err(e) => {
-                // println!("Test DF for Ichimoku: {:?}", df.head(None));
                 panic!("Ichimoku signal generation failed: {:?}", e);
             }
         }
+        Ok(())
     }
 }

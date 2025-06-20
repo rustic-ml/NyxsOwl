@@ -474,7 +474,7 @@ impl<T> MemoryPool<T> {
 ///
 /// This structure can store price data in ~60% less memory by using
 /// appropriate precision for financial data.
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct CompactPrice {
     // Store price as u32 with 4 decimal places precision

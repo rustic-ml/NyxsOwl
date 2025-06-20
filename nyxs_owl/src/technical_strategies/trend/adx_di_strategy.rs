@@ -11,7 +11,7 @@ use crate::trade_math::trend::calculate_adx_di;
 /// A common strategy formulation:
 /// - Buy when +DI crosses above -DI, and ADX is above a certain threshold (e.g., 20 or 25) indicating trend strength.
 /// - Sell when -DI crosses above +DI, and ADX is above the threshold.
-/// This implementation uses an ADX threshold of 20.
+///   This implementation uses an ADX threshold of 20.
 ///
 /// # Arguments
 /// * `df` - A Polars DataFrame with "high", "low", and "close" price columns.
@@ -92,7 +92,12 @@ pub fn adx_di_signals(
     // A common starting point for signals is after `period + period` (for smoothed DI and ADX itself)
     let first_signal_idx = period * 2; // Heuristic, check nulls in loop
 
-    for i in first_signal_idx..data_len {
+    for (i, signal) in signals
+        .iter_mut()
+        .enumerate()
+        .take(data_len)
+        .skip(first_signal_idx)
+    {
         if i == 0 {
             continue;
         } // Should be covered by first_signal_idx
@@ -119,11 +124,11 @@ pub fn adx_di_signals(
             if adx_val > adx_threshold {
                 // Buy signal: +DI crosses above -DI
                 if prev_plus_di <= prev_minus_di && current_plus_di > current_minus_di {
-                    signals[i] = Signal::Buy;
+                    *signal = Signal::Buy;
                 }
                 // Sell signal: -DI crosses above +DI (or +DI crosses below -DI)
                 else if prev_plus_di >= prev_minus_di && current_plus_di < current_minus_di {
-                    signals[i] = Signal::Sell;
+                    *signal = Signal::Sell;
                 }
             }
         }
@@ -134,10 +139,9 @@ pub fn adx_di_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::error::PolarsResult;
-    use polars::prelude::{df, PolarsError};
+    use polars::prelude::*;
 
-    fn create_test_df_adx(len: usize) -> PolarsResult<DataFrame> {
+    fn create_test_df_adx(len: usize) -> std::result::Result<DataFrame, NyxsOwlError> {
         let mut highs: Vec<f64> = Vec::with_capacity(len);
         let mut lows: Vec<f64> = Vec::with_capacity(len);
         let mut closes: Vec<f64> = Vec::with_capacity(len);
@@ -152,41 +156,42 @@ mod tests {
             "low" => lows,
             "close" => closes
         }
+        .map_err(NyxsOwlError::PolarsError)
     }
 
     #[test]
-    fn test_adx_di_invalid_period() {
-        let df = create_test_df_adx(50).unwrap();
+    fn test_adx_di_invalid_period() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_adx(50)?;
         assert!(matches!(
             adx_di_signals(&df, "high", "low", "close", 0, 20.0),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_adx_di_insufficient_data() {
+    fn test_adx_di_insufficient_data() -> std::result::Result<(), NyxsOwlError> {
         let period = 14;
-        let df_too_short = create_test_df_adx(period * 2 - 1).unwrap();
+        let df_too_short = create_test_df_adx(period * 2 - 1)?;
         assert!(matches!(
             adx_di_signals(&df_too_short, "high", "low", "close", period, 20.0),
             Err(NyxsOwlError::MissingData(_))
         ));
 
-        let df_just_enough = create_test_df_adx(period * 2).unwrap(); // Min length for calculation
+        let df_just_enough = create_test_df_adx(period * 2)?; // Min length for calculation
         match adx_di_signals(&df_just_enough, "high", "low", "close", period, 20.0) {
             Ok(signals) => {
                 assert_eq!(signals.len(), period * 2);
-                // Expect all holds as signal loop starts at period*2, and crossover needs i and i-1
-                // Also, ADX values might still be forming.
                 assert!(signals.iter().all(|&s| s == Signal::Hold));
             }
             Err(e) => panic!("ADX/DI signals failed for minimal data: {:?}", e),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_adx_di_columns_not_found() {
-        let df = create_test_df_adx(50).unwrap();
+    fn test_adx_di_columns_not_found() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_adx(50)?;
         assert!(matches!(
             adx_di_signals(&df, "non_existent", "low", "close", 14, 20.0),
             Err(NyxsOwlError::DataError(_))
@@ -199,11 +204,12 @@ mod tests {
             adx_di_signals(&df, "high", "low", "non_existent", 14, 20.0),
             Err(NyxsOwlError::DataError(_))
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_adx_di_signals_conceptual() {
-        let df = create_test_df_adx(100).unwrap(); // Longer df for signals to develop
+    fn test_adx_di_signals_conceptual() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_adx(100)?; // Longer df for signals to develop
         let period = 14;
         let adx_threshold = 20.0;
 
@@ -229,10 +235,6 @@ mod tests {
                         println!("Signals: {:?}", signals);
                     }
                 }
-                // This is a conceptual test; actual signals depend heavily on data pattern and period.
-                // We assert that *some* signal might be generated if data is varied enough.
-                // For a truly robust test, compare against known values from another library or reference.
-                // Allow all Hold signals if the test data doesn't generate crossovers
                 if !(has_buy_signal || has_sell_signal) {
                     println!("ADX/DI test: No signals generated. This may be due to test data not triggering crossovers.");
                     println!("ADX threshold: {}, Period: {}", adx_threshold, period);
@@ -241,5 +243,6 @@ mod tests {
             }
             Err(e) => panic!("ADX/DI strategy signal generation failed: {:?}", e),
         }
+        Ok(())
     }
 }

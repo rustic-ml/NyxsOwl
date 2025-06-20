@@ -36,7 +36,7 @@ fn periods_since_extremum(
     let len = prices_ca.len();
     let mut result_values: Vec<Option<f64>> = vec![None; len];
 
-    for i in (period - 1)..len {
+    for (i, result_value) in result_values.iter_mut().enumerate().skip(period - 1) {
         let mut extremum_idx = 0;
         let mut extremum_val_opt: Option<f64> = None;
 
@@ -69,7 +69,7 @@ fn periods_since_extremum(
             }
         }
 
-        result_values[i] = if extremum_val_opt.is_some() {
+        *result_value = if extremum_val_opt.is_some() {
             let actual_window_size = end_idx - start_idx + 1;
             // Ensure safe arithmetic to prevent underflow
             if actual_window_size > extremum_idx {
@@ -137,16 +137,16 @@ pub fn calculate_aroon(
     let mut aroon_up_values = Vec::with_capacity(periods_high_ca.len());
     let mut aroon_down_values = Vec::with_capacity(periods_low_ca.len());
 
-    for i in 0..periods_high_ca.len() {
-        if let Some(val) = periods_high_ca.get(i) {
+    for val in periods_high_ca.iter() {
+        if let Some(val) = val {
             aroon_up_values.push(Some(((period_f64 - val) / period_f64) * 100.0));
         } else {
             aroon_up_values.push(None);
         }
     }
 
-    for i in 0..periods_low_ca.len() {
-        if let Some(val) = periods_low_ca.get(i) {
+    for val in periods_low_ca.iter() {
+        if let Some(val) = val {
             aroon_down_values.push(Some(((period_f64 - val) / period_f64) * 100.0));
         } else {
             aroon_down_values.push(None);
@@ -401,8 +401,9 @@ pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series>
 
     // Manual EWM implementation since ewm_mean was removed in Polars 0.47
     let alpha = 2.0 / (period as f64 + 1.0);
-    let ca = series.f64()?;
-    let len = ca.len();
+    let _high_ca = series.f64()?;
+    let _low_ca = series.f64()?;
+    let len = series.len();
 
     if len == 0 {
         return Ok(Series::new_empty(series.name().clone(), &DataType::Float64));
@@ -413,7 +414,7 @@ pub fn wilders_smoothing(series: &Series, period: usize) -> PolarsResult<Series>
     let mut initialized = false;
 
     for i in 0..len {
-        if let Some(val) = ca.get(i) {
+        if let Some(val) = series.f64()?.get(i) {
             if !initialized {
                 ewm = val;
                 initialized = true;
@@ -1015,8 +1016,8 @@ fn calculate_hl_avg(
         ));
     }
 
-    let high_ca = high_series.f64()?;
-    let low_ca = low_series.f64()?;
+    let _high_ca = high_series.f64()?;
+    let _low_ca = low_series.f64()?;
 
     let rolling_high = high_series.rolling_max(RollingOptionsFixedWindow {
         window_size: period,

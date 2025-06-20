@@ -40,6 +40,19 @@ impl Default for ExponentialSmoothingConfig {
 
 impl ExponentialSmoothingConfig {
     /// Create a new configuration with validation
+    ///
+    /// # Arguments
+    /// * `alpha` - Level smoothing parameter (0.0 to 1.0)
+    /// * `beta` - Trend smoothing parameter (0.0 to 1.0, None for simple smoothing)
+    /// * `gamma` - Seasonal smoothing parameter (0.0 to 1.0, None for non-seasonal)
+    /// * `seasonal_periods` - Number of seasonal periods (e.g., 12 for monthly data)
+    /// * `forecast_horizon` - Number of periods ahead to predict
+    /// * `threshold` - Minimum percentage change threshold for signals
+    /// * `min_data_points` - Minimum data points required
+    /// * `window_size` - Rolling window size for forecasts
+    ///
+    /// # Returns
+    /// A new `ExponentialSmoothingConfig` instance or an error if parameters are invalid
     pub fn new(
         alpha: f64,
         beta: Option<f64>,
@@ -122,6 +135,8 @@ impl ExponentialSmoothingConfig {
     }
 
     /// Create conservative configuration (lower alpha, no trend/seasonality)
+    ///
+    /// Returns a conservative configuration with lower alpha values and higher thresholds
     pub fn conservative() -> Self {
         Self {
             alpha: 0.1,
@@ -136,6 +151,8 @@ impl ExponentialSmoothingConfig {
     }
 
     /// Create moderate configuration (with trend but no seasonality)
+    ///
+    /// Returns a moderate configuration with balanced parameters
     pub fn moderate() -> Self {
         Self {
             alpha: 0.3,
@@ -150,6 +167,8 @@ impl ExponentialSmoothingConfig {
     }
 
     /// Create aggressive configuration (higher alpha, with trend)
+    ///
+    /// Returns an aggressive configuration with higher alpha values and lower thresholds
     pub fn aggressive() -> Self {
         Self {
             alpha: 0.5,
@@ -164,6 +183,12 @@ impl ExponentialSmoothingConfig {
     }
 
     /// Create seasonal configuration (with trend and seasonality)
+    ///
+    /// # Arguments
+    /// * `seasonal_periods` - Number of seasonal periods (e.g., 12 for monthly data)
+    ///
+    /// # Returns
+    /// A seasonal configuration with trend and seasonality parameters
     pub fn seasonal(seasonal_periods: usize) -> Result<Self> {
         Self::new(
             0.3,
@@ -179,17 +204,31 @@ impl ExponentialSmoothingConfig {
 }
 
 /// Exponential Smoothing forecasting strategy
+///
+/// This strategy uses exponential smoothing methods to forecast future prices
+/// and generate trading signals based on the forecasted values.
 pub struct ExponentialSmoothingStrategy {
     config: ExponentialSmoothingConfig,
 }
 
 impl ExponentialSmoothingStrategy {
     /// Create a new Exponential Smoothing strategy
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for the exponential smoothing strategy
     pub fn new(config: ExponentialSmoothingConfig) -> Self {
         Self { config }
     }
 
     /// Generate trading signals based on Exponential Smoothing forecasts
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns
+    /// * `price_column` - Name of the price column
+    /// * `timestamp_column` - Name of the timestamp column
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame
     pub fn generate_signals(
         &self,
         df: &DataFrame,

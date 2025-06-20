@@ -4,36 +4,37 @@ use thiserror::Error;
 /// Custom error type for NyxsOwl operations
 #[derive(Error, Debug)]
 pub enum NyxsOwlError {
+    /// Data processing error
     #[error("Data processing error: {0}")]
     DataError(String),
-
+    /// Invalid parameter error
     #[error("Invalid parameter: {0}")]
     InvalidParameter(String),
-
+    /// Missing data error
     #[error("Missing data: {0}")]
     MissingData(String),
-
+    /// Strategy error
     #[error("Strategy error: {0}")]
     StrategyError(String),
-
+    /// Backtest execution error
     #[error("Backtest execution error: {0}")]
     BacktestError(String),
-
+    /// Validation error
     #[error("Validation error: {0}")]
     ValidationError(String),
-
+    /// Indicator calculation error
     #[error("Indicator calculation error: {0}")]
     IndicatorError(String),
-
+    /// Model error
     #[error("Model error: {0}")]
     ModelError(String),
-
+    /// Not implemented error
     #[error("Not implemented: {0}")]
     NotImplemented(String),
-
+    /// IO error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-
+    /// Polars error
     #[error("Polars error: {0}")]
     PolarsError(#[from] PolarsError),
 }
@@ -144,10 +145,14 @@ impl SignalData {
     }
 
     /// Add a single metadata entry
-    pub fn add_metadata(mut self, key: &str, value: f64) -> Self {
-        let mut metadata = self.metadata.unwrap_or_default();
-        metadata.insert(key.to_string(), value);
-        self.metadata = Some(metadata);
+    pub fn add_metadata(mut self, key: String, value: f64) -> Self {
+        if let Some(ref mut map) = self.metadata {
+            map.insert(key, value);
+        } else {
+            let mut map = std::collections::HashMap::new();
+            map.insert(key, value);
+            self.metadata = Some(map);
+        }
         self
     }
 }
@@ -186,7 +191,7 @@ mod tests {
     fn test_signal_data_creation() {
         let signal_data = SignalData::new(Signal::Buy)
             .with_confidence(0.8)
-            .add_metadata("rsi", 75.0);
+            .add_metadata("rsi".to_string(), 75.0);
 
         assert_eq!(signal_data.signal, Signal::Buy);
         assert_eq!(signal_data.position_type, PositionType::Long);

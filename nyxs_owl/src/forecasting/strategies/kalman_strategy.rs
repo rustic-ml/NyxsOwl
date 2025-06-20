@@ -157,6 +157,14 @@ impl KalmanStrategy {
     }
 
     /// Generate trading signals based on Kalman Filter estimates
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns.
+    /// * `price_column` - Name of the price column.
+    /// * `timestamp_column` - Name of the timestamp column.
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame.
     pub fn generate_signals(
         &self,
         df: &DataFrame,
@@ -168,7 +176,7 @@ impl KalmanStrategy {
 
         // Extract price data
         let prices = self.extract_prices(df, price_column)?;
-        let timestamps = self.extract_timestamps(df, timestamp_column)?;
+        let _timestamps = self.extract_timestamps(df, timestamp_column)?;
 
         // Apply Kalman Filter
         let filter_results = self.apply_kalman_filter(&prices)?;

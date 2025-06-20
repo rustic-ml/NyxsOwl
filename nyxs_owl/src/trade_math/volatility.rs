@@ -92,7 +92,7 @@ pub fn calculate_bollinger_bands(
 ///   - Current High - Current Low
 ///   - abs(Current High - Previous Close)
 ///   - abs(Current Low - Previous Close)
-/// ATR is typically a smoothed average (Wilder's smoothing) of TR values.
+///     ATR is typically a smoothed average (Wilder's smoothing) of TR values.
 ///
 /// # Arguments
 /// * `df` - DataFrame with "high", "low", "close" columns (Float64).
@@ -130,7 +130,7 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
 
     let mut tr_values: Vec<Option<f64>> = vec![None; len]; // TR for index 0 is None
 
-    for i in 1..len {
+    for (i, tr_value) in tr_values.iter_mut().enumerate().skip(1) {
         // Start from 1 because TR uses previous close
         let h_opt = high_ca.get(i);
         let l_opt = low_ca.get(i);
@@ -140,13 +140,13 @@ pub fn calculate_atr(df: &DataFrame, period: usize) -> PolarsResult<Series> {
             let tr1 = h - l;
             let tr2 = (h - pc).abs();
             let tr3 = (l - pc).abs();
-            tr_values[i] = Some(tr1.max(tr2).max(tr3));
+            *tr_value = Some(tr1.max(tr2).max(tr3));
         } else {
-            tr_values[i] = None; // If any component is None, TR is None
+            *tr_value = None; // If any component is None, TR is None
         }
     }
 
-    let tr_series = Series::new("tr".into(), tr_values.clone()); // Keep tr_values for direct access if needed
+    let _tr_series = Series::new("tr".into(), tr_values.clone()); // Keep tr_values for direct access if needed
 
     // Calculate ATR using Wilder's smoothing
     // Initial ATR is the SMA of the first 'period' TR values.
@@ -247,7 +247,7 @@ pub fn calculate_ease_of_movement(
 
     let mut one_period_eom_values: Vec<Option<f64>> = vec![None; len]; // EOM[0] is None due to prev_midpoint
 
-    for i in 1..len {
+    for (i, eom_value) in one_period_eom_values.iter_mut().enumerate().skip(1) {
         // Start from 1 for MidpointMove
         let current_high = high_ca.get(i);
         let current_low = low_ca.get(i);
@@ -264,7 +264,7 @@ pub fn calculate_ease_of_movement(
         ) {
             if ch == cl || vol == 0.0 {
                 // If high equals low, or volume is zero, EOM is 0
-                one_period_eom_values[i] = Some(0.0);
+                *eom_value = Some(0.0);
                 continue;
             }
 
@@ -272,7 +272,7 @@ pub fn calculate_ease_of_movement(
             let box_ratio = (vol / scaling_factor) / (ch - cl);
 
             if box_ratio != 0.0 {
-                one_period_eom_values[i] = Some(midpoint_move / box_ratio);
+                *eom_value = Some(midpoint_move / box_ratio);
             } else {
                 // This case should ideally be rare if ch != cl and vol != 0.
                 // If box_ratio is zero (e.g. scaled volume is zero but H-L is not),
@@ -280,10 +280,10 @@ pub fn calculate_ease_of_movement(
                 // Stockcharts typically shows 0 if H=L or Vol=0, which we handle above.
                 // For extremely small volume that rounds to 0 after scaling, BoxRatio could be 0.
                 // Let's treat it as effectively zero movement or infinite resistance.
-                one_period_eom_values[i] = Some(0.0);
+                *eom_value = Some(0.0);
             }
         } else {
-            one_period_eom_values[i] = None; // If any required data is None
+            *eom_value = None; // If any required data is None
         }
     }
 
@@ -376,7 +376,7 @@ pub fn calculate_volume_price_trend(df: &DataFrame) -> PolarsResult<Series> {
 /// - If CurrentClose > PreviousClose, OBV_current = Previous_OBV + CurrentVolume
 /// - If CurrentClose < PreviousClose, OBV_current = Previous_OBV - CurrentVolume
 /// - If CurrentClose == PreviousClose, OBV_current = Previous_OBV
-/// The first OBV value is typically 0.
+///   The first OBV value is typically 0.
 ///
 /// # Arguments
 /// * `df` - DataFrame with "close" and "volume" columns (Float64).
@@ -443,7 +443,6 @@ pub fn calculate_obv(df: &DataFrame) -> PolarsResult<Series> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::prelude::*;
     use polars::prelude::{AnyValue, IntoLazy};
     // calculate_sma is now imported, so its specific tests are in moving_averages.rs
     // We keep tests for calculate_bollinger_bands and calculate_rolling_std_dev here.

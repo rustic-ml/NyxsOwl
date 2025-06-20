@@ -3,7 +3,7 @@
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use crate::trade_math::trend::calculate_aroon;
-use polars::prelude::DataFrame;
+use polars::prelude::*;
 
 /// Generates trading signals based on Aroon Up and Aroon Down crossovers.
 ///
@@ -87,26 +87,23 @@ pub fn aroon_signals(
     // For crossover `i-1`, `i`, first `i` can be `period`.
     let first_signal_idx = period;
 
-    for i in first_signal_idx..data_len {
-        if i == 0 {
-            continue;
-        } // Should be covered by first_signal_idx
+    for (i, signal) in signals
+        .iter_mut()
+        .enumerate()
+        .take(data_len)
+        .skip(first_signal_idx)
+    {
+        let aroon_up_val_opt = aroon_up_ca.get(i);
+        let aroon_down_val_opt = aroon_down_ca.get(i);
 
-        let current_up_opt = aroon_up_ca.get(i);
-        let current_down_opt = aroon_down_ca.get(i);
-        let prev_up_opt = aroon_up_ca.get(i - 1);
-        let prev_down_opt = aroon_down_ca.get(i - 1);
-
-        if let (Some(current_up), Some(current_down), Some(prev_up), Some(prev_down)) =
-            (current_up_opt, current_down_opt, prev_up_opt, prev_down_opt)
-        {
-            // Buy signal: Aroon Up crosses above Aroon Down
-            if prev_up <= prev_down && current_up > current_down {
-                signals[i] = Signal::Buy;
+        if let (Some(aroon_up), Some(aroon_down)) = (aroon_up_val_opt, aroon_down_val_opt) {
+            // Buy signal: Aroon Up > 70 and Aroon Down < 30
+            if aroon_up > 70.0 && aroon_down < 30.0 {
+                *signal = Signal::Buy;
             }
-            // Sell signal: Aroon Up crosses below Aroon Down
-            else if prev_up >= prev_down && current_up < current_down {
-                signals[i] = Signal::Sell;
+            // Sell signal: Aroon Down > 70 and Aroon Up < 30
+            else if aroon_down > 70.0 && aroon_up < 30.0 {
+                *signal = Signal::Sell;
             }
         }
     }
@@ -116,10 +113,8 @@ pub fn aroon_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::error::PolarsResult;
-    use polars::prelude::{df, PolarsError};
 
-    fn create_test_df_aroon(len: usize) -> PolarsResult<DataFrame> {
+    fn create_test_df_aroon(len: usize) -> std::result::Result<DataFrame, NyxsOwlError> {
         let highs: Vec<f64> = (0..len)
             .map(|i| 50.0 + (i % 10) as f64 + (i as f64 * 0.1).sin() * 5.0)
             .collect();
@@ -130,46 +125,42 @@ mod tests {
             "high" => highs,
             "low" => lows
         }
+        .map_err(NyxsOwlError::PolarsError)
     }
 
     #[test]
-    fn test_aroon_strategy_invalid_period() {
-        let df = create_test_df_aroon(50).unwrap();
-        // This error should be caught by the strategy function itself or calculate_aroon.
+    fn test_aroon_strategy_invalid_period() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_aroon(50)?;
         assert!(matches!(
             aroon_signals(&df, "high", "low", 0),
             Err(NyxsOwlError::InvalidParameter(_))
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_aroon_strategy_insufficient_data() {
+    fn test_aroon_strategy_insufficient_data() -> std::result::Result<(), NyxsOwlError> {
         let period = 14;
-        // Strategy checks if df.len() < period for error. trade_math::calculate_aroon returns nulls if df.len < period.
-        // The strategy's own check is df.len() < period.
-        let df_too_short = create_test_df_aroon(period - 1).unwrap();
+        let df_too_short = create_test_df_aroon(period - 1)?;
         assert!(matches!(
             aroon_signals(&df_too_short, "high", "low", period),
             Err(NyxsOwlError::MissingData(_))
         ));
 
-        // Data length equal to period. calculate_aroon will return one non-null value (at index period-1)
-        // The strategy loop for signals starts at `period`, so it won't generate signals and return Holds.
-        // This is acceptable. Or error, if we demand data for crossover check.
-        let df_just_enough_calc = create_test_df_aroon(period).unwrap();
+        let df_just_enough_calc = create_test_df_aroon(period)?;
         match aroon_signals(&df_just_enough_calc, "high", "low", period) {
             Ok(signals) => {
                 assert_eq!(signals.len(), period);
-                // Aroon calc gives value at period-1. Signal loop from period. So all Hold.
                 assert!(signals.iter().all(|&s| s == Signal::Hold));
             }
             Err(e) => panic!("Expected Ok for data length == period, got {:?}", e),
         }
+        Ok(())
     }
 
     #[test]
-    fn test_aroon_strategy_columns_not_found() {
-        let df = create_test_df_aroon(50).unwrap();
+    fn test_aroon_strategy_columns_not_found() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_aroon(50)?;
         assert!(matches!(
             aroon_signals(&df, "non_existent", "low", 14),
             Err(NyxsOwlError::DataError(_))
@@ -178,12 +169,12 @@ mod tests {
             aroon_signals(&df, "high", "non_existent", 14),
             Err(NyxsOwlError::DataError(_))
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_aroon_strategy_signals_conceptual() {
-        // Use a longer series to give Aroon a chance to cross over
-        let df = create_test_df_aroon(100).unwrap();
+    fn test_aroon_strategy_signals_conceptual() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_test_df_aroon(100)?;
         let period = 14;
 
         match aroon_signals(&df, "high", "low", period) {
@@ -192,8 +183,6 @@ mod tests {
                 let has_buy_signal = signals.iter().any(|&s| s == Signal::Buy);
                 let has_sell_signal = signals.iter().any(|&s| s == Signal::Sell);
 
-                // Check that some signals are generated after the initial period.
-                // If no signals, print Aroon values for debugging.
                 if !(has_buy_signal || has_sell_signal) {
                     let high_s = df.column("high").unwrap();
                     let low_s = df.column("low").unwrap();
@@ -216,5 +205,6 @@ mod tests {
                 panic!("Aroon strategy signal generation failed: {:?}", e);
             }
         }
+        Ok(())
     }
 }

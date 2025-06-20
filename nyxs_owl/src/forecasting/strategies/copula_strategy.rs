@@ -35,31 +35,22 @@ pub enum CopulaStrategyType {
 pub struct CopulaStrategyConfig {
     /// Type of copula model to use
     pub copula_type: CopulaType,
-
     /// Strategy type
     pub strategy_type: CopulaStrategyType,
-
     /// Asset pairs or groups to analyze
     pub asset_pairs: Vec<(String, String)>,
-
     /// Lookback window for correlation estimation
     pub lookback_window: usize,
-
     /// Threshold for correlation deviation signals
     pub correlation_threshold: f64,
-
     /// Signal threshold for trading decisions
     pub signal_threshold: f64,
-
     /// Minimum number of data points required
     pub min_data_points: usize,
-
     /// Rolling window for dynamic correlation
     pub rolling_window: usize,
-
     /// Confidence level for tail dependence
     pub confidence_level: f64,
-
     /// Risk adjustment factor
     pub risk_adjustment: f64,
 }
@@ -110,8 +101,8 @@ impl CopulaStrategyConfig {
 
         // Validate copula parameters
         match &copula_type {
-            CopulaType::StudentT(df) => {
-                if *df <= 0.0 {
+            CopulaType::StudentT(_df) => {
+                if *_df <= 0.0 {
                     return Err(NyxsOwlError::InvalidParameter(
                         "Student-t degrees of freedom must be positive".to_string(),
                     ));
@@ -256,6 +247,14 @@ impl CopulaStrategy {
     }
 
     /// Generate trading signals based on copula dependency analysis
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns.
+    /// * `price_columns` - Names of the price columns for each asset.
+    /// * `timestamp_column` - Name of the timestamp column.
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame.
     pub fn generate_signals(
         &self,
         df: &DataFrame,
@@ -470,7 +469,7 @@ impl CopulaStrategy {
                 // For Gaussian copula, parameter is correlation
                 self.calculate_correlation(x, y)?
             }
-            CopulaType::StudentT(df) => {
+            CopulaType::StudentT(_df) => {
                 // For Student-t copula, use correlation with given df
                 self.calculate_correlation(x, y)?
             }

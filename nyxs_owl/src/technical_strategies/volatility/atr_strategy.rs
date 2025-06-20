@@ -414,9 +414,8 @@ mod tests {
 
         let atr_values = strategy.calculate_atr_values(&data).unwrap();
 
-        // First few values might be NaN due to the calculation period
-        for i in 14..atr_values.len() {
-            assert!(atr_values[i] >= 0.0, "ATR values should be non-negative");
+        for value in atr_values.iter().skip(14) {
+            assert!(*value >= 0.0);
         }
     }
 

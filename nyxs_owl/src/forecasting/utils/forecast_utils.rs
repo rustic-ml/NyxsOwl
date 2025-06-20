@@ -115,14 +115,26 @@ pub fn rolling_windows<T>(data: &[T], window_size: usize) -> impl Iterator<Item 
 /// Calculate simple statistics for a slice of f64 values
 #[derive(Debug, Clone)]
 pub struct SimpleStats {
+    /// Mean (average) of the data values
     pub mean: f64,
+    /// Standard deviation of the data values
     pub std: f64,
+    /// Minimum value in the data
     pub min: f64,
+    /// Maximum value in the data
     pub max: f64,
+    /// Number of data points
     pub count: usize,
 }
 
 impl SimpleStats {
+    /// Calculate statistics for a slice of f64 values
+    ///
+    /// # Arguments
+    /// * `data` - Slice of f64 values to calculate statistics for
+    ///
+    /// # Returns
+    /// A `SimpleStats` instance with calculated statistics or an error if data is empty
     pub fn calculate(data: &[f64]) -> Result<Self> {
         if data.is_empty() {
             return Err(NyxsOwlError::DataError(

@@ -34,6 +34,7 @@
 
 // Common types and utilities
 pub mod common;
+/// Simplified type definitions and error handling for NyxsOwl
 pub mod simple_types;
 
 pub mod prelude {

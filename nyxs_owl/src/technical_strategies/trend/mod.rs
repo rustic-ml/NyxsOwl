@@ -8,6 +8,7 @@ pub mod psar_strategy;
 pub mod vortex_strategy;
 
 // Re-export key strategy functions and types
+/// Enhanced Ichimoku signals and configuration
 pub use ichimoku_strategy::{
     enhanced_ichimoku_signals, ichimoku_kumo_breakout_signals, EnhancedIchimokuConfig,
     EnhancedIchimokuSignal, MarketRegime,

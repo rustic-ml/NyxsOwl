@@ -32,8 +32,8 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
     let mut gains = Vec::new();
     let mut losses = Vec::new();
 
-    for i in 1..price_values.len() {
-        if let (Some(current), Some(previous)) = (price_values[i], price_values[i - 1]) {
+    for (current, previous) in price_values.iter().zip(price_values.iter().skip(1)) {
+        if let (Some(current), Some(previous)) = (current, previous) {
             let change = current - previous;
             if change > 0.0 {
                 gains.push(change);
@@ -66,7 +66,12 @@ pub fn calculate_rsi(prices: &Series, period: usize) -> PolarsResult<Series> {
 
     // Calculate RSI using EMA-style smoothing for subsequent periods
     let alpha = 1.0 / period as f64;
-    for i in (period + 1)..price_values.len() {
+    for (i, _) in price_values
+        .iter()
+        .enumerate()
+        .take(price_values.len())
+        .skip(period + 1)
+    {
         let gain_idx = i - 1;
         if gain_idx < gains.len() {
             // Exponential moving average for gains and losses
@@ -148,11 +153,9 @@ fn calculate_ema_internal(series: &Series, period: usize) -> PolarsResult<Series
     // Calculate SMA for the first EMA value
     let mut sum = 0.0;
     let mut count = 0;
-    for i in 0..period {
-        if let Some(val) = values[i] {
-            sum += val;
-            count += 1;
-        }
+    for val in values.iter().take(period).flatten() {
+        sum += val;
+        count += 1;
     }
 
     if count == 0 {
@@ -164,8 +167,8 @@ fn calculate_ema_internal(series: &Series, period: usize) -> PolarsResult<Series
 
     // Calculate subsequent EMA values
     let multiplier = 2.0 / (period as f64 + 1.0);
-    for i in period..values.len() {
-        if let Some(current) = values[i] {
+    for (i, val) in values.iter().enumerate().take(values.len()).skip(period) {
+        if let Some(current) = val {
             ema = (current * multiplier) + (ema * (1.0 - multiplier));
             ema_values[i] = Some(ema);
         }
@@ -243,20 +246,22 @@ pub fn calculate_stochastic(
 
     // Calculate %D (SMA of %K)
     let mut d_values = vec![None; len];
-    for i in (k_period - 1 + d_period - 1)..len {
-        let start_idx = i + 1 - d_period;
-        let mut sum = 0.0;
-        let mut count = 0;
-
-        for j in start_idx..=i {
-            if let Some(k_val) = k_values[j] {
-                sum += k_val;
-                count += 1;
-            }
+    let mut sum = 0.0;
+    let mut count = 0;
+    for (i, k_val) in k_values.iter().enumerate().take(len).skip(k_period - 1) {
+        if let Some(val) = k_val {
+            sum += val;
+            count += 1;
         }
-
-        if count == d_period {
-            d_values[i] = Some(sum / count as f64);
+        if i + 1 >= d_period {
+            if count > 0 {
+                d_values[i] = Some(sum / count as f64);
+            }
+            // Remove the value that is sliding out of the window
+            if let Some(Some(val)) = k_values.get(i + 1 - d_period) {
+                sum -= val;
+                count -= 1;
+            }
         }
     }
 
@@ -295,9 +300,14 @@ mod tests {
         }
 
         // Verify RSI is between 0 and 100
-        for i in 14..rsi_values.len() {
-            if let Some(rsi_val) = rsi_values[i] {
-                assert!((0.0..=100.0).contains(&rsi_val));
+        for (i, value) in rsi_values.iter().enumerate().take(14) {
+            if let Some(val) = value {
+                assert!(*val >= 0.0 && *val <= 100.0);
+            }
+        }
+        for (i, value) in rsi_values.iter().enumerate().skip(14) {
+            if let Some(val) = value {
+                assert!(*val >= 0.0 && *val <= 100.0);
             }
         }
     }

@@ -181,12 +181,20 @@ pub struct GarchStrategy {
 }
 
 impl GarchStrategy {
-    /// Create a new GARCH strategy
+    /// Create a new GARCH strategy instance with the given configuration.
     pub fn new(config: GarchStrategyConfig) -> Self {
         Self { config }
     }
 
-    /// Generate trading signals based on GARCH volatility forecasts
+    /// Generate trading signals based on GARCH volatility forecasts.
+    ///
+    /// # Arguments
+    /// * `df` - Input DataFrame containing price and timestamp columns.
+    /// * `price_column` - Name of the price column.
+    /// * `timestamp_column` - Name of the timestamp column.
+    ///
+    /// # Returns
+    /// A vector of trading signals (`Signal`) for each row in the DataFrame.
     pub fn generate_signals(
         &self,
         df: &DataFrame,
@@ -305,12 +313,12 @@ impl GarchStrategy {
         let mut volatilities = vec![0.0; n];
 
         // Enhanced initialization using robust variance estimate
-        let initial_variance = self.calculate_robust_initial_variance(returns)?;
-        let mut conditional_variances = vec![initial_variance; n];
+        let _initial_variance = self.calculate_robust_initial_variance(returns)?;
+        let mut conditional_variances = vec![_initial_variance; n];
 
         // Enhanced parameter estimation with constraints
         let (omega, alpha, beta) =
-            self.estimate_garch_parameters_enhanced(returns, initial_variance)?;
+            self.estimate_garch_parameters_enhanced(returns, _initial_variance)?;
 
         // Apply GARCH recursion with numerical stability checks
         for i in (self.config.arch_order.max(self.config.garch_order))..n {
@@ -341,7 +349,7 @@ impl GarchStrategy {
         }
 
         // Fill initial values with unconditional volatility
-        let unconditional_vol = (initial_variance).sqrt();
+        let unconditional_vol = (_initial_variance).sqrt();
         for i in 0..(self.config.arch_order.max(self.config.garch_order)) {
             volatilities[i] = unconditional_vol;
         }
@@ -355,8 +363,8 @@ impl GarchStrategy {
         let mut log_volatilities = vec![0.0; n];
 
         // Enhanced initialization
-        let initial_variance = self.calculate_robust_initial_variance(returns)?;
-        let initial_log_vol = initial_variance.ln() / 2.0;
+        let _initial_variance = self.calculate_robust_initial_variance(returns)?;
+        let initial_log_vol = _initial_variance.ln() / 2.0;
 
         // Enhanced parameter estimation for EGARCH
         let (omega, alpha, beta, gamma) = self.estimate_egarch_parameters_enhanced(returns)?;
@@ -402,7 +410,7 @@ impl GarchStrategy {
         let mut volatilities = self.garch_standard_enhanced(returns)?;
 
         // Calculate mean return for risk premium adjustment
-        let mean_return = returns.iter().sum::<f64>() / returns.len() as f64;
+        let _mean_return = returns.iter().sum::<f64>() / returns.len() as f64;
         let mean_vol = volatilities.iter().sum::<f64>() / volatilities.len() as f64;
 
         // GARCH-M incorporates volatility into the mean equation
@@ -429,12 +437,12 @@ impl GarchStrategy {
         let mut volatilities = vec![0.0; n];
 
         // Enhanced initialization
-        let initial_variance = self.calculate_robust_initial_variance(returns)?;
-        let mut conditional_variances = vec![initial_variance; n];
+        let _initial_variance = self.calculate_robust_initial_variance(returns)?;
+        let mut conditional_variances = vec![_initial_variance; n];
 
         // Enhanced parameter estimation for GJR-GARCH
         let (omega, alpha, beta, gamma) =
-            self.estimate_gjr_garch_parameters_enhanced(returns, initial_variance)?;
+            self.estimate_gjr_garch_parameters_enhanced(returns, _initial_variance)?;
 
         // Apply GJR-GARCH recursion with enhanced precision
         for i in 1..n {
@@ -456,7 +464,7 @@ impl GarchStrategy {
         }
 
         // Set initial volatility
-        volatilities[0] = initial_variance.sqrt();
+        volatilities[0] = _initial_variance.sqrt();
 
         Ok(volatilities)
     }
@@ -491,14 +499,14 @@ impl GarchStrategy {
     /// Enhanced GARCH parameter estimation with constraints
     fn estimate_garch_parameters_enhanced(
         &self,
-        returns: &[f64],
-        initial_variance: f64,
+        _returns: &[f64],
+        _initial_variance: f64,
     ) -> Result<(f64, f64, f64)> {
         // Simple but robust parameter estimation
         // In practice, this would use maximum likelihood estimation
 
         let sample_variance =
-            returns.iter().map(|&r| r.powi(2)).sum::<f64>() / returns.len() as f64;
+            _returns.iter().map(|&r| r.powi(2)).sum::<f64>() / _returns.len() as f64;
 
         // Conservative parameter estimates with stationarity constraints
         let omega = 0.1 * sample_variance; // Unconditional variance component
@@ -518,7 +526,10 @@ impl GarchStrategy {
     }
 
     /// Enhanced EGARCH parameter estimation
-    fn estimate_egarch_parameters_enhanced(&self, returns: &[f64]) -> Result<(f64, f64, f64, f64)> {
+    fn estimate_egarch_parameters_enhanced(
+        &self,
+        _returns: &[f64],
+    ) -> Result<(f64, f64, f64, f64)> {
         // Conservative EGARCH parameters
         let omega = -0.1; // Log volatility intercept
         let alpha = 0.15; // Innovation magnitude effect
@@ -532,7 +543,7 @@ impl GarchStrategy {
     fn estimate_gjr_garch_parameters_enhanced(
         &self,
         returns: &[f64],
-        initial_variance: f64,
+        _initial_variance: f64,
     ) -> Result<(f64, f64, f64, f64)> {
         let sample_variance =
             returns.iter().map(|&r| r.powi(2)).sum::<f64>() / returns.len() as f64;
@@ -593,28 +604,28 @@ impl GarchStrategy {
     /// Convert volatility forecasts to trading signals
     fn volatility_to_signals(
         &self,
-        prices: &[f64],
+        _prices: &[f64],
         returns: &[f64],
         volatilities: &[f64],
     ) -> Result<Vec<Signal>> {
-        if prices.len() != volatilities.len() + 1 {
+        if _prices.len() != volatilities.len() + 1 {
             return Err(NyxsOwlError::DataError(
                 "Price and volatility arrays have incompatible lengths".to_string(),
             ));
         }
 
-        let mut signals = vec![Signal::Hold; prices.len()];
+        let mut signals = vec![Signal::Hold; _prices.len()];
 
         // Calculate rolling average volatility for comparison
         let avg_volatility = self.calculate_rolling_average_volatility(volatilities)?;
 
-        for i in 1..prices.len() {
+        for i in 1.._prices.len() {
             let vol_idx = i - 1; // Volatility array is one element shorter
             let current_vol = volatilities[vol_idx];
             let avg_vol = avg_volatility[vol_idx];
 
             let signal = if self.config.use_volatility_targeting {
-                self.generate_volatility_targeting_signal(i, prices, current_vol, avg_vol)?
+                self.generate_volatility_targeting_signal(i, _prices, current_vol, avg_vol)?
             } else {
                 self.generate_volatility_breakout_signal(i, returns, current_vol, avg_vol)?
             };
@@ -644,8 +655,8 @@ impl GarchStrategy {
     /// Generate signals based on volatility targeting
     fn generate_volatility_targeting_signal(
         &self,
-        index: usize,
-        prices: &[f64],
+        _index: usize,
+        _prices: &[f64],
         current_vol: f64,
         avg_vol: f64,
     ) -> Result<Signal> {
@@ -669,16 +680,16 @@ impl GarchStrategy {
     /// Generate signals based on volatility breakouts
     fn generate_volatility_breakout_signal(
         &self,
-        index: usize,
+        _index: usize,
         returns: &[f64],
         current_vol: f64,
         avg_vol: f64,
     ) -> Result<Signal> {
-        if index == 0 || index > returns.len() {
+        if _index == 0 || _index > returns.len() {
             return Ok(Signal::Hold);
         }
 
-        let recent_return = returns[index - 1];
+        let recent_return = returns[_index - 1];
         let vol_ratio = current_vol / avg_vol;
 
         // Volatility breakout strategy
@@ -707,7 +718,14 @@ impl GarchStrategy {
         Ok(Signal::Hold)
     }
 
-    /// Calculate position size based on volatility targeting
+    /// Calculate position size based on volatility targeting.
+    ///
+    /// # Arguments
+    /// * `current_volatility` - The current volatility estimate.
+    /// * `base_position` - The base position size before adjustment.
+    ///
+    /// # Returns
+    /// The adjusted position size based on target volatility and risk adjustment.
     pub fn calculate_position_size(&self, current_volatility: f64, base_position: f64) -> f64 {
         if !self.config.use_volatility_targeting {
             return base_position;

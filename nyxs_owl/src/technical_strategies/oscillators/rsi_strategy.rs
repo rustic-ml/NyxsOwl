@@ -63,28 +63,25 @@ pub fn rsi_signals(
     let data_len = prices_series.len();
     let mut signals = vec![Signal::Hold; data_len];
 
-    // Iteration should start from an index where both current and previous RSI values can be non-null.
-    // If `calculate_rsi` with period `p` produces first value at index `p` (0-indexed after initial nulls),
-    // then `rsi_ca.get(period)` would be the first value, and `rsi_ca.get(period -1)` would be null.
-    // So, to compare `rsi[i]` and `rsi[i-1]`, `i` must start from `period + 1` if the first value is at index `period`.
-    // However, ta-lib-in-rust might return a series that is shorter or has a different null padding scheme.
-    // Assuming `calculate_rsi` returns a series of the same length as input `df` rows,
-    // padded with nulls. The first non-null RSI value is typically at index `period`.
-    // So, for `prev_rsi` to be valid, `i-1` must be at least `period`. So `i` must be at least `period + 1`.
     let rsi_len = rsi_ca.len();
     let start_index = (period + 1).min(rsi_len);
-    for i in start_index..data_len.min(rsi_len) {
+    for (i, signal) in signals
+        .iter_mut()
+        .enumerate()
+        .skip(start_index)
+        .take(data_len.min(rsi_len) - start_index)
+    {
         let current_rsi_opt = rsi_ca.get(i);
         let prev_rsi_opt = rsi_ca.get(i - 1);
 
         if let (Some(current_rsi), Some(prev_rsi)) = (current_rsi_opt, prev_rsi_opt) {
             // Buy signal: RSI crosses above oversold threshold
             if prev_rsi <= oversold_threshold && current_rsi > oversold_threshold {
-                signals[i] = Signal::Buy;
+                *signal = Signal::Buy;
             }
             // Sell signal: RSI crosses below overbought threshold
             else if prev_rsi >= overbought_threshold && current_rsi < overbought_threshold {
-                signals[i] = Signal::Sell;
+                *signal = Signal::Sell;
             }
         }
     }
@@ -95,7 +92,6 @@ pub fn rsi_signals(
 ///
 /// Failure swings are more advanced RSI patterns that help confirm reversal signals
 /// by looking for failures to reach previous extremes before reversing direction.
-
 /// Detects RSI Bullish Failure Swing patterns
 ///
 /// A bullish failure swing occurs when:
@@ -116,11 +112,11 @@ pub fn rsi_bullish_failure_swing(
         return Ok(signals);
     }
 
-    for i in lookback_period..rsi_values.len() {
+    for (i, signal) in signals.iter_mut().enumerate().skip(lookback_period) {
         if let Some(swing_signal) =
             detect_bullish_failure_swing(rsi_values, i, oversold_threshold, lookback_period)
         {
-            signals[i] = swing_signal;
+            *signal = swing_signal;
         }
     }
 
@@ -147,11 +143,11 @@ pub fn rsi_bearish_failure_swing(
         return Ok(signals);
     }
 
-    for i in lookback_period..rsi_values.len() {
+    for (i, signal) in signals.iter_mut().enumerate().skip(lookback_period) {
         if let Some(swing_signal) =
             detect_bearish_failure_swing(rsi_values, i, overbought_threshold, lookback_period)
         {
-            signals[i] = swing_signal;
+            *signal = swing_signal;
         }
     }
 
@@ -192,9 +188,14 @@ fn detect_bullish_failure_swing(
     let mut reaction_high = f64::NEG_INFINITY;
     let mut reaction_high_idx = None;
 
-    for i in (oversold_idx + 1)..current_idx {
-        if rsi_values[i] > oversold_threshold && rsi_values[i] > reaction_high {
-            reaction_high = rsi_values[i];
+    for (i, &value) in rsi_values
+        .iter()
+        .enumerate()
+        .skip(oversold_idx + 1)
+        .take(current_idx - oversold_idx - 1)
+    {
+        if value > oversold_threshold && value > reaction_high {
+            reaction_high = value;
             reaction_high_idx = Some(i);
         }
     }
@@ -203,9 +204,13 @@ fn detect_bullish_failure_swing(
 
     // Step 3: Find the subsequent pullback that stays above the previous low
     let mut pullback_low = f64::INFINITY;
-    for i in (reaction_idx + 1)..current_idx {
-        if rsi_values[i] < pullback_low {
-            pullback_low = rsi_values[i];
+    for &value in rsi_values
+        .iter()
+        .skip(reaction_idx + 1)
+        .take(current_idx - reaction_idx - 1)
+    {
+        if value < pullback_low {
+            pullback_low = value;
         }
     }
 
@@ -252,9 +257,14 @@ fn detect_bearish_failure_swing(
     let mut reaction_low = f64::INFINITY;
     let mut reaction_low_idx = None;
 
-    for i in (overbought_idx + 1)..current_idx {
-        if rsi_values[i] < overbought_threshold && rsi_values[i] < reaction_low {
-            reaction_low = rsi_values[i];
+    for (i, &value) in rsi_values
+        .iter()
+        .enumerate()
+        .skip(overbought_idx + 1)
+        .take(current_idx - overbought_idx - 1)
+    {
+        if value < overbought_threshold && value < reaction_low {
+            reaction_low = value;
             reaction_low_idx = Some(i);
         }
     }
@@ -263,9 +273,13 @@ fn detect_bearish_failure_swing(
 
     // Step 3: Find the subsequent rally that stays below the previous high
     let mut rally_high = f64::NEG_INFINITY;
-    for i in (reaction_idx + 1)..current_idx {
-        if rsi_values[i] > rally_high {
-            rally_high = rsi_values[i];
+    for &value in rsi_values
+        .iter()
+        .skip(reaction_idx + 1)
+        .take(current_idx - reaction_idx - 1)
+    {
+        if value > rally_high {
+            rally_high = value;
         }
     }
 

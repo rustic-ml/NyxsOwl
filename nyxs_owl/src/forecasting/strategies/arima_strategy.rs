@@ -11,41 +11,70 @@ use std::time::Instant;
 /// Configuration for ARIMA strategy
 #[derive(Debug, Clone)]
 pub struct ArimaStrategyConfig {
-    pub p: usize,                 // AR order
-    pub d: usize,                 // Integration order
-    pub q: usize,                 // MA order
-    pub threshold: f64,           // Base signal threshold
-    pub min_data_points: usize,   // Minimum data required
-    pub forecast_horizon: usize,  // How many steps to forecast
+    /// AR order (autoregressive)
+    pub p: usize, // AR order
+    /// Integration order (differencing)
+    pub d: usize, // Integration order
+    /// MA order (moving average)
+    pub q: usize, // MA order
+    /// Base signal threshold for trading decisions
+    pub threshold: f64, // Base signal threshold
+    /// Minimum number of data points required
+    pub min_data_points: usize, // Minimum data required
+    /// Number of steps to forecast ahead
+    pub forecast_horizon: usize, // How many steps to forecast
+    /// Confidence threshold for signal generation
     pub forecast_confidence: f64, // Confidence threshold for signals
 
     // NEW: Enhanced parameters for better accuracy
+    /// Enable volatility-adjusted thresholds
     pub dynamic_threshold: bool, // Enable volatility-adjusted thresholds
+    /// Periods for volatility calculation (20-50)
     pub volatility_lookback: usize, // Periods for volatility calculation (20-50)
+    /// Volatility adjustment factor (1.5-3.0)
     pub volatility_multiplier: f64, // Volatility adjustment factor (1.5-3.0)
-    pub min_threshold: f64,      // Minimum threshold bound (0.002-0.005)
-    pub max_threshold: f64,      // Maximum threshold bound (0.02-0.05)
-    pub model_selection: bool,   // Enable automatic ARIMA order selection
-    pub max_p: usize,            // Maximum AR order to test (3-5)
-    pub max_q: usize,            // Maximum MA order to test (3-5)
+    /// Minimum threshold bound (0.002-0.005)
+    pub min_threshold: f64, // Minimum threshold bound (0.002-0.005)
+    /// Maximum threshold bound (0.02-0.05)
+    pub max_threshold: f64, // Maximum threshold bound (0.02-0.05)
+    /// Enable automatic ARIMA order selection
+    pub model_selection: bool, // Enable automatic ARIMA order selection
+    /// Maximum AR order to test (3-5)
+    pub max_p: usize, // Maximum AR order to test (3-5)
+    /// Maximum MA order to test (3-5)
+    pub max_q: usize, // Maximum MA order to test (3-5)
+    /// Enable outlier handling
     pub outlier_detection: bool, // Enable outlier handling
-    pub outlier_threshold: f64,  // IQR multiplier for outliers (2.0-3.0)
+    /// IQR multiplier for outliers (2.0-3.0)
+    pub outlier_threshold: f64, // IQR multiplier for outliers (2.0-3.0)
 
     // NEW: Additional adaptive features for 1.2.0
+    /// Generate prediction intervals
     pub confidence_intervals: bool, // Generate prediction intervals
-    pub confidence_level: f64,      // Confidence level (0.95)
-    pub ensemble_models: usize,     // Number of models to ensemble (3-7)
-    pub trend_confirmation: bool,   // Require trend confirmation
-    pub momentum_filter: bool,      // Apply momentum-based filters
-    pub regime_detection: bool,     // Enable regime detection
-    pub adaptive_refit: bool,       // Enable adaptive refitting
-    pub refit_frequency: usize,     // Base refit frequency
+    /// Confidence level (0.95)
+    pub confidence_level: f64, // Confidence level (0.95)
+    /// Number of models to ensemble (3-7)
+    pub ensemble_models: usize, // Number of models to ensemble (3-7)
+    /// Require trend confirmation
+    pub trend_confirmation: bool, // Require trend confirmation
+    /// Apply momentum-based filters
+    pub momentum_filter: bool, // Apply momentum-based filters
+    /// Enable regime detection
+    pub regime_detection: bool, // Enable regime detection
+    /// Enable adaptive refitting
+    pub adaptive_refit: bool, // Enable adaptive refitting
+    /// Base refit frequency
+    pub refit_frequency: usize, // Base refit frequency
 
     // NEW: Async/Parallel processing configuration
+    /// Enable async/parallel forecasting
     pub enable_parallel_processing: bool, // Enable async/parallel forecasting
-    pub max_concurrent_forecasts: usize,  // Maximum concurrent forecast tasks
-    pub parallel_ensemble: bool,          // Enable parallel ensemble processing
-    pub forecast_timeout_secs: u64,       // Timeout for individual forecasts
+    /// Maximum concurrent forecast tasks
+    pub max_concurrent_forecasts: usize, // Maximum concurrent forecast tasks
+    /// Enable parallel ensemble processing
+    pub parallel_ensemble: bool, // Enable parallel ensemble processing
+    /// Timeout for individual forecasts
+    pub forecast_timeout_secs: u64, // Timeout for individual forecasts
 }
 
 impl Default for ArimaStrategyConfig {
@@ -190,25 +219,37 @@ pub struct ArimaStrategy {
 /// Market regime types for adaptive behavior
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MarketRegime {
+    /// Trending market with clear directional movement
     Trending,
+    /// Mean reverting market with price oscillations
     MeanReverting,
+    /// High volatility market with large price swings
     HighVolatility,
+    /// Low volatility market with small price movements
     LowVolatility,
 }
 
 /// Forecast result with confidence intervals
 #[derive(Debug, Clone)]
 pub struct ForecastResult {
+    /// Point forecast value
     pub point_forecast: f64,
+    /// Lower bound of confidence interval
     pub lower_bound: Option<f64>,
+    /// Upper bound of confidence interval
     pub upper_bound: Option<f64>,
+    /// Confidence level of the forecast
     pub confidence_level: f64,
+    /// Name of the model used for forecasting
     pub model_used: String,
 }
 
 impl ArimaStrategy {
+    /// Create a new ARIMA strategy with the given configuration
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for the ARIMA strategy
     pub fn new(config: ArimaStrategyConfig) -> Self {
-        // Initialize memory-optimized structures
         let accuracy_buffer_size = 100; // Track last 100 accuracy measurements
         let memory_pool_capacity = 1000; // Default capacity for frequent allocations
 
@@ -249,7 +290,7 @@ impl ArimaStrategy {
 
         // Extract price data
         let prices = self.extract_prices(df, price_column)?;
-        let timestamps = self.extract_timestamps(df, timestamp_column)?;
+        let _timestamps = self.extract_timestamps(df, timestamp_column)?;
 
         // Detect and handle outliers if enabled
         let cleaned_prices = if self.config.outlier_detection {
@@ -265,7 +306,7 @@ impl ArimaStrategy {
         }
 
         // Generate forecasts using rolling window approach with adaptive features
-        let signals = self.generate_adaptive_forecasts(&cleaned_prices, &timestamps)?;
+        let signals = self.generate_adaptive_forecasts(&cleaned_prices, &_timestamps)?;
 
         Ok(signals)
     }
@@ -445,7 +486,7 @@ impl ArimaStrategy {
         // Generate forecasts using rolling window with adaptive features
         for i in window_size..prices.len() {
             let window_data = &prices[i - window_size..i];
-            let current_price = prices[i];
+            let _current_price = prices[i];
 
             // Check if we need to refit (adaptive refitting)
             let should_refit = self.should_refit(i);
@@ -453,7 +494,7 @@ impl ArimaStrategy {
             match self.generate_enhanced_forecast(window_data, should_refit) {
                 Ok(forecast_result) => {
                     let signal = self.forecast_to_enhanced_signal(
-                        current_price,
+                        _current_price,
                         &forecast_result,
                         window_data,
                     );
@@ -461,7 +502,7 @@ impl ArimaStrategy {
 
                     // Track forecast accuracy for adaptive learning
                     if i > window_size {
-                        let actual_change = (current_price - prices[i - 1]) / prices[i - 1];
+                        let actual_change = (prices[i] - prices[i - 1]) / prices[i - 1];
                         let predicted_change =
                             (forecast_result.point_forecast - prices[i - 1]) / prices[i - 1];
                         let accuracy = 1.0 - (actual_change - predicted_change).abs();
@@ -470,7 +511,7 @@ impl ArimaStrategy {
 
                     debug!(
                         "Generated signal {:?} for price {} with forecast {}",
-                        signal, current_price, forecast_result.point_forecast
+                        signal, _current_price, forecast_result.point_forecast
                     );
                 }
                 Err(e) => {
@@ -571,7 +612,7 @@ impl ArimaStrategy {
         let mut forecasts = Vec::new();
         let mut weights = Vec::new();
 
-        for (i, &(p, d, q)) in model_configs
+        for (_i, &(p, d, q)) in model_configs
             .iter()
             .take(self.config.ensemble_models)
             .enumerate()
@@ -815,7 +856,7 @@ impl ArimaStrategy {
     /// NEW: Enhanced signal generation with multiple filters
     fn forecast_to_enhanced_signal(
         &self,
-        current_price: f64,
+        _current_price: f64,
         forecast_result: &ForecastResult,
         prices: &[f64],
     ) -> Signal {
@@ -823,7 +864,7 @@ impl ArimaStrategy {
         let threshold = self.calculate_dynamic_threshold(prices);
 
         // Basic price change signal
-        let price_change = (forecast_result.point_forecast - current_price) / current_price;
+        let price_change = (forecast_result.point_forecast - _current_price) / _current_price;
         let base_signal = if price_change > threshold {
             Signal::Buy
         } else if price_change < -threshold {
@@ -836,7 +877,7 @@ impl ArimaStrategy {
         let confidence_filter = if let (Some(lower), Some(upper)) =
             (forecast_result.lower_bound, forecast_result.upper_bound)
         {
-            let interval_width = (upper - lower) / current_price;
+            let interval_width = (upper - lower) / _current_price;
             interval_width < 0.05 // Only trade if confidence interval is narrow enough
         } else {
             true // No confidence intervals available
@@ -849,7 +890,7 @@ impl ArimaStrategy {
         // Apply additional filters
         self.apply_signal_filters(
             base_signal,
-            current_price,
+            _current_price,
             forecast_result.point_forecast,
             prices,
         )
@@ -859,8 +900,8 @@ impl ArimaStrategy {
     fn apply_signal_filters(
         &self,
         base_signal: Signal,
-        current_price: f64,
-        forecast: f64,
+        _current_price: f64,
+        _forecast: f64,
         prices: &[f64],
     ) -> Signal {
         // Trend confirmation filter
@@ -1079,7 +1120,7 @@ impl ArimaStrategy {
         timestamp_column: &str,
     ) -> Result<()> {
         let prices = self.extract_prices(df, price_column)?;
-        let timestamps = self.extract_timestamps(df, timestamp_column)?;
+        let _timestamps = self.extract_timestamps(df, timestamp_column)?;
 
         // Initialize cache if not present
         if self.cached_time_series.is_none() {
@@ -1091,7 +1132,7 @@ impl ArimaStrategy {
         self.cached_time_series = Some(CacheOptimizedTimeSeries::with_capacity(prices.len() * 2));
 
         // Add price data
-        for (i, (&price, timestamp_str)) in prices.iter().zip(timestamps.iter()).enumerate() {
+        for (i, (&price, timestamp_str)) in prices.iter().zip(_timestamps.iter()).enumerate() {
             let timestamp = Self::parse_timestamp_static(timestamp_str)?;
             // For simplicity, using same price for OHLC (in real implementation, you'd have separate OHLC data)
             if let Some(ref mut cached_ts) = self.cached_time_series {
@@ -1188,7 +1229,7 @@ impl ArimaStrategy {
 
         // Extract data for parallel processing
         let prices = self.extract_prices(df, price_column)?;
-        let timestamps = self.extract_timestamps(df, timestamp_column)?;
+        let _timestamps = self.extract_timestamps(df, timestamp_column)?;
 
         if prices.is_empty() || prices.len() < self.config.min_data_points {
             return Ok(vec![Signal::Hold; prices.len()]);
@@ -1199,11 +1240,11 @@ impl ArimaStrategy {
         for &price in &prices {
             time_series.add_price(price as f32);
         }
-        let time_series = Arc::new(time_series);
+        let _time_series = Arc::new(time_series);
 
         // Generate parallel forecast tasks
         let tasks =
-            self.create_parallel_forecast_tasks(&prices, &timestamps, time_series.clone())?;
+            self.create_parallel_forecast_tasks(&prices, &_timestamps, _time_series.clone())?;
 
         // Process forecasts concurrently
         let forecast_results = processor.process_forecasts_concurrent(tasks).await;
@@ -1231,8 +1272,8 @@ impl ArimaStrategy {
     fn create_parallel_forecast_tasks(
         &self,
         prices: &[f64],
-        timestamps: &[String],
-        time_series: Arc<CacheOptimizedTimeSeries>,
+        _timestamps: &[String],
+        _time_series: Arc<CacheOptimizedTimeSeries>,
     ) -> Result<Vec<ForecastTask>> {
         let mut tasks = Vec::new();
         let window_size = self.config.min_data_points;
@@ -1331,7 +1372,7 @@ impl ArimaStrategy {
 
             // Extract data
             let prices = self.extract_prices(df, price_column)?;
-            let timestamps = self.extract_timestamps(df, timestamp_column)?;
+            let _timestamps = self.extract_timestamps(df, timestamp_column)?;
 
             if prices.is_empty() || prices.len() < self.config.min_data_points {
                 return Ok(vec![Signal::Hold; prices.len()]);
@@ -1342,11 +1383,11 @@ impl ArimaStrategy {
             for &price in &prices {
                 time_series.add_price(price as f32);
             }
-            let time_series = Arc::new(time_series);
+            let _time_series = Arc::new(time_series);
 
             // Process ensemble forecasts in parallel
             let ensemble_results = processor
-                .process_ensemble_parallel(time_series, ensemble_size, "ENSEMBLE".to_string())
+                .process_ensemble_parallel(_time_series, ensemble_size, "ENSEMBLE".to_string())
                 .await;
 
             // Convert ensemble results to signals

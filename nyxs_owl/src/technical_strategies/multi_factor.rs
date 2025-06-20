@@ -5,7 +5,8 @@
 
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{
-    PerformanceMetrics, Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy,
+    ConfigExtractor, PerformanceMetrics, Strategy, StrategyConfig, TechnicalSignal,
+    TechnicalStrategy,
 };
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use std::collections::HashMap;
@@ -44,7 +45,7 @@ impl Strategy for MultiFactorStrategy {
     }
 
     fn min_data_points(&self) -> usize {
-        self.config.get_int("min_data_points").ok().unwrap_or(20) as usize
+        self.config.get_int("min_data_points").unwrap_or(20) as usize
     }
 }
 
@@ -80,7 +81,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
 
     fn validate_parameters(&self) -> NyxsOwlResult<()> {
         // Validate signal strength parameter
-        if let Some(min_strength) = self.config.get_float("min_signal_strength").ok() {
+        if let Some(min_strength) = self.config.get_float_safe("min_signal_strength") {
             if !(0.0..=1.0).contains(&min_strength) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_signal_strength must be between 0.0 and 1.0".to_string(),
@@ -89,7 +90,7 @@ impl TechnicalStrategy for MultiFactorStrategy {
         }
 
         // Validate confidence parameter
-        if let Some(min_confidence) = self.config.get_float("min_confidence").ok() {
+        if let Some(min_confidence) = self.config.get_float_safe("min_confidence") {
             if !(0.0..=1.0).contains(&min_confidence) {
                 return Err(NyxsOwlError::InvalidParameter(
                     "min_confidence must be between 0.0 and 1.0".to_string(),
@@ -98,10 +99,9 @@ impl TechnicalStrategy for MultiFactorStrategy {
         }
 
         // Validate MA periods if set
-        if let (Some(short_ma), Some(long_ma)) = (
-            self.config.get_int("short_ma_period").ok(),
-            self.config.get_int("long_ma_period").ok(),
-        ) {
+        let short_ma = self.config.get_int_safe("short_ma_period");
+        let long_ma = self.config.get_int_safe("long_ma_period");
+        if let (Some(short_ma), Some(long_ma)) = (short_ma, long_ma) {
             if short_ma >= long_ma {
                 return Err(NyxsOwlError::InvalidParameter(
                     "short_ma_period must be less than long_ma_period".to_string(),
@@ -185,13 +185,12 @@ mod tests {
 
     #[test]
     fn test_parameter_validation_invalid_signal_strength() {
-        let config = StrategyConfig::new()
-            .with_parameter("min_signal_strength", -0.1); // Invalid: negative
+        let config = StrategyConfig::new().with_parameter("min_signal_strength", -0.1); // Invalid: negative
 
         let strategy = MultiFactorStrategy::new(config);
         let result = strategy.validate_parameters();
         assert!(result.is_err());
-        
+
         if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
             assert!(msg.contains("min_signal_strength must be between 0.0 and 1.0"));
         } else {
@@ -201,13 +200,12 @@ mod tests {
 
     #[test]
     fn test_parameter_validation_invalid_confidence() {
-        let config = StrategyConfig::new()
-            .with_parameter("min_confidence", 1.5); // Invalid: > 1.0
+        let config = StrategyConfig::new().with_parameter("min_confidence", 1.5); // Invalid: > 1.0
 
         let strategy = MultiFactorStrategy::new(config);
         let result = strategy.validate_parameters();
         assert!(result.is_err());
-        
+
         if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
             assert!(msg.contains("min_confidence must be between 0.0 and 1.0"));
         } else {
@@ -224,7 +222,7 @@ mod tests {
         let strategy = MultiFactorStrategy::new(config);
         let result = strategy.validate_parameters();
         assert!(result.is_err());
-        
+
         if let Err(NyxsOwlError::InvalidParameter(msg)) = result {
             assert!(msg.contains("short_ma_period must be less than long_ma_period"));
         } else {
@@ -255,8 +253,7 @@ mod tests {
 
     #[test]
     fn test_min_data_points_with_config() {
-        let config = StrategyConfig::new()
-            .with_parameter("min_data_points", 50);
+        let config = StrategyConfig::new().with_parameter("min_data_points", 50);
 
         let strategy = MultiFactorStrategy::new(config);
         assert_eq!(strategy.min_data_points(), 50);
@@ -317,7 +314,10 @@ mod tests {
         let strategy = MultiFactorStrategy::new(config);
 
         assert_eq!(strategy.name(), "Multi-Factor Strategy");
-        assert_eq!(strategy.description(), "Strategy combining multiple technical indicators");
+        assert_eq!(
+            strategy.description(),
+            "Strategy combining multiple technical indicators"
+        );
         assert_eq!(strategy.required_columns(), vec!["close", "volume"]);
         let _ = strategy.config(); // Just ensure this method is callable
     }

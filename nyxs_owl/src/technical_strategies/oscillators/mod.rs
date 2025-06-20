@@ -5,4 +5,5 @@ pub mod rsi_strategy;
 pub mod williams_r_strategy;
 
 // Re-export key strategy types
+/// Williams %R configuration and strategy
 pub use williams_r_strategy::{WilliamsRConfig, WilliamsRStrategy};

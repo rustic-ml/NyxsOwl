@@ -75,7 +75,7 @@ pub fn psar_signals(
 
     let mut signals = vec![Signal::Hold; data_len];
 
-    for i in 1..data_len {
+    for (i, signal) in signals.iter_mut().enumerate().take(data_len).skip(1) {
         let current_psar_opt = psar_ca.get(i);
         let prev_psar_opt = psar_ca.get(i - 1);
         let current_close_opt = close_ca.get(i);
@@ -93,9 +93,9 @@ pub fn psar_signals(
             let current_price_below_psar = cur_close < cur_psar;
 
             if prev_price_below_psar && current_price_above_psar {
-                signals[i] = Signal::Buy;
+                *signal = Signal::Buy;
             } else if prev_price_above_psar && current_price_below_psar {
-                signals[i] = Signal::Sell;
+                *signal = Signal::Sell;
             }
         }
     }
@@ -105,81 +105,90 @@ pub fn psar_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polars::error::PolarsResult;
-    use polars::prelude::{df, PolarsError};
+    use polars::prelude::*;
 
-    fn create_psar_test_df(len: usize) -> PolarsResult<DataFrame> {
-        let mut highs: Vec<f64> = Vec::with_capacity(len);
-        let mut lows: Vec<f64> = Vec::with_capacity(len);
-        let mut closes: Vec<f64> = Vec::with_capacity(len);
-        for i in 0..len {
-            let base = 50.0 + (i as f64 * 0.1).sin() * 5.0 + (i as f64 * 0.05);
-            highs.push(base + 1.0 + (i % 2) as f64 * 0.5);
-            lows.push(base - 1.0 - (i % 2) as f64 * 0.5);
-            closes.push(base + ((i % 3) as f64 - 1.0) * 0.2);
-        }
-        // Ensure the DataFrame has columns named "high" and "low" for calculate_psar(df, step, max_step)
+    fn create_psar_test_df(len: usize) -> std::result::Result<DataFrame, NyxsOwlError> {
+        let highs: Vec<f64> = (0..len)
+            .map(|i| 50.0 + (i % 10) as f64 + (i as f64 * 0.1).sin() * 5.0)
+            .collect();
+        let lows: Vec<f64> = (0..len)
+            .map(|i| 40.0 - (i % 5) as f64 + (i as f64 * 0.1).cos() * 5.0)
+            .collect();
+        let closes: Vec<f64> = (0..len)
+            .map(|i| 45.0 + (i % 7) as f64 + (i as f64 * 0.1).sin() * 3.0)
+            .collect();
         df! {
             "high" => highs,
             "low" => lows,
             "close" => closes
         }
+        .map_err(NyxsOwlError::PolarsError)
     }
 
     #[test]
-    fn test_psar_invalid_params() {
-        let df = create_psar_test_df(50).unwrap();
-        assert!(psar_signals(&df, "high", "low", "close", 0.0, 0.2).is_err());
-        assert!(psar_signals(&df, "high", "low", "close", 0.02, 0.0).is_err());
-        assert!(psar_signals(&df, "high", "low", "close", 0.2, 0.02).is_err());
+    fn test_psar_strategy_invalid_period() -> std::result::Result<(), NyxsOwlError> {
+        let _df = create_psar_test_df(50)?;
+        assert!(matches!(
+            psar_signals(&_df, "high", "low", "close", 0.0, 0.2),
+            Err(NyxsOwlError::InvalidParameter(_))
+        ));
+        Ok(())
     }
 
     #[test]
-    fn test_psar_insufficient_data() {
-        let min_len = 5;
-        let df_too_short = create_psar_test_df(min_len).unwrap();
-        assert!(psar_signals(&df_too_short, "high", "low", "close", 0.02, 0.2).is_err());
-
-        let df_ok = create_psar_test_df(min_len + 1).unwrap();
-        assert!(psar_signals(&df_ok, "high", "low", "close", 0.02, 0.2).is_ok());
+    fn test_psar_strategy_insufficient_data() -> std::result::Result<(), NyxsOwlError> {
+        let df_too_short = create_psar_test_df(5)?;
+        assert!(matches!(
+            psar_signals(&df_too_short, "high", "low", "close", 0.02, 0.2),
+            Err(NyxsOwlError::MissingData(_))
+        ));
+        Ok(())
     }
 
     #[test]
-    fn test_psar_missing_columns() {
-        let df_no_high = df! { "lows" => vec![50.0; 20], "close" => vec![50.0; 20] }.unwrap(); // Intentionally misspelled "lows"
-        assert!(psar_signals(&df_no_high, "high", "low", "close", 0.02, 0.2).is_err());
-
-        let df_no_low = df! { "high" => vec![50.0; 20], "close" => vec![50.0; 20] }.unwrap();
-        assert!(psar_signals(&df_no_low, "high", "low", "close", 0.02, 0.2).is_err());
-
-        let df_no_close = df! { "high" => vec![50.0; 20], "low" => vec![50.0; 20] }.unwrap();
-        assert!(psar_signals(&df_no_close, "high", "low", "close", 0.02, 0.2).is_err());
+    fn test_psar_strategy_columns_not_found() -> std::result::Result<(), NyxsOwlError> {
+        let _df = create_psar_test_df(50)?;
+        let df_no_high = df! { "lows" => vec![50.0; 20], "close" => vec![50.0; 20] }
+            .map_err(NyxsOwlError::PolarsError)?;
+        let df_no_low = df! { "high" => vec![50.0; 20], "close" => vec![50.0; 20] }
+            .map_err(NyxsOwlError::PolarsError)?;
+        let df_no_close = df! { "high" => vec![50.0; 20], "low" => vec![50.0; 20] }
+            .map_err(NyxsOwlError::PolarsError)?;
+        assert!(matches!(
+            psar_signals(&df_no_high, "high", "low", "close", 0.02, 0.2),
+            Err(NyxsOwlError::DataError(_))
+        ));
+        assert!(matches!(
+            psar_signals(&df_no_low, "high", "low", "close", 0.02, 0.2),
+            Err(NyxsOwlError::DataError(_))
+        ));
+        assert!(matches!(
+            psar_signals(&df_no_close, "high", "low", "close", 0.02, 0.2),
+            Err(NyxsOwlError::DataError(_))
+        ));
+        Ok(())
     }
 
     #[test]
-    fn test_psar_signals_conceptual() {
-        let df = create_psar_test_df(100).unwrap();
-        let step = 0.02;
-        let max_step = 0.2;
-
-        match psar_signals(&df, "high", "low", "close", step, max_step) {
+    fn test_psar_strategy_signals_conceptual() -> std::result::Result<(), NyxsOwlError> {
+        let df = create_psar_test_df(100)?;
+        let acceleration = 0.02;
+        let maximum = 0.2;
+        match psar_signals(&df, "high", "low", "close", acceleration, maximum) {
             Ok(signals) => {
                 assert_eq!(signals.len(), df.height());
                 let has_buy_signal = signals.iter().any(|&s| s == Signal::Buy);
                 let has_sell_signal = signals.iter().any(|&s| s == Signal::Sell);
-
-                if df.height() > 20 {
-                    // Allow all Hold signals if the test data doesn't generate PSAR flips
-                    if !(has_buy_signal || has_sell_signal) {
-                        println!("PSAR test: No signals generated. This may be due to test data not triggering PSAR flips.");
-                        println!("Step: {}, Max Step: {}", step, max_step);
-                        println!("This is acceptable for synthetic test data.");
-                    }
+                if !(has_buy_signal || has_sell_signal) {
+                    println!("PSAR test: No signals generated. This may be due to test data not triggering PSAR flips.");
+                    println!("Acceleration: {}, Maximum: {}", acceleration, maximum);
+                    println!("This is acceptable for synthetic test data.");
                 }
             }
             Err(e) => {
-                panic!("PSAR signal generation failed: {:?}", e);
+                panic!("PSAR strategy signal generation failed: {:?}", e);
             }
         }
+        Ok(())
     }
 }
