@@ -9,11 +9,15 @@ This guide provides comprehensive implementation details for NyxsOwl's technical
 1. [Architecture Overview](#architecture-overview)
 2. [Moving Average Strategies](#moving-average-strategies)
 3. [Momentum Indicator Strategies](#momentum-indicator-strategies)
-4. [Volatility Indicator Strategies](#volatility-indicator-strategies)
-5. [Multi-Indicator Systems](#multi-indicator-systems)
-6. [Signal Generation Framework](#signal-generation-framework)
-7. [Strategy Optimization](#strategy-optimization)
-8. [Best Practices](#best-practices)
+4. [Advanced Oscillator Strategies](#advanced-oscillator-strategies)
+5. [Volume-Based Indicator Strategies](#volume-based-indicator-strategies)
+6. [Advanced Trend Indicator Strategies](#advanced-trend-indicator-strategies)
+7. [Pattern Recognition Strategies](#pattern-recognition-strategies)
+8. [Volatility Indicator Strategies](#volatility-indicator-strategies)
+9. [Multi-Indicator Systems](#multi-indicator-systems)
+10. [Signal Generation Framework](#signal-generation-framework)
+11. [Strategy Optimization](#strategy-optimization)
+12. [Best Practices](#best-practices)
 
 ## Architecture Overview
 
@@ -417,6 +421,661 @@ impl EnhancedRSIStrategy {
 }
 ```
 
+## Advanced Oscillator Strategies
+
+### Commodity Channel Index (CCI) Strategy
+
+```rust
+use nyxs_owl::trade_math::oscillators::CommodityChannelIndex;
+
+#[derive(Debug, Clone)]
+pub struct CCIStrategyConfig {
+    pub period: usize,
+    pub overbought_threshold: f64,
+    pub oversold_threshold: f64,
+    pub signal_threshold: f64,
+}
+
+impl Default for CCIStrategyConfig {
+    fn default() -> Self {
+        Self {
+            period: 20,
+            overbought_threshold: 100.0,
+            oversold_threshold: -100.0,
+            signal_threshold: 50.0,
+        }
+    }
+}
+
+pub struct CCIStrategy {
+    config: CCIStrategyConfig,
+    cci: CommodityChannelIndex,
+}
+
+impl TechnicalStrategy for CCIStrategy {
+    type Config = CCIStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            cci: CommodityChannelIndex::new(config.period)?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let prices = df.column("close")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for (price, timestamp) in prices.zip(timestamps) {
+            self.cci.update(price)?;
+            
+            if let Some(cci_value) = self.cci.value() {
+                if let Some(signal) = self.evaluate_cci_signals(price, cci_value, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, price: f64, _volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        self.cci.update(price)?;
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "CCI_Strategy"
+    }
+}
+
+impl CCIStrategy {
+    fn evaluate_cci_signals(
+        &self,
+        price: f64,
+        cci: f64,
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let mut metadata = HashMap::new();
+        metadata.insert("cci".to_string(), cci);
+        
+        let (signal_type, strength) = if cci > self.config.overbought_threshold {
+            (SignalType::Sell, (cci - self.config.overbought_threshold) / self.config.signal_threshold)
+        } else if cci < self.config.oversold_threshold {
+            (SignalType::Buy, (self.config.oversold_threshold - cci) / self.config.signal_threshold)
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(Signal {
+            timestamp: datetime,
+            signal_type,
+            strength: strength.min(1.0),
+            price,
+            metadata,
+        }))
+    }
+}
+```
+
+### Money Flow Index (MFI) Strategy
+
+```rust
+use nyxs_owl::trade_math::oscillators::MoneyFlowIndex;
+
+#[derive(Debug, Clone)]
+pub struct MFIStrategyConfig {
+    pub period: usize,
+    pub overbought_threshold: f64,
+    pub oversold_threshold: f64,
+    pub volume_confirmation: bool,
+}
+
+impl Default for MFIStrategyConfig {
+    fn default() -> Self {
+        Self {
+            period: 14,
+            overbought_threshold: 80.0,
+            oversold_threshold: 20.0,
+            volume_confirmation: true,
+        }
+    }
+}
+
+pub struct MFIStrategy {
+    config: MFIStrategyConfig,
+    mfi: MoneyFlowIndex,
+}
+
+impl TechnicalStrategy for MFIStrategy {
+    type Config = MFIStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            mfi: MoneyFlowIndex::new(config.period)?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let highs = df.column("high")?.f64()?.into_no_null_iter();
+        let lows = df.column("low")?.f64()?.into_no_null_iter();
+        let closes = df.column("close")?.f64()?.into_no_null_iter();
+        let volumes = df.column("volume")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for ((((high, low), close), volume), timestamp) in highs.zip(lows).zip(closes).zip(volumes).zip(timestamps) {
+            self.mfi.update(high, low, close, volume)?;
+            
+            if let Some(mfi_value) = self.mfi.value() {
+                if let Some(signal) = self.evaluate_mfi_signals(close, mfi_value, volume, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, price: f64, volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        // MFI requires OHLCV data, so we need to store previous values
+        // This is a simplified version - in practice, you'd need to maintain OHLCV history
+        if let Some(vol) = volume {
+            // Use price as approximation for OHLC in streaming mode
+            self.mfi.update(price, price, price, vol)?;
+        }
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "MFI_Strategy"
+    }
+}
+
+impl MFIStrategy {
+    fn evaluate_mfi_signals(
+        &self,
+        price: f64,
+        mfi: f64,
+        volume: f64,
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let mut metadata = HashMap::new();
+        metadata.insert("mfi".to_string(), mfi);
+        metadata.insert("volume".to_string(), volume);
+        
+        let (signal_type, strength) = if mfi > self.config.overbought_threshold {
+            (SignalType::Sell, (mfi - self.config.overbought_threshold) / (100.0 - self.config.overbought_threshold))
+        } else if mfi < self.config.oversold_threshold {
+            (SignalType::Buy, (self.config.oversold_threshold - mfi) / self.config.oversold_threshold)
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(Signal {
+            timestamp: datetime,
+            signal_type,
+            strength: strength.min(1.0),
+            price,
+            metadata,
+        }))
+    }
+}
+```
+
+## Volume-Based Indicator Strategies
+
+### Volume Rate of Change (VROC) Strategy
+
+```rust
+use nyxs_owl::trade_math::volume::VolumeRateOfChange;
+
+#[derive(Debug, Clone)]
+pub struct VROCStrategyConfig {
+    pub period: usize,
+    pub signal_threshold: f64,
+    pub volume_spike_threshold: f64,
+}
+
+impl Default for VROCStrategyConfig {
+    fn default() -> Self {
+        Self {
+            period: 25,
+            signal_threshold: 0.5, // 50% volume increase
+            volume_spike_threshold: 2.0, // 200% volume spike
+        }
+    }
+}
+
+pub struct VROCStrategy {
+    config: VROCStrategyConfig,
+    vroc: VolumeRateOfChange,
+}
+
+impl TechnicalStrategy for VROCStrategy {
+    type Config = VROCStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            vroc: VolumeRateOfChange::new(config.period)?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let volumes = df.column("volume")?.f64()?.into_no_null_iter();
+        let prices = df.column("close")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for ((volume, price), timestamp) in volumes.zip(prices).zip(timestamps) {
+            self.vroc.update(volume)?;
+            
+            if let Some(vroc_value) = self.vroc.value() {
+                if let Some(signal) = self.evaluate_vroc_signals(price, vroc_value, volume, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, _price: f64, volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        if let Some(vol) = volume {
+            self.vroc.update(vol)?;
+        }
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "VROC_Strategy"
+    }
+}
+
+impl VROCStrategy {
+    fn evaluate_vroc_signals(
+        &self,
+        price: f64,
+        vroc: f64,
+        volume: f64,
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let mut metadata = HashMap::new();
+        metadata.insert("vroc".to_string(), vroc);
+        metadata.insert("volume".to_string(), volume);
+        
+        let (signal_type, strength) = if vroc > self.config.volume_spike_threshold {
+            (SignalType::StrongBuy, (vroc - self.config.signal_threshold) / self.config.volume_spike_threshold)
+        } else if vroc > self.config.signal_threshold {
+            (SignalType::Buy, (vroc - self.config.signal_threshold) / self.config.signal_threshold)
+        } else if vroc < -self.config.volume_spike_threshold {
+            (SignalType::StrongSell, (vroc.abs() - self.config.signal_threshold) / self.config.volume_spike_threshold)
+        } else if vroc < -self.config.signal_threshold {
+            (SignalType::Sell, (vroc.abs() - self.config.signal_threshold) / self.config.signal_threshold)
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(Signal {
+            timestamp: datetime,
+            signal_type,
+            strength: strength.min(1.0),
+            price,
+            metadata,
+        }))
+    }
+}
+```
+
+## Advanced Trend Indicator Strategies
+
+### SuperTrend Strategy
+
+```rust
+use nyxs_owl::trade_math::volatility::SuperTrend;
+
+#[derive(Debug, Clone)]
+pub struct SuperTrendStrategyConfig {
+    pub period: usize,
+    pub multiplier: f64,
+    pub signal_threshold: f64,
+}
+
+impl Default for SuperTrendStrategyConfig {
+    fn default() -> Self {
+        Self {
+            period: 10,
+            multiplier: 3.0,
+            signal_threshold: 0.01, // 1% threshold
+        }
+    }
+}
+
+pub struct SuperTrendStrategy {
+    config: SuperTrendStrategyConfig,
+    supertrend: SuperTrend,
+}
+
+impl TechnicalStrategy for SuperTrendStrategy {
+    type Config = SuperTrendStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            supertrend: SuperTrend::new(config.period, config.multiplier)?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let highs = df.column("high")?.f64()?.into_no_null_iter();
+        let lows = df.column("low")?.f64()?.into_no_null_iter();
+        let closes = df.column("close")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for (((high, low), close), timestamp) in highs.zip(lows).zip(closes).zip(timestamps) {
+            self.supertrend.update(high, low, close)?;
+            
+            if let Some(supertrend_data) = self.supertrend.value() {
+                if let Some(signal) = self.evaluate_supertrend_signals(close, supertrend_data, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, price: f64, _volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        // SuperTrend requires OHLC data, use price as approximation in streaming mode
+        self.supertrend.update(price, price, price)?;
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "SuperTrend_Strategy"
+    }
+}
+
+impl SuperTrendStrategy {
+    fn evaluate_supertrend_signals(
+        &self,
+        price: f64,
+        supertrend_data: (f64, bool), // (value, trend)
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let (supertrend_value, is_uptrend) = supertrend_data;
+        let mut metadata = HashMap::new();
+        metadata.insert("supertrend_value".to_string(), supertrend_value);
+        metadata.insert("is_uptrend".to_string(), if is_uptrend { 1.0 } else { 0.0 });
+        
+        let price_diff = (price - supertrend_value).abs() / price;
+        
+        if price_diff > self.config.signal_threshold {
+            let (signal_type, strength) = if is_uptrend && price > supertrend_value {
+                (SignalType::Buy, price_diff / self.config.signal_threshold)
+            } else if !is_uptrend && price < supertrend_value {
+                (SignalType::Sell, price_diff / self.config.signal_threshold)
+            } else {
+                return Ok(None);
+            };
+            
+            Ok(Some(Signal {
+                timestamp: datetime,
+                signal_type,
+                strength: strength.min(1.0),
+                price,
+                metadata,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+}
+```
+
+## Pattern Recognition Strategies
+
+### Fibonacci Retracement Strategy
+
+```rust
+use nyxs_owl::trade_math::patterns::FibonacciRetracement;
+
+#[derive(Debug, Clone)]
+pub struct FibonacciStrategyConfig {
+    pub swing_period: usize,
+    pub retracement_levels: Vec<f64>,
+    pub extension_levels: Vec<f64>,
+    pub signal_threshold: f64,
+}
+
+impl Default for FibonacciStrategyConfig {
+    fn default() -> Self {
+        Self {
+            swing_period: 20,
+            retracement_levels: vec![0.236, 0.382, 0.5, 0.618, 0.786],
+            extension_levels: vec![1.272, 1.618, 2.0, 2.618],
+            signal_threshold: 0.02, // 2% threshold
+        }
+    }
+}
+
+pub struct FibonacciStrategy {
+    config: FibonacciStrategyConfig,
+    fib: FibonacciRetracement,
+}
+
+impl TechnicalStrategy for FibonacciStrategy {
+    type Config = FibonacciStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            fib: FibonacciRetracement::new()?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let highs = df.column("high")?.f64()?.into_no_null_iter();
+        let lows = df.column("low")?.f64()?.into_no_null_iter();
+        let closes = df.column("close")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for (((high, low), close), timestamp) in highs.zip(lows).zip(closes).zip(timestamps) {
+            self.fib.update(high, low, close)?;
+            
+            if let Some(fib_levels) = self.fib.value() {
+                if let Some(signal) = self.evaluate_fibonacci_signals(close, fib_levels, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, price: f64, _volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        // Fibonacci requires OHLC data, use price as approximation in streaming mode
+        self.fib.update(price, price, price)?;
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "Fibonacci_Strategy"
+    }
+}
+
+impl FibonacciStrategy {
+    fn evaluate_fibonacci_signals(
+        &self,
+        price: f64,
+        fib_levels: (f64, f64, Vec<f64>), // (swing_high, swing_low, retracements)
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let (swing_high, swing_low, retracements) = fib_levels;
+        let mut metadata = HashMap::new();
+        metadata.insert("swing_high".to_string(), swing_high);
+        metadata.insert("swing_low".to_string(), swing_low);
+        
+        let range = swing_high - swing_low;
+        if range == 0.0 {
+            return Ok(None);
+        }
+        
+        // Check if price is near any retracement level
+        for (i, &level) in retracements.iter().enumerate() {
+            let level_price = swing_high - (range * level);
+            let price_diff = (price - level_price).abs() / price;
+            
+            if price_diff < self.config.signal_threshold {
+                let (signal_type, strength) = if price < level_price {
+                    // Price below retracement level - potential support
+                    (SignalType::Buy, 1.0 - price_diff / self.config.signal_threshold)
+                } else {
+                    // Price above retracement level - potential resistance
+                    (SignalType::Sell, 1.0 - price_diff / self.config.signal_threshold)
+                };
+                
+                metadata.insert(format!("retracement_level_{}", i), level);
+                metadata.insert("price_diff".to_string(), price_diff);
+                
+                return Ok(Some(Signal {
+                    timestamp: datetime,
+                    signal_type,
+                    strength: strength.min(1.0),
+                    price,
+                    metadata,
+                }));
+            }
+        }
+        
+        Ok(None)
+    }
+}
+```
+
+## Volatility Indicator Strategies
+
+### Bollinger Bands Strategy
+
+```rust
+use nyxs_owl::trade_math::volatility::BollingerBands;
+
+#[derive(Debug, Clone)]
+pub struct BollingerBandsStrategyConfig {
+    pub period: usize,
+    pub std_dev: f64,
+    pub signal_threshold: f64,
+}
+
+impl Default for BollingerBandsStrategyConfig {
+    fn default() -> Self {
+        Self {
+            period: 20,
+            std_dev: 2.0,
+            signal_threshold: 0.01, // 1% threshold
+        }
+    }
+}
+
+pub struct BollingerBandsStrategy {
+    config: BollingerBandsStrategyConfig,
+    bollinger_bands: BollingerBands,
+}
+
+impl TechnicalStrategy for BollingerBandsStrategy {
+    type Config = BollingerBandsStrategyConfig;
+    
+    fn new(config: Self::Config) -> Result<Self, NyxsOwlError> {
+        Ok(Self {
+            bollinger_bands: BollingerBands::new(config.period, config.std_dev)?,
+            config,
+        })
+    }
+    
+    fn generate_signals(&mut self, df: &DataFrame) -> Result<Vec<Signal>, NyxsOwlError> {
+        let mut signals = Vec::new();
+        
+        let prices = df.column("close")?.f64()?.into_no_null_iter();
+        let timestamps = df.column("timestamp")?.datetime()?.into_no_null_iter();
+        
+        for (price, timestamp) in prices.zip(timestamps) {
+            self.bollinger_bands.update(price)?;
+            
+            if let Some(bollinger_data) = self.bollinger_bands.value() {
+                if let Some(signal) = self.evaluate_bollinger_signals(price, bollinger_data, timestamp)? {
+                    signals.push(signal);
+                }
+            }
+        }
+        
+        Ok(signals)
+    }
+    
+    fn update_indicators(&mut self, price: f64, _volume: Option<f64>) -> Result<(), NyxsOwlError> {
+        self.bollinger_bands.update(price)?;
+        Ok(())
+    }
+    
+    fn get_strategy_name(&self) -> &'static str {
+        "BollingerBands_Strategy"
+    }
+}
+
+impl BollingerBandsStrategy {
+    fn evaluate_bollinger_signals(
+        &self,
+        price: f64,
+        bollinger_data: (f64, f64, f64, f64), // (middle, upper, lower, width)
+        timestamp_ns: i64,
+    ) -> Result<Option<Signal>, NyxsOwlError> {
+        let datetime = DateTime::from_timestamp_nanos(timestamp_ns);
+        let (middle, upper, lower, width) = bollinger_data;
+        let mut metadata = HashMap::new();
+        metadata.insert("middle".to_string(), middle);
+        metadata.insert("upper".to_string(), upper);
+        metadata.insert("lower".to_string(), lower);
+        metadata.insert("width".to_string(), width);
+        
+        let price_diff = (price - middle).abs() / price;
+        
+        if price_diff > self.config.signal_threshold {
+            let (signal_type, strength) = if price > upper {
+                (SignalType::Sell, (price - upper) / (upper - lower))
+            } else if price < lower {
+                (SignalType::Buy, (lower - price) / (upper - lower))
+            } else {
+                return Ok(None);
+            };
+            
+            Ok(Some(Signal {
+                timestamp: datetime,
+                signal_type,
+                strength: strength.min(1.0),
+                price,
+                metadata,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+}
+```
+
 ## Multi-Indicator Systems
 
 ### Multi-Factor Strategy
@@ -619,7 +1278,6 @@ trait Indicator {
     fn update(&mut self, price: f64) -> Result<(), NyxsOwlError>;
     fn value(&self) -> Option<f64>;
 }
-```
 
 ## Signal Generation Framework
 

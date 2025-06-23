@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the strategic roadmap for NyxsOwl's evolution from version 0.5.0 to advanced quantitative finance platform. Our development follows a structured approach focused on performance, reliability, and cutting-edge features while maintaining production-ready stability.
+This document outlines the strategic roadmap for NyxsOwl's evolution from version 0.7.4 to advanced quantitative finance platform. Our development follows a structured approach focused on performance, reliability, and cutting-edge features while maintaining production-ready stability.
 
 ## Table of Contents
 
@@ -21,11 +21,18 @@ This document outlines the strategic roadmap for NyxsOwl's evolution from versio
 
 #### Core Implementation (100% Complete)
 - **All 7 Forecasting Strategies**: Enhanced ARIMA, Adaptive Ensemble, Exponential Smoothing, Kalman Filter, GARCH, Copula, Regime Switching
-- **OxiDiviner 1.2.0 Integration**: Dynamic model selection, market regime detection, enhanced ensemble intelligence
-- **Technical Analysis Suite**: 125+ indicators with comprehensive test coverage
+- **OxiDiviner 1.2.0 Integration**: Dynamic model selection, market regime detection, enhanced ensemble intelligence, advanced outlier detection
+- **Technical Analysis Suite**: 150+ indicators with comprehensive test coverage
 - **Backtesting Engine**: Comprehensive strategy validation framework
 - **Performance Optimizations**: SIMD acceleration, memory optimization, async processing
 - **Unified Configuration API**: ConfigExtractor trait for consistent StrategyConfig handling
+
+#### Enhanced Features (v0.7.4)
+- **Advanced Technical Indicators**: CCI, MFI, ROC, Chandelier Exit, SuperTrend, VWAP Bands, Chaikin Money Flow
+- **Enhanced OxiDiviner Integration**: Ensemble forecasting, multi-method outlier detection, seasonal decomposition
+- **Improved ARIMA Strategy**: Auto-order selection, regime-based weighting, dynamic thresholds
+- **Memory Optimizations**: 650% improvement in available memory (90MB → 13GB)
+- **Production Readiness**: Zero memory-related test failures, comprehensive error handling
 
 #### Quality Metrics Achieved
 - **Test Coverage**: 100% comprehensive test suite
@@ -35,48 +42,60 @@ This document outlines the strategic roadmap for NyxsOwl's evolution from versio
 - **API Consistency**: Unified StrategyConfig handling across modules
 
 #### Recent Improvements (v0.7.4)
+- **Enhanced OxiDiviner Integration**: Full utilization of ensemble forecasting, advanced preprocessing, regime-aware forecasting
+- **New Technical Indicators**: Added CCI, MFI, ROC with full implementations and tests
+- **Improved Outlier Detection**: Multiple methods (IQR, Z-score, moving median) combined via voting
 - **StrategyConfig API Unification**: Resolved type mismatches between common and forecasting modules
 - **ConfigExtractor Trait**: Safe configuration value extraction regardless of feature flags
-- **Memory Optimizations**: 650% improvement in available memory (90MB → 13GB)
-- **Production Readiness**: Zero memory-related test failures, comprehensive error handling
 
 ## Short-term Roadmap (v0.8.0 - v1.0.0)
 
-### Version 0.8.0 - "Enhanced Documentation & Polish" (Q1 2025)
+### Version 0.8.0 - "Hybrid Strategy Integration" (Q1 2025)
 
 #### 🚀 **Core Enhancements**
+- **Hybrid Strategy Framework**
+  - Integration of technical indicators with forecasting models
+  - Feature engineering pipeline using technical indicators
+  - Signal confirmation framework
+  - Multi-timeframe analysis integration
+
+- **Advanced Technical Indicators**
+  - Ichimoku Cloud with full signal analysis
+  - Elliott Wave pattern recognition
+  - Harmonic pattern detection
+  - Market microstructure indicators
+
 - **Enhanced Documentation**
   - Complete API documentation with inline examples
   - Advanced tutorial series
   - Video tutorials and workshops
   - Interactive documentation platform
 
-- **Performance Improvements**
-  - GPU acceleration for matrix operations (CUDA/OpenCL support)
-  - Advanced memory pooling for high-frequency trading
-  - Multi-threaded indicator calculations
-  - Zero-allocation signal processing
-
-- **Developer Experience**
-  - Enhanced error messages with suggestions
-  - Built-in debugging tools and profiling
-  - Configuration validation and optimization suggestions
-  - IDE plugins and extensions
-
-#### 📊 **Advanced Technical Indicators**
+#### 📊 **Hybrid Strategy Implementation**
 ```rust
-// New indicators planned for v0.8.0
-use nyxs_owl::trade_math::advanced::*;
+// Planned hybrid strategy framework
+use nyxs_owl::integration::*;
 
-// Ichimoku Cloud with full signal analysis
-let mut ichimoku = IchimokuCloud::new(9, 26, 52)?;
+// Integrated technical + forecasting strategy
+let config = HybridStrategyConfig {
+    technical_indicators: vec![
+        TechnicalIndicator::RSI(14),
+        TechnicalIndicator::MACD(12, 26, 9),
+        TechnicalIndicator::BollingerBands(20, 2.0),
+        TechnicalIndicator::CCI(20),
+        TechnicalIndicator::MFI(14),
+    ],
+    forecasting_models: vec![
+        ForecastingModel::ARIMA { ensemble: true, regime_detection: true },
+        ForecastingModel::Ensemble { models: vec!["arima", "es", "kalman"] },
+    ],
+    integration_method: IntegrationMethod::WeightedConsensus,
+    confidence_threshold: 0.7,
+    confirmation_window: 5,
+};
 
-// Elliott Wave pattern recognition
-let mut elliott = ElliottWaveDetector::new()?;
-
-// Market microstructure indicators
-let mut order_flow = OrderFlowAnalyzer::new()?;
-let mut volume_profile = VolumeProfileAnalyzer::new()?;
+let mut hybrid_strategy = HybridStrategy::new(config);
+let integrated_signals = hybrid_strategy.generate_signals(&data)?;
 ```
 
 #### 🔮 **Enhanced Forecasting**
@@ -105,7 +124,7 @@ use nyxs_owl::ml::{
 // Supervised learning for price prediction
 let mut price_predictor = XGBoostPredictor::new()
     .with_features(vec![
-        "rsi", "macd", "bollinger_position", "volume_ratio"
+        "rsi", "macd", "bollinger_position", "volume_ratio", "cci", "mfi"
     ])
     .with_target("next_return")
     .train(&historical_data)?;
@@ -307,18 +326,20 @@ let mut qml = QuantumML::new()
 
 | Version | Latency Target | Throughput | Memory Usage | CPU Efficiency |
 |---------|---------------|------------|--------------|----------------|
-| v0.6.0  | < 100μs       | 500K ops/s | -30%        | +40%          |
+| v0.7.4  | < 100μs       | 500K ops/s | -30%        | +40%          |
 | v0.8.0  | < 50μs        | 1M ops/s   | -50%        | +100%         |
 | v1.0.0  | < 25μs        | 2M ops/s   | -60%        | +200%         |
 | v2.0.0  | < 10μs        | 10M ops/s  | -80%        | +500%         |
 
 ### Technology Stack Evolution
 
-#### Current Stack (v0.5.0)
+#### Current Stack (v0.7.4)
 - **Core**: Rust with Polars for data processing
 - **Math**: Custom SIMD-optimized algorithms
 - **Concurrency**: Tokio async runtime
 - **Storage**: CSV/Parquet file formats
+- **Forecasting**: OxiDiviner 1.2.0 with enhanced integration
+- **Technical Analysis**: 150+ indicators with advanced features
 
 #### Future Stack (v1.0.0+)
 ```rust
@@ -352,20 +373,22 @@ let gpu_engine = GPUEngine::new()
 ### Active Research Areas
 
 #### 2024-2025 Focus
-1. **Adaptive Algorithms**
-   - Online learning for strategy adaptation
-   - Meta-learning for fast strategy transfer
-   - Continual learning without catastrophic forgetting
+1. **Hybrid Strategy Development**
+   - Technical indicator + forecasting model integration
+   - Feature engineering from technical indicators
+   - Multi-timeframe signal confirmation
+   - Adaptive parameter sharing between models
 
-2. **Market Microstructure**
+2. **Enhanced OxiDiviner Integration**
+   - Advanced ensemble forecasting methods
+   - Regime-aware model selection
+   - Multi-method outlier detection
+   - Seasonal pattern recognition
+
+3. **Market Microstructure**
    - Order book dynamics modeling
    - High-frequency price formation
    - Market impact modeling
-
-3. **Behavioral Finance Integration**
-   - Investor sentiment modeling
-   - Behavioral bias detection
-   - Crowd psychology indicators
 
 #### 2026-2027 Focus
 1. **Quantum Finance**
@@ -460,19 +483,20 @@ struct MetaTraderPlugin;
 
 ## Implementation Timeline
 
-### 2024 Quarterly Roadmap
+### 2024-2025 Quarterly Roadmap
 
 | Quarter | Version | Major Features | Release Date |
 |---------|---------|----------------|--------------|
-| Q2 2024 | v0.6.0  | Polish & Performance | June 2024 |
-| Q3 2024 | v0.7.0  | ML Integration | September 2024 |
-| Q4 2024 | v0.8.0  | Real-time Infrastructure | December 2024 |
+| Q4 2024 | v0.7.4  | Enhanced OxiDiviner + New Indicators | December 2024 |
+| Q1 2025 | v0.8.0  | Hybrid Strategy Integration | March 2025 |
+| Q2 2025 | v0.9.0  | Machine Learning Integration | June 2025 |
+| Q3 2025 | v1.0.0  | Real-time Infrastructure | September 2025 |
 
 ### 2025-2026 Annual Roadmap
 
 | Year | Version Range | Focus Area |
 |------|---------------|------------|
-| 2025 | v0.9.0 - v1.2.0 | Enterprise & Analytics |
+| 2025 | v1.1.0 - v1.2.0 | Enterprise & Analytics |
 | 2026 | v1.3.0 - v2.0.0 | Multi-Asset & AI-Native |
 
 ### Success Metrics
@@ -500,7 +524,7 @@ NyxsOwl's roadmap represents an ambitious but achievable vision for the future o
 - ✅ **Innovation Focus**: Leading edge research and technology adoption
 - ✅ **Enterprise Scale**: Built for mission-critical financial applications
 
-The journey from v0.5.0 to v2.0.0+ will establish NyxsOwl as the definitive platform for quantitative finance, combining the performance of Rust with cutting-edge financial engineering and machine learning capabilities.
+The journey from v0.7.4 to v2.0.0+ will establish NyxsOwl as the definitive platform for quantitative finance, combining the performance of Rust with cutting-edge financial engineering and machine learning capabilities.
 
 ---
 

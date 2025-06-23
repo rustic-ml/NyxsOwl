@@ -2,7 +2,7 @@
 
 ## Overview
 
-This comprehensive guide provides practical usage instructions for NyxsOwl, a production-ready financial analysis library for Rust. NyxsOwl offers institutional-grade tools for quantitative finance, technical analysis, and algorithmic trading.
+This comprehensive guide provides practical usage instructions for NyxsOwl, a production-ready financial analysis library for Rust. NyxsOwl offers institutional-grade tools for quantitative finance, technical analysis, and algorithmic trading with enhanced OxiDiviner 1.2.0 integration.
 
 ## Table of Contents
 
@@ -10,12 +10,14 @@ This comprehensive guide provides practical usage instructions for NyxsOwl, a pr
 2. [Memory Optimization](#memory-optimization)
 3. [Quick Start Examples](#quick-start-examples)
 4. [Core Modules](#core-modules)
-5. [Data Integration](#data-integration)
-6. [Strategy Development](#strategy-development)
-7. [Backtesting](#backtesting)
-8. [Production Deployment](#production-deployment)
-9. [Advanced Features](#advanced-features)
-10. [Troubleshooting](#troubleshooting)
+5. [Enhanced OxiDiviner Integration](#enhanced-oxidiviner-integration)
+6. [Advanced Technical Indicators](#advanced-technical-indicators)
+7. [Data Integration](#data-integration)
+8. [Strategy Development](#strategy-development)
+9. [Backtesting](#backtesting)
+10. [Production Deployment](#production-deployment)
+11. [Advanced Features](#advanced-features)
+12. [Troubleshooting](#troubleshooting)
 
 ## Installation & Setup
 
@@ -37,16 +39,17 @@ Control what you include based on your needs:
 # Minimal - just technical indicators
 nyxs_owl = { version = "0.7.4", default-features = false, features = ["trading-math"] }
 
-# With forecasting
+# With enhanced forecasting (OxiDiviner 1.2.0)
 nyxs_owl = { version = "0.7.4", features = ["trading-math", "forecasting"] }
 
-# Full features
+# Full features with all optimizations
 nyxs_owl = { version = "0.7.4", features = ["all"] }
 
 # Additional dependencies for full functionality
 polars = { version = "0.47.0", features = ["lazy", "csv", "temporal"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.0", features = ["full"] }
+oxidiviner = "1.2.0"  # Enhanced forecasting capabilities
 ```
 
 ### Environment Setup
@@ -56,10 +59,11 @@ tokio = { version = "1.0", features = ["full"] }
 git clone https://github.com/rustic-ml/NyxsOwl.git
 cd NyxsOwl
 
-# Run basic examples
+# Run enhanced examples
 cargo run --example quick_start
 cargo run --example enhanced_rsi_strategy_example
 cargo run --example arima_strategy_example
+cargo run --example comprehensive_indicators_demo
 ```
 
 ## Memory Optimization
@@ -330,11 +334,175 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Enhanced OxiDiviner Integration
+
+### Advanced Forecasting with OxiDiviner 1.2.0
+
+NyxsOwl now leverages the full power of OxiDiviner 1.2.0 for adaptive forecasting:
+
+```rust
+use nyxs_owl::forecasting::strategies::*;
+use oxidiviner::prelude::*;
+
+// Enhanced ARIMA Strategy with Ensemble Forecasting
+let arima_config = ArimaStrategyConfig {
+    model_selection: true,           // Auto-select optimal ARIMA orders
+    dynamic_threshold: true,         // Volatility-based signal thresholds
+    regime_detection: true,          // Market regime awareness
+    ensemble_forecasting: true,      // Multiple ARIMA models
+    outlier_detection: true,         // Advanced outlier handling
+    seasonal_decomposition: true,    // Seasonal pattern detection
+    ..ArimaStrategyConfig::default()
+};
+
+let mut arima_strategy = ArimaStrategy::new(arima_config);
+
+// Generate signals with enhanced forecasting
+let signals = arima_strategy.generate_signals(&df, "close", "timestamp")?;
+
+// Access detailed forecasting analysis
+let analysis = arima_strategy.get_forecast_analysis()?;
+println!("Model confidence: {:.2}", analysis.confidence);
+println!("Regime detected: {:?}", analysis.regime);
+println!("Outliers detected: {}", analysis.outliers.len());
+```
+
+### Ensemble Forecasting Strategies
+
+```rust
+// Adaptive Ensemble with Multiple Models
+let ensemble_config = AdaptiveEnsembleConfig {
+    models: vec![
+        ModelType::ARIMA,
+        ModelType::ExponentialSmoothing,
+        ModelType::KalmanFilter,
+        ModelType::GARCH,
+    ],
+    adaptive_weighting: true,        // Dynamic model weighting
+    regime_aware: true,              // Regime-based model selection
+    confidence_threshold: 0.7,       // Minimum confidence for signals
+    ..AdaptiveEnsembleConfig::default()
+};
+
+let mut ensemble_strategy = AdaptiveEnsemble::new(ensemble_config);
+
+// Generate ensemble signals
+let signals = ensemble_strategy.generate_signals(&df)?;
+
+// Get ensemble analysis
+let ensemble_analysis = ensemble_strategy.get_ensemble_analysis()?;
+for (model, weight) in ensemble_analysis.model_weights.iter() {
+    println!("Model {}: weight {:.3}", model, weight);
+}
+```
+
+### Advanced Outlier Detection
+
+```rust
+// Multi-method outlier detection
+let outlier_config = OutlierDetectionConfig {
+    methods: vec![
+        OutlierMethod::IQR { multiplier: 1.5 },
+        OutlierMethod::ZScore { threshold: 3.0 },
+        OutlierMethod::MovingMedian { window: 20, threshold: 2.0 },
+    ],
+    voting_threshold: 2,             // Require 2+ methods to agree
+    adaptive_thresholds: true,       // Adjust based on volatility
+    ..OutlierDetectionConfig::default()
+};
+
+let outlier_detector = OutlierDetector::new(outlier_config);
+let outliers = outlier_detector.detect(&price_series)?;
+```
+
+## Advanced Technical Indicators
+
+### New Momentum Indicators
+
+```rust
+use nyxs_owl::trade_math::momentum::*;
+
+// Commodity Channel Index (CCI)
+let mut cci = CommodityChannelIndex::new(20)?;
+for &price in &prices {
+    cci.update(price, high, low)?;
+    if let Some(value) = cci.value() {
+        println!("CCI: {:.2}", value);
+    }
+}
+
+// Money Flow Index (MFI)
+let mut mfi = MoneyFlowIndex::new(14)?;
+for ((price, high, low), volume) in prices.iter().zip(highs).zip(lows).zip(volumes) {
+    mfi.update(*price, *high, *low, *volume)?;
+    if let Some(value) = mfi.value() {
+        println!("MFI: {:.2}", value);
+    }
+}
+
+// Rate of Change (ROC)
+let mut roc = RateOfChange::new(10)?;
+for &price in &prices {
+    roc.update(price)?;
+    if let Some(value) = roc.value() {
+        println!("ROC: {:.2}%", value * 100.0);
+    }
+}
+```
+
+### Enhanced Volatility Indicators
+
+```rust
+use nyxs_owl::trade_math::volatility::*;
+
+// Chandelier Exit
+let mut chandelier = ChandelierExit::new(22, 3.0)?;
+for ((high, low, close), volume) in highs.iter().zip(lows).zip(closes).zip(volumes) {
+    chandelier.update(*high, *low, *close, *volume)?;
+    if let Some((long_exit, short_exit)) = chandelier.value() {
+        println!("Long exit: {:.2}, Short exit: {:.2}", long_exit, short_exit);
+    }
+}
+
+// SuperTrend
+let mut supertrend = SuperTrend::new(10, 3.0)?;
+for ((high, low, close), volume) in highs.iter().zip(lows).zip(closes).zip(volumes) {
+    supertrend.update(*high, *low, *close, *volume)?;
+    if let Some((trend, signal)) = supertrend.value() {
+        println!("SuperTrend: {:.2}, Signal: {:?}", trend, signal);
+    }
+}
+```
+
+### Volume-Based Indicators
+
+```rust
+use nyxs_owl::trade_math::volume::*;
+
+// VWAP Bands
+let mut vwap_bands = VWAPBands::new(20, 2.0)?;
+for ((high, low, close), volume) in highs.iter().zip(lows).zip(closes).zip(volumes) {
+    vwap_bands.update(*high, *low, *close, *volume)?;
+    if let Some((upper, middle, lower)) = vwap_bands.value() {
+        println!("VWAP Bands: Upper {:.2}, Middle {:.2}, Lower {:.2}", upper, middle, lower);
+    }
+}
+
+// Chaikin Money Flow
+let mut cmf = ChaikinMoneyFlow::new(20)?;
+for ((high, low, close), volume) in highs.iter().zip(lows).zip(closes).zip(volumes) {
+    cmf.update(*high, *low, *close, *volume)?;
+    if let Some(value) = cmf.value() {
+        println!("CMF: {:.3}", value);
+    }
+}
+```
+
 ## Core Modules
 
 ### Trade Math Module
 
-The core technical analysis module providing 125+ indicators:
+The core technical analysis module providing 150+ indicators:
 
 ```rust
 use nyxs_owl::trade_math::*;
@@ -344,18 +512,25 @@ let mut sma = moving_averages::SimpleMovingAverage::new(20)?;
 let mut ema = moving_averages::ExponentialMovingAverage::new(20)?;
 let mut vwap = moving_averages::VolumeWeightedAveragePrice::new()?;
 
-// Oscillators
+// Enhanced Oscillators
 let mut rsi = oscillators::RelativeStrengthIndex::new(14)?;
 let mut macd = oscillators::MACD::new(12, 26, 9)?;
 let mut stoch = oscillators::StochasticOscillator::new(14, 3)?;
+let mut cci = momentum::CommodityChannelIndex::new(20)?;
+let mut mfi = momentum::MoneyFlowIndex::new(14)?;
+let mut roc = momentum::RateOfChange::new(10)?;
 
-// Volatility Indicators
+// Advanced Volatility Indicators
 let mut bb = volatility::BollingerBands::new(20, 2.0)?;
 let mut atr = volatility::AverageTrueRange::new(14)?;
+let mut chandelier = volatility::ChandelierExit::new(22, 3.0)?;
+let mut supertrend = volatility::SuperTrend::new(10, 3.0)?;
 
 // Volume Indicators
 let mut obv = volume::OnBalanceVolume::new()?;
 let mut vwap_vol = volume::VolumeWeightedAveragePrice::new()?;
+let mut vwap_bands = volume::VWAPBands::new(20, 2.0)?;
+let mut cmf = volume::ChaikinMoneyFlow::new(20)?;
 ```
 
 ### Technical Strategies Module
@@ -963,8 +1138,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
     
     let results = processor.process_parallel(data_frames, |df| {
-        // Strategy processing logic
-        let mut strategy = ArimaStrategy::new(ArimaStrategyConfig::default());
+        // Enhanced strategy processing with OxiDiviner
+        let mut strategy = ArimaStrategy::new(ArimaStrategyConfig {
+            ensemble_forecasting: true,
+            regime_detection: true,
+            outlier_detection: true,
+            ..ArimaStrategyConfig::default()
+        });
         strategy.generate_signals(&df, "close", "timestamp")
     }).await?;
     
@@ -991,39 +1171,61 @@ let circular_buffer = CacheOptimizedCircularBuffer::new(1000);
 
 ## Enhanced Integration: Technical Indicators + Forecasting
 
-### Current Integration Gaps
+### Hybrid Strategy Framework
 
-#### 🔗 **Missing Hybrid Strategies**
 ```rust
-// Current: Separate technical and forecasting strategies
-let rsi_signals = rsi_strategy.generate_signals(&data)?;
-let arima_forecast = arima_strategy.generate_signals(&data)?;
+use nyxs_owl::integration::*;
 
-// Enhanced: Integrated hybrid approach
-let hybrid_config = HybridStrategyConfig {
-    technical_indicators: vec![
-        TechnicalIndicator::RSI(14),
-        TechnicalIndicator::MACD(12, 26, 9),
-        TechnicalIndicator::BollingerBands(20, 2.0),
-    ],
-    forecasting_models: vec![
-        ForecastingModel::ARIMA,
-        ForecastingModel::ExponentialSmoothing,
-    ],
-    integration_method: IntegrationMethod::WeightedConsensus,
-    confidence_threshold: 0.7,
-};
+// Create integrated strategy with enhanced features
+let config = IntegratedStrategyConfig::new()
+    .with_technical_indicators(vec![
+        TechnicalConfig::RSI { period: 14, thresholds: (30.0, 70.0) },
+        TechnicalConfig::MACD { fast: 12, slow: 26, signal: 9 },
+        TechnicalConfig::BollingerBands { period: 20, std_dev: 2.0 },
+        TechnicalConfig::CCI { period: 20, threshold: 100.0 },
+        TechnicalConfig::MFI { period: 14, thresholds: (20.0, 80.0) },
+    ])
+    .with_forecasting_models(vec![
+        ForecastingConfig::ARIMA { 
+            auto_order: true, 
+            regime_detection: true,
+            ensemble_forecasting: true,
+            outlier_detection: true,
+        },
+        ForecastingConfig::Ensemble { 
+            models: vec!["arima", "es", "kalman", "garch"],
+            adaptive_weighting: true,
+        },
+    ])
+    .with_integration(IntegrationConfig::WeightedConsensus {
+        technical_weight: 0.6,
+        forecast_weight: 0.4,
+        min_confidence: 0.7,
+        confirmation_window: 5,
+    });
 
-let mut hybrid_strategy = HybridStrategy::new(hybrid_config);
-let integrated_signals = hybrid_strategy.generate_signals(&data)?;
+let mut strategy = IntegratedStrategy::new(config);
+
+// Generate integrated signals with enhanced analysis
+let signals = strategy.generate_signals(&market_data)?;
+
+// Get detailed analysis
+let analysis = strategy.get_analysis()?;
+println!("Technical confidence: {:.2}", analysis.technical_confidence);
+println!("Forecast confidence: {:.2}", analysis.forecast_confidence);
+println!("Integrated confidence: {:.2}", analysis.integrated_confidence);
+println!("Regime detected: {:?}", analysis.market_regime);
+println!("Outliers detected: {}", analysis.outliers.len());
 ```
 
-#### 📊 **Feature Engineering for Forecasting**
+### Feature Engineering Pipeline
+
 ```rust
 // Enhanced feature engineering using technical indicators
 pub struct TechnicalFeatureEngine {
     indicators: Vec<Box<dyn TechnicalIndicator>>,
     feature_window: usize,
+    outlier_detector: OutlierDetector,
 }
 
 impl TechnicalFeatureEngine {
@@ -1036,104 +1238,31 @@ impl TechnicalFeatureEngine {
             features.push(values);
         }
         
-        // Add derived features
+        // Add derived features with outlier detection
         features.push(self.calculate_momentum_features(data)?);
         features.push(self.calculate_volatility_features(data)?);
         features.push(self.calculate_trend_features(data)?);
+        features.push(self.calculate_volume_features(data)?);
+        
+        // Detect and handle outliers
+        let outlier_mask = self.outlier_detector.detect(data)?;
+        let cleaned_features = self.remove_outliers(features, &outlier_mask)?;
         
         // Combine into feature DataFrame
-        self.combine_features(features)
+        self.combine_features(cleaned_features)
     }
     
     fn calculate_momentum_features(&self, data: &DataFrame) -> Result<Series> {
-        // RSI divergence, MACD histogram, etc.
-        Ok(Series::new("momentum_score", vec![/* calculated values */]))
+        // Enhanced momentum features including CCI, MFI, ROC
+        let cci_values = self.calculate_cci(data)?;
+        let mfi_values = self.calculate_mfi(data)?;
+        let roc_values = self.calculate_roc(data)?;
+        
+        // Combine into momentum score
+        let momentum_score = (cci_values + mfi_values + roc_values) / 3.0;
+        Ok(Series::new("momentum_score", momentum_score))
     }
 }
-```
-
-#### 🎯 **Signal Confirmation Framework**
-```rust
-pub struct SignalConfirmationEngine {
-    technical_threshold: f64,
-    forecast_threshold: f64,
-    confirmation_window: usize,
-}
-
-impl SignalConfirmationEngine {
-    pub fn confirm_signals(
-        &self,
-        technical_signals: &[Signal],
-        forecast_signals: &[Signal],
-    ) -> Result<Vec<ConfirmedSignal>> {
-        let mut confirmed_signals = Vec::new();
-        
-        for (tech_signal, forecast_signal) in technical_signals.iter().zip(forecast_signals.iter()) {
-            let confirmation = self.calculate_confirmation_score(tech_signal, forecast_signal);
-            
-            if confirmation > self.confirmation_threshold {
-                confirmed_signals.push(ConfirmedSignal {
-                    signal: tech_signal.clone(),
-                    confirmation_score: confirmation,
-                    confidence: (tech_signal.confidence + forecast_signal.confidence) / 2.0,
-                });
-            }
-        }
-        
-        Ok(confirmed_signals)
-    }
-}
-```
-
-### Implementation Roadmap
-
-#### Phase 1: Basic Integration (v0.8.0)
-- [ ] Create `HybridStrategy` trait
-- [ ] Implement basic technical + forecasting combination
-- [ ] Add signal confirmation logic
-
-#### Phase 2: Advanced Features (v0.9.0)
-- [ ] Feature engineering pipeline
-- [ ] Multi-timeframe integration
-- [ ] Adaptive parameter sharing
-
-#### Phase 3: Production Ready (v1.0.0)
-- [ ] Performance optimization
-- [ ] Comprehensive testing
-- [ ] Documentation and examples
-
-### Usage Example: Enhanced Integration
-
-```rust
-use nyxs_owl::integration::*;
-
-// Create integrated strategy
-let config = IntegratedStrategyConfig::new()
-    .with_technical_indicators(vec![
-        TechnicalConfig::RSI { period: 14, thresholds: (30.0, 70.0) },
-        TechnicalConfig::MACD { fast: 12, slow: 26, signal: 9 },
-        TechnicalConfig::BollingerBands { period: 20, std_dev: 2.0 },
-    ])
-    .with_forecasting_models(vec![
-        ForecastingConfig::ARIMA { auto_order: true, regime_detection: true },
-        ForecastingConfig::Ensemble { models: vec!["arima", "es", "kalman"] },
-    ])
-    .with_integration(IntegrationConfig::WeightedConsensus {
-        technical_weight: 0.6,
-        forecast_weight: 0.4,
-        min_confidence: 0.7,
-    });
-
-let mut strategy = IntegratedStrategy::new(config);
-
-// Generate integrated signals
-let signals = strategy.generate_signals(&market_data)?;
-
-// Get detailed analysis
-let analysis = strategy.get_analysis()?;
-println!("Technical confidence: {:.2}", analysis.technical_confidence);
-println!("Forecast confidence: {:.2}", analysis.forecast_confidence);
-println!("Integrated confidence: {:.2}", analysis.integrated_confidence);
 ```
 
 ## Troubleshooting
@@ -1238,4 +1367,4 @@ fn profile_strategy_performance(
 
 ---
 
-*Last updated: December 2024 | Version: 0.7.4 | Status: Production Ready* 
+*Last updated: December 2024 | Version: 0.7.4 | Status: Production Ready with Enhanced OxiDiviner Integration* 

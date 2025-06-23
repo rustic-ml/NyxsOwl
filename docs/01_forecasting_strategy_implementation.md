@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides comprehensive implementation details for NyxsOwl's forecasting strategies, featuring OxiDiviner 1.2.0 adaptive capabilities. NyxsOwl offers 7 production-ready forecasting strategies with advanced adaptive features for quantitative trading.
+This guide provides comprehensive implementation details for NyxsOwl's forecasting strategies, featuring OxiDiviner 1.2.0 adaptive capabilities. NyxsOwl offers 8 production-ready forecasting strategies with advanced adaptive features for quantitative trading.
 
 ## Table of Contents
 
@@ -33,6 +33,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 ```rust
 use nyxs_owl::forecasting::strategies::arima_strategy::{ArimaStrategy, ArimaStrategyConfig};
+use nyxs_owl::forecasting::strategies::neural_network_strategy::{NeuralNetworkStrategy, NeuralNetworkStrategyConfig};
 use polars::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,6 +60,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for signal in signals.iter().take(5) {
         println!("{:?}", signal);
     }
+    
+    // Create neural network strategy
+    let nn_config = NeuralNetworkStrategyConfig {
+        hidden_layers: vec![64, 32, 16],
+        learning_rate: 0.001,
+        epochs: 100,
+        adaptive_parameters: true,
+        ..Default::default()
+    };
+    
+    let mut nn_strategy = NeuralNetworkStrategy::new(nn_config);
+    let nn_signals = nn_strategy.generate_signals(&df, "close", "timestamp")?;
+    
+    println!("Generated {} neural network signals", nn_signals.len());
     
     Ok(())
 }
@@ -154,7 +169,67 @@ println!("Current ARIMA order: ({}, {}, {})",
          diagnostics.p, diagnostics.d, diagnostics.q);
 ```
 
-### 2. Adaptive Ensemble Strategy
+### 2. Neural Network Strategy
+
+**Best for**: Complex non-linear patterns, high-dimensional data, adaptive learning
+
+```rust
+use nyxs_owl::forecasting::strategies::neural_network_strategy::{
+    NeuralNetworkStrategy, NeuralNetworkStrategyConfig
+};
+
+let config = NeuralNetworkStrategyConfig {
+    // Network architecture
+    hidden_layers: vec![64, 32, 16],  // Three hidden layers
+    learning_rate: 0.001,
+    epochs: 100,
+    batch_size: 32,
+    
+    // Adaptive features
+    adaptive_parameters: true,    // Dynamic parameter adjustment
+    early_stopping: true,         // Prevent overfitting
+    dropout_rate: 0.2,           // Regularization
+    
+    // Signal generation
+    signal_threshold: 0.02,      // 2% signal threshold
+    confidence_threshold: 0.7,   // Minimum confidence for signals
+    
+    // Performance monitoring
+    validation_split: 0.2,       // 20% validation data
+    performance_window: 50,      // Rolling performance window
+    
+    ..NeuralNetworkStrategyConfig::default()
+};
+
+let mut strategy = NeuralNetworkStrategy::new(config);
+```
+
+**Key Features**:
+- Multi-layer perceptron with configurable architecture
+- Adaptive learning rate and parameter optimization
+- Early stopping to prevent overfitting
+- Confidence-based signal generation
+- Real-time performance monitoring
+
+**Usage Example**:
+
+```rust
+// Generate signals with confidence scores
+let signals = strategy.generate_signals(&df, "close", "timestamp")?;
+
+// Get model performance metrics
+let metrics = strategy.get_performance_metrics()?;
+println!("Training accuracy: {:.2}%", metrics.training_accuracy * 100.0);
+println!("Validation accuracy: {:.2}%", metrics.validation_accuracy * 100.0);
+
+// Check if model needs retraining
+if strategy.should_retrain()? {
+    println!("Model performance degraded, initiating retraining...");
+    strategy.retrain(&df, "close", "timestamp")?;
+}
+```
+
+### 3. Adaptive Ensemble Strategy
 
 **Best for**: Robust forecasting, combining multiple models for improved accuracy
 
@@ -170,6 +245,7 @@ let config = AdaptiveEnsembleConfig {
         ModelType::ExponentialSmoothing,
         ModelType::KalmanFilter,
         ModelType::GARCH,
+        ModelType::NeuralNetwork,  // Now includes neural network
     ],
     
     // Adaptive features
@@ -195,7 +271,7 @@ let mut ensemble = AdaptiveEnsemble::new(config);
 
 For more implementation details, see the complete technical documentation and examples directory.
 
-### 3. Exponential Smoothing Strategy
+### 4. Exponential Smoothing Strategy
 
 **Best for**: Trend and seasonal patterns, smooth forecasting
 
@@ -225,7 +301,7 @@ let config = ExponentialSmoothingConfig {
 let mut strategy = ExponentialSmoothingStrategy::new(config);
 ```
 
-### 4. Kalman Filter Strategy
+### 5. Kalman Filter Strategy
 
 **Best for**: Noisy data, state estimation, adaptive filtering
 
@@ -253,7 +329,7 @@ let config = KalmanStrategyConfig {
 let mut strategy = KalmanStrategy::new(config);
 ```
 
-### 5. GARCH Strategy
+### 6. GARCH Strategy
 
 **Best for**: Volatility modeling, risk management
 
@@ -281,7 +357,7 @@ let config = GarchStrategyConfig {
 let mut strategy = GarchStrategy::new(config);
 ```
 
-### 6. Copula Strategy
+### 7. Copula Strategy
 
 **Best for**: Multi-asset correlation modeling, pairs trading
 
@@ -311,7 +387,7 @@ let config = CopulaStrategyConfig {
 let mut strategy = CopulaStrategy::new(config);
 ```
 
-### 7. Regime Switching Strategy
+### 8. Regime Switching Strategy
 
 **Best for**: Markets with distinct behavioral regimes, structural breaks
 
