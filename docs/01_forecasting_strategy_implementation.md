@@ -13,6 +13,7 @@ This guide provides comprehensive implementation details for NyxsOwl's forecasti
 5. [Integration Patterns](#integration-patterns)
 6. [Performance Optimization](#performance-optimization)
 7. [Best Practices](#best-practices)
+8. [Enhanced OxiDiviner 1.2.0 Integration](#enhanced-oxidiviner-120-integration)
 
 ## Quick Start
 
@@ -614,6 +615,71 @@ fn adaptive_parameter_tuning(
     Ok(())
 }
 ```
+
+## Enhanced OxiDiviner 1.2.0 Integration
+
+### Advanced Features Currently Underutilized
+
+#### 🔄 **Multi-Model Ensemble with OxiDiviner**
+```rust
+use oxidiviner::ensemble::EnsembleForecaster;
+use oxidiviner::model_selection::InformationCriterion;
+
+// Enhanced ensemble using OxiDiviner's built-in capabilities
+let ensemble_config = EnsembleForecaster::new()
+    .with_models(vec![
+        ModelType::ARIMA,
+        ModelType::ExponentialSmoothing,
+        ModelType::Prophet,
+        ModelType::NeuralProphet,
+    ])
+    .with_selection_criterion(InformationCriterion::AIC)
+    .with_adaptive_weighting(true)
+    .with_cross_validation(true);
+
+let forecasts = ensemble_config.forecast(&data, horizon)?;
+```
+
+#### 📊 **Advanced Preprocessing Pipeline**
+```rust
+use oxidiviner::preprocessing::{
+    OutlierDetector, DataTransformer, SeasonalDecomposer
+};
+
+// Enhanced data preprocessing
+let preprocessor = DataTransformer::new()
+    .with_outlier_detection(OutlierDetector::IsolationForest)
+    .with_seasonal_decomposition(SeasonalDecomposer::STL)
+    .with_stationarity_tests(true)
+    .with_differencing_strategy(DifferencingStrategy::Auto);
+
+let cleaned_data = preprocessor.transform(&raw_data)?;
+```
+
+#### 🎯 **Regime-Aware Forecasting**
+```rust
+use oxidiviner::regime::RegimeDetector;
+use oxidiviner::adaptive::AdaptiveForecaster;
+
+// Regime detection with OxiDiviner's built-in capabilities
+let regime_detector = RegimeDetector::new()
+    .with_method(RegimeMethod::HiddenMarkovModel)
+    .with_features(vec!["returns", "volatility", "volume"])
+    .with_regime_count(5);
+
+let adaptive_forecaster = AdaptiveForecaster::new()
+    .with_regime_detector(regime_detector)
+    .with_regime_specific_models(true)
+    .with_smooth_transitions(true);
+
+let forecasts = adaptive_forecaster.forecast(&data, horizon)?;
+```
+
+### Implementation Priority
+
+1. **High Priority**: Implement OxiDiviner's ensemble capabilities
+2. **Medium Priority**: Add advanced preprocessing pipeline
+3. **Low Priority**: Integrate regime-aware forecasting
 
 ---
 

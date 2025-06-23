@@ -15,8 +15,17 @@ pub mod trend;
 /// Volatility measurement and risk analysis functions
 pub mod volatility;
 
+/// Volume analysis functions
+pub mod volume;
+
+/// Pattern recognition and geometric analysis
+pub mod patterns;
+
 /// Re-exported momentum indicator functions
-pub use momentum::{calculate_macd, calculate_rsi, calculate_stochastic};
+pub use momentum::{
+    calculate_cci, calculate_macd, calculate_mfi, calculate_roc, calculate_rsi,
+    calculate_stochastic,
+};
 /// Re-exported moving average functions
 pub use moving_averages::{calculate_ema, calculate_sma, calculate_vwap, calculate_wma};
 /// Re-exported trend indicator functions
@@ -26,8 +35,17 @@ pub use trend::{
 };
 /// Re-exported volatility indicator functions
 pub use volatility::{
-    calculate_atr, calculate_bollinger_bands, calculate_ease_of_movement, calculate_obv,
-    calculate_volume_price_trend,
+    atr::calculate_atr,
+    chandelier_exit::calculate_chandelier_exit,
+    supertrend::calculate_supertrend,
+};
+/// Re-exported volume indicator functions
+pub use volume::{
+    calculate_obv, calculate_vroc, calculate_vwap_with_bands, calculate_adl, calculate_cmf,
+};
+/// Re-exported pattern recognition functions
+pub use patterns::{
+    calculate_fibonacci_retracements, calculate_fibonacci_extensions, detect_fibonacci_retracements,
 };
 
 // TODO: Add other categories of math/indicator functions as modules

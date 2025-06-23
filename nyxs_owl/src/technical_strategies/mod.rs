@@ -145,17 +145,41 @@ impl ConfigExtractor for StrategyConfig {
     }
 }
 
-// Define a simplified Strategy trait for technical strategies (when forecasting is not available)
-#[cfg(not(feature = "forecasting"))]
+/// The Strategy trait defines the interface for all technical analysis strategies.
+/// 
+/// Each strategy must implement this trait to provide a consistent interface for:
+/// - Creating new strategy instances with configuration
+/// - Generating trading signals from market data
+/// - Providing metadata about the strategy
+/// - Specifying data requirements
 pub trait Strategy {
+    /// Creates a new strategy instance with the provided configuration.
     fn new(config: StrategyConfig) -> Self
     where
         Self: Sized;
+
+    /// Generates trading signals based on the provided market data.
+    /// 
+    /// # Arguments
+    /// * `data` - DataFrame containing market data with required columns
+    /// 
+    /// # Returns
+    /// * `NyxsOwlResult<Series>` - Series of trading signals
     fn generate_signals(&self, data: &DataFrame) -> NyxsOwlResult<Series>;
+
+    /// Returns the name of the strategy.
     fn name(&self) -> &str;
+
+    /// Returns a description of the strategy's methodology.
     fn description(&self) -> &str;
+
+    /// Returns a list of column names required by the strategy.
     fn required_columns(&self) -> Vec<&str>;
+
+    /// Returns the strategy's configuration.
     fn config(&self) -> &StrategyConfig;
+
+    /// Returns the minimum number of data points required for the strategy.
     fn min_data_points(&self) -> usize;
 
     /// Validate input data against strategy requirements

@@ -7,8 +7,9 @@
 use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, TechnicalStrategy};
 use crate::technical_strategies::{Strategy, StrategyConfig};
-use crate::trade_math::{calculate_obv, calculate_vwap};
-use polars::prelude::{DataFrame, NamedFrom, Series};
+use crate::trade_math::moving_averages::calculate_vwap;
+use crate::trade_math::volume::calculate_obv;
+use polars::prelude::{DataFrame, NamedFrom, Series, DataType};
 use std::collections::HashMap;
 
 /// Volume Weighted Average Price (VWAP) Strategy
@@ -120,7 +121,12 @@ impl TechnicalStrategy for VWAPStrategy {
 
     fn get_indicator_values(&self, data: &DataFrame) -> NyxsOwlResult<HashMap<String, Series>> {
         let vwap = calculate_vwap(data)?;
-        let obv = calculate_obv(data)?;
+        let close = data.column("close")?.cast(&DataType::Float64)?;
+        let volume = data.column("volume")?.cast(&DataType::Float64)?;
+        
+        let close_series = close.as_series().expect("Failed to get close series");
+        let volume_series = volume.as_series().expect("Failed to get volume series");
+        let obv = calculate_obv(close_series, volume_series)?;
 
         let mut indicators = HashMap::new();
         indicators.insert("vwap".to_string(), vwap);

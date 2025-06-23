@@ -63,15 +63,18 @@ impl ATRStrategy {
 
     /// Calculate ATR values
     pub fn calculate_atr_values(&self, data: &DataFrame) -> NyxsOwlResult<Vec<f64>> {
-        let atr_series = calculate_atr(data, self.config.period)?;
+        let high = data.column("high")?.cast(&DataType::Float64)?;
+        let low = data.column("low")?.cast(&DataType::Float64)?;
+        let close = data.column("close")?.cast(&DataType::Float64)?;
+        
+        let high_series = high.as_series().expect("Failed to get high series");
+        let low_series = low.as_series().expect("Failed to get low series");
+        let close_series = close.as_series().expect("Failed to get close series");
+        
+        let atr_series = calculate_atr(high_series, low_series, close_series, self.config.period)?;
         let atr_values = atr_series.f64()?;
 
-        let mut result = Vec::new();
-        for i in 0..atr_values.len() {
-            result.push(atr_values.get(i).unwrap_or(0.0));
-        }
-
-        Ok(result)
+        Ok(atr_values.into_iter().flatten().collect())
     }
 
     /// Calculate ATR-based volatility ratio

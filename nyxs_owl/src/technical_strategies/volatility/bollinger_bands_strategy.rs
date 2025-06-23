@@ -2,7 +2,7 @@
 //! Bollinger Bands Strategy using local trade_math module.
 
 use crate::simple_types::{NyxsOwlError, Result, Signal};
-use crate::trade_math::volatility::calculate_bollinger_bands;
+use crate::trade_math::volatility::bollinger_bands::calculate_bollinger_bands;
 use polars::chunked_array::ChunkedArray;
 use polars::prelude::{DataFrame, Float64Type};
 

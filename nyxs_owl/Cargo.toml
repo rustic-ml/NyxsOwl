@@ -209,6 +209,11 @@ name = "enhanced_rsi_strategy_example"
 path = "../examples/enhanced_rsi_strategy_example.rs"
 required-features = ["trading-math"]
 
+[[example]]
+name = "comprehensive_indicators_demo"
+path = "../examples/comprehensive_indicators_demo.rs"
+required-features = ["trading-math"]
+
 # Benchmarks for performance testing
 # Commenting out the missing trade_math_bench as well
 # [[bench]]

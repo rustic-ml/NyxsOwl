@@ -989,6 +989,153 @@ let time_series = CacheOptimizedTimeSeries::new(prices, timestamps);
 let circular_buffer = CacheOptimizedCircularBuffer::new(1000);
 ```
 
+## Enhanced Integration: Technical Indicators + Forecasting
+
+### Current Integration Gaps
+
+#### 🔗 **Missing Hybrid Strategies**
+```rust
+// Current: Separate technical and forecasting strategies
+let rsi_signals = rsi_strategy.generate_signals(&data)?;
+let arima_forecast = arima_strategy.generate_signals(&data)?;
+
+// Enhanced: Integrated hybrid approach
+let hybrid_config = HybridStrategyConfig {
+    technical_indicators: vec![
+        TechnicalIndicator::RSI(14),
+        TechnicalIndicator::MACD(12, 26, 9),
+        TechnicalIndicator::BollingerBands(20, 2.0),
+    ],
+    forecasting_models: vec![
+        ForecastingModel::ARIMA,
+        ForecastingModel::ExponentialSmoothing,
+    ],
+    integration_method: IntegrationMethod::WeightedConsensus,
+    confidence_threshold: 0.7,
+};
+
+let mut hybrid_strategy = HybridStrategy::new(hybrid_config);
+let integrated_signals = hybrid_strategy.generate_signals(&data)?;
+```
+
+#### 📊 **Feature Engineering for Forecasting**
+```rust
+// Enhanced feature engineering using technical indicators
+pub struct TechnicalFeatureEngine {
+    indicators: Vec<Box<dyn TechnicalIndicator>>,
+    feature_window: usize,
+}
+
+impl TechnicalFeatureEngine {
+    pub fn create_forecasting_features(&self, data: &DataFrame) -> Result<DataFrame> {
+        let mut features = Vec::new();
+        
+        // Add technical indicator values as features
+        for indicator in &self.indicators {
+            let values = indicator.calculate(data)?;
+            features.push(values);
+        }
+        
+        // Add derived features
+        features.push(self.calculate_momentum_features(data)?);
+        features.push(self.calculate_volatility_features(data)?);
+        features.push(self.calculate_trend_features(data)?);
+        
+        // Combine into feature DataFrame
+        self.combine_features(features)
+    }
+    
+    fn calculate_momentum_features(&self, data: &DataFrame) -> Result<Series> {
+        // RSI divergence, MACD histogram, etc.
+        Ok(Series::new("momentum_score", vec![/* calculated values */]))
+    }
+}
+```
+
+#### 🎯 **Signal Confirmation Framework**
+```rust
+pub struct SignalConfirmationEngine {
+    technical_threshold: f64,
+    forecast_threshold: f64,
+    confirmation_window: usize,
+}
+
+impl SignalConfirmationEngine {
+    pub fn confirm_signals(
+        &self,
+        technical_signals: &[Signal],
+        forecast_signals: &[Signal],
+    ) -> Result<Vec<ConfirmedSignal>> {
+        let mut confirmed_signals = Vec::new();
+        
+        for (tech_signal, forecast_signal) in technical_signals.iter().zip(forecast_signals.iter()) {
+            let confirmation = self.calculate_confirmation_score(tech_signal, forecast_signal);
+            
+            if confirmation > self.confirmation_threshold {
+                confirmed_signals.push(ConfirmedSignal {
+                    signal: tech_signal.clone(),
+                    confirmation_score: confirmation,
+                    confidence: (tech_signal.confidence + forecast_signal.confidence) / 2.0,
+                });
+            }
+        }
+        
+        Ok(confirmed_signals)
+    }
+}
+```
+
+### Implementation Roadmap
+
+#### Phase 1: Basic Integration (v0.8.0)
+- [ ] Create `HybridStrategy` trait
+- [ ] Implement basic technical + forecasting combination
+- [ ] Add signal confirmation logic
+
+#### Phase 2: Advanced Features (v0.9.0)
+- [ ] Feature engineering pipeline
+- [ ] Multi-timeframe integration
+- [ ] Adaptive parameter sharing
+
+#### Phase 3: Production Ready (v1.0.0)
+- [ ] Performance optimization
+- [ ] Comprehensive testing
+- [ ] Documentation and examples
+
+### Usage Example: Enhanced Integration
+
+```rust
+use nyxs_owl::integration::*;
+
+// Create integrated strategy
+let config = IntegratedStrategyConfig::new()
+    .with_technical_indicators(vec![
+        TechnicalConfig::RSI { period: 14, thresholds: (30.0, 70.0) },
+        TechnicalConfig::MACD { fast: 12, slow: 26, signal: 9 },
+        TechnicalConfig::BollingerBands { period: 20, std_dev: 2.0 },
+    ])
+    .with_forecasting_models(vec![
+        ForecastingConfig::ARIMA { auto_order: true, regime_detection: true },
+        ForecastingConfig::Ensemble { models: vec!["arima", "es", "kalman"] },
+    ])
+    .with_integration(IntegrationConfig::WeightedConsensus {
+        technical_weight: 0.6,
+        forecast_weight: 0.4,
+        min_confidence: 0.7,
+    });
+
+let mut strategy = IntegratedStrategy::new(config);
+
+// Generate integrated signals
+let signals = strategy.generate_signals(&market_data)?;
+
+// Get detailed analysis
+let analysis = strategy.get_analysis()?;
+println!("Technical confidence: {:.2}", analysis.technical_confidence);
+println!("Forecast confidence: {:.2}", analysis.forecast_confidence);
+println!("Integrated confidence: {:.2}", analysis.integrated_confidence);
+```
+
 ## Troubleshooting
 
 ### Common Issues

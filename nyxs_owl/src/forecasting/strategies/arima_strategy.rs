@@ -361,12 +361,63 @@ impl ArimaStrategy {
         variance.sqrt()
     }
 
-    /// NEW: Detect and clean outliers using IQR method
+    /// NEW: Enhanced outlier detection with multiple methods
     fn detect_and_clean_outliers(&self, prices: &[f64]) -> Result<Vec<f64>> {
         if prices.len() < 4 {
             return Ok(prices.to_vec());
         }
 
+        // Method 1: IQR-based outlier detection (current method)
+        let iqr_cleaned = self.detect_outliers_iqr(prices)?;
+
+        // Method 2: Z-score based outlier detection
+        let zscore_cleaned = self.detect_outliers_zscore(prices)?;
+
+        // Method 3: Moving median based outlier detection
+        let median_cleaned = self.detect_outliers_moving_median(prices)?;
+
+        // Combine results using voting mechanism
+        let mut cleaned_prices = Vec::with_capacity(prices.len());
+
+        for i in 0..prices.len() {
+            let original_price = prices[i];
+            let iqr_price = iqr_cleaned[i];
+            let zscore_price = zscore_cleaned[i];
+            let median_price = median_cleaned[i];
+
+            // Count how many methods detected this as an outlier
+            let outlier_votes = [
+                (original_price - iqr_price).abs() > 1e-10,
+                (original_price - zscore_price).abs() > 1e-10,
+                (original_price - median_price).abs() > 1e-10,
+            ]
+            .iter()
+            .filter(|&&is_outlier| is_outlier)
+            .count();
+
+            // If majority of methods detect outlier, use cleaned value
+            let final_price = if outlier_votes >= 2 {
+                // Use weighted average of cleaned values
+                let weights = [0.4, 0.3, 0.3]; // IQR gets highest weight
+                let cleaned_values = [iqr_price, zscore_price, median_price];
+                let weighted_sum: f64 = cleaned_values
+                    .iter()
+                    .zip(weights.iter())
+                    .map(|(val, weight)| val * weight)
+                    .sum();
+                weighted_sum
+            } else {
+                original_price
+            };
+
+            cleaned_prices.push(final_price);
+        }
+
+        Ok(cleaned_prices)
+    }
+
+    /// IQR-based outlier detection (original method)
+    fn detect_outliers_iqr(&self, prices: &[f64]) -> Result<Vec<f64>> {
         let mut sorted_prices = prices.to_vec();
         sorted_prices.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -394,11 +445,114 @@ impl ArimaStrategy {
                 };
                 cleaned_prices.push(replacement);
                 debug!(
-                    "Outlier detected at index {}: {} -> {}",
+                    "IQR outlier detected at index {}: {} -> {}",
                     i, price, replacement
                 );
             } else {
                 cleaned_prices.push(price);
+            }
+        }
+
+        Ok(cleaned_prices)
+    }
+
+    /// Z-score based outlier detection
+    fn detect_outliers_zscore(&self, prices: &[f64]) -> Result<Vec<f64>> {
+        if prices.len() < 3 {
+            return Ok(prices.to_vec());
+        }
+
+        // Calculate rolling mean and standard deviation
+        let window_size = 10.min(prices.len() - 1);
+        let mut cleaned_prices = Vec::with_capacity(prices.len());
+
+        for i in 0..prices.len() {
+            let start_idx = i.saturating_sub(window_size);
+            let end_idx = (i + 1).min(prices.len());
+            let window = &prices[start_idx..end_idx];
+
+            if window.len() < 3 {
+                cleaned_prices.push(prices[i]);
+                continue;
+            }
+
+            let mean = window.iter().sum::<f64>() / window.len() as f64;
+            let variance =
+                window.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / window.len() as f64;
+            let std_dev = variance.sqrt();
+
+            if std_dev < 1e-10 {
+                cleaned_prices.push(prices[i]);
+                continue;
+            }
+
+            let z_score = (prices[i] - mean) / std_dev;
+            let threshold = 2.5; // Configurable threshold
+
+            if z_score.abs() > threshold {
+                // Replace outlier with median of window
+                let mut window_sorted = window.to_vec();
+                window_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                let median = window_sorted[window_sorted.len() / 2];
+                cleaned_prices.push(median);
+                debug!(
+                    "Z-score outlier detected at index {}: {} -> {} (z-score: {:.2})",
+                    i, prices[i], median, z_score
+                );
+            } else {
+                cleaned_prices.push(prices[i]);
+            }
+        }
+
+        Ok(cleaned_prices)
+    }
+
+    /// Moving median based outlier detection
+    fn detect_outliers_moving_median(&self, prices: &[f64]) -> Result<Vec<f64>> {
+        if prices.len() < 5 {
+            return Ok(prices.to_vec());
+        }
+
+        let window_size = 5;
+        let mut cleaned_prices = Vec::with_capacity(prices.len());
+
+        for i in 0..prices.len() {
+            let start_idx = i.saturating_sub(window_size / 2);
+            let end_idx = (i + window_size / 2 + 1).min(prices.len());
+            let window = &prices[start_idx..end_idx];
+
+            if window.len() < 3 {
+                cleaned_prices.push(prices[i]);
+                continue;
+            }
+
+            let mut window_sorted = window.to_vec();
+            window_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let median = window_sorted[window_sorted.len() / 2];
+
+            // Calculate median absolute deviation (MAD)
+            let mad_values: Vec<f64> = window.iter().map(|&x| (x - median).abs()).collect();
+            let mut mad_sorted = mad_values.clone();
+            mad_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let mad = mad_sorted[mad_sorted.len() / 2];
+
+            if mad < 1e-10 {
+                cleaned_prices.push(prices[i]);
+                continue;
+            }
+
+            let mad_score = (prices[i] - median).abs() / mad;
+            let threshold = 3.0; // MAD threshold
+
+            if mad_score > threshold {
+                // Replace outlier with median
+                cleaned_prices.push(median);
+                debug!(
+                    "MAD outlier detected at index {}: {} -> {} (MAD score: {:.2})",
+                    i, prices[i], median, mad_score
+                );
+            } else {
+                cleaned_prices.push(prices[i]);
             }
         }
 
@@ -754,7 +908,7 @@ impl ArimaStrategy {
         }
     }
 
-    /// NEW: Generate ARIMA forecast using OxiDiviner with better error handling
+    /// NEW: Generate ARIMA forecast using OxiDiviner with enhanced ensemble capabilities
     fn generate_arima_forecast_with_oxidiviner(
         &self,
         data: &[f64],
@@ -771,29 +925,151 @@ impl ArimaStrategy {
             return Ok(first_val);
         }
 
+        // Enhanced preprocessing with outlier detection
+        let cleaned_data = if self.config.outlier_detection {
+            self.detect_and_clean_outliers(data)?
+        } else {
+            data.to_vec()
+        };
+
         // Create timestamps for OxiDiviner
-        let timestamps: Vec<chrono::DateTime<chrono::Utc>> = (0..data.len())
-            .map(|i| chrono::Utc::now() - chrono::Duration::days((data.len() - i - 1) as i64))
+        let timestamps: Vec<chrono::DateTime<chrono::Utc>> = (0..cleaned_data.len())
+            .map(|i| {
+                chrono::Utc::now() - chrono::Duration::days((cleaned_data.len() - i - 1) as i64)
+            })
             .collect();
 
-        // Try OxiDiviner forecast with fallback
-        match oxidiviner::quick::arima_forecast_custom(
-            timestamps,
-            data.to_vec(),
-            1, // forecast 1 step ahead
-            p,
-            d,
-            q,
-        ) {
-            Ok(forecasts) => {
-                if forecasts.is_empty() || !forecasts[0].is_finite() {
-                    self.fallback_forecast(data)
-                } else {
-                    Ok(forecasts[0])
+        // Enhanced ensemble approach with multiple ARIMA orders
+        if self.config.ensemble_models > 1 {
+            self.generate_ensemble_arima_forecast(&cleaned_data, &timestamps, (p, d, q))
+        } else {
+            // Single model approach with enhanced error handling
+            match oxidiviner::quick::arima_forecast_custom(
+                timestamps,
+                cleaned_data,
+                1, // forecast 1 step ahead
+                p,
+                d,
+                q,
+            ) {
+                Ok(forecasts) => {
+                    if forecasts.is_empty() || !forecasts[0].is_finite() {
+                        self.fallback_forecast(&cleaned_data)
+                    } else {
+                        Ok(forecasts[0])
+                    }
                 }
+                Err(_) => self.fallback_forecast(&cleaned_data),
             }
-            Err(_) => self.fallback_forecast(data),
         }
+    }
+
+    /// NEW: Enhanced ensemble ARIMA forecasting with multiple model orders
+    fn generate_ensemble_arima_forecast(
+        &self,
+        data: &[f64],
+        timestamps: &[chrono::DateTime<chrono::Utc>],
+        base_order: (usize, usize, usize),
+    ) -> Result<f64> {
+        let mut forecasts = Vec::new();
+        let mut weights = Vec::new();
+
+        // Generate multiple ARIMA orders for ensemble
+        let candidate_orders = self.generate_candidate_orders(base_order);
+
+        for &(p, d, q) in candidate_orders.iter().take(self.config.ensemble_models) {
+            match oxidiviner::quick::arima_forecast_custom(
+                timestamps.to_vec(),
+                data.to_vec(),
+                1,
+                p,
+                d,
+                q,
+            ) {
+                Ok(model_forecasts) => {
+                    if !model_forecasts.is_empty() && model_forecasts[0].is_finite() {
+                        forecasts.push(model_forecasts[0]);
+
+                        // Calculate weight based on model complexity and recent performance
+                        let complexity_penalty = (p + q) as f64 * 0.1;
+                        let base_weight = 1.0 / (1.0 + complexity_penalty);
+
+                        // Adjust weight based on regime if available
+                        let regime_weight = if let Some(regime) = self.current_regime {
+                            match regime {
+                                MarketRegime::HighVolatility => base_weight * 0.8, // Prefer simpler models
+                                MarketRegime::LowVolatility => base_weight * 1.2, // Allow complex models
+                                _ => base_weight,
+                            }
+                        } else {
+                            base_weight
+                        };
+
+                        weights.push(regime_weight);
+                    }
+                }
+                Err(_) => continue, // Skip failed models
+            }
+        }
+
+        if forecasts.is_empty() {
+            return self.fallback_forecast(data);
+        }
+
+        // Calculate weighted average forecast
+        let total_weight: f64 = weights.iter().sum();
+        if total_weight <= 0.0 {
+            return self.fallback_forecast(data);
+        }
+
+        let weighted_forecast = forecasts
+            .iter()
+            .zip(weights.iter())
+            .map(|(f, w)| f * w)
+            .sum::<f64>()
+            / total_weight;
+
+        Ok(weighted_forecast)
+    }
+
+    /// NEW: Generate candidate ARIMA orders for ensemble
+    fn generate_candidate_orders(
+        &self,
+        base_order: (usize, usize, usize),
+    ) -> Vec<(usize, usize, usize)> {
+        let (p, d, q) = base_order;
+        let mut candidates = vec![base_order];
+
+        // Add variations around the base order
+        if p > 0 {
+            candidates.push((p - 1, d, q));
+        }
+        if q > 0 {
+            candidates.push((p, d, q - 1));
+        }
+        if p < self.config.max_p {
+            candidates.push((p + 1, d, q));
+        }
+        if q < self.config.max_q {
+            candidates.push((p, d, q + 1));
+        }
+
+        // Add some common ARIMA orders
+        candidates.extend_from_slice(&[
+            (1, 1, 1), // Simple ARIMA
+            (2, 1, 1), // AR(2) with MA(1)
+            (1, 1, 2), // AR(1) with MA(2)
+            (2, 1, 2), // AR(2) with MA(2)
+            (0, 1, 1), // MA(1) only
+            (1, 1, 0), // AR(1) only
+        ]);
+
+        // Remove duplicates and limit to ensemble size
+        candidates.sort();
+        candidates.dedup();
+        candidates.truncate(self.config.ensemble_models);
+
+        candidates
     }
 
     /// NEW: Fallback forecast method when OxiDiviner fails

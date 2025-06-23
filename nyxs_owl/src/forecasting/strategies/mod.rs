@@ -24,6 +24,9 @@ pub mod garch_strategy;
 /// Kalman filter-based forecasting strategy
 pub mod kalman_strategy;
 
+/// Neural network-based forecasting strategy
+pub mod neural_network_strategy;
+
 /// Regime switching forecasting for market state changes
 pub mod regime_switching_strategy;
 
@@ -35,6 +38,7 @@ pub use ensemble_strategy::{EnsembleMethod, EnsembleStrategy, EnsembleStrategyCo
 pub use exponential_smoothing::{ExponentialSmoothingConfig, ExponentialSmoothingStrategy};
 pub use garch_strategy::{GarchStrategy, GarchStrategyConfig, GarchType};
 pub use kalman_strategy::{KalmanStrategy, KalmanStrategyConfig};
+pub use neural_network_strategy::{NeuralNetworkStrategy, NeuralNetworkConfig};
 pub use regime_switching_strategy::{
     MarketRegime, RegimeSwitchingConfig, RegimeSwitchingStrategy, RegimeSwitchingType,
 };
