@@ -38,7 +38,7 @@ pub use ensemble_strategy::{EnsembleMethod, EnsembleStrategy, EnsembleStrategyCo
 pub use exponential_smoothing::{ExponentialSmoothingConfig, ExponentialSmoothingStrategy};
 pub use garch_strategy::{GarchStrategy, GarchStrategyConfig, GarchType};
 pub use kalman_strategy::{KalmanStrategy, KalmanStrategyConfig};
-pub use neural_network_strategy::{NeuralNetworkStrategy, NeuralNetworkConfig};
+pub use neural_network_strategy::{NeuralNetworkConfig, NeuralNetworkStrategy};
 pub use regime_switching_strategy::{
     MarketRegime, RegimeSwitchingConfig, RegimeSwitchingStrategy, RegimeSwitchingType,
 };

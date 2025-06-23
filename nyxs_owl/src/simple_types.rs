@@ -31,6 +31,9 @@ pub enum NyxsOwlError {
     /// Not implemented error
     #[error("Not implemented: {0}")]
     NotImplemented(String),
+    /// Feature not available error
+    #[error("Feature not available: {0}")]
+    FeatureError(String),
     /// IO error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),

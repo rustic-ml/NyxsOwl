@@ -4,6 +4,253 @@
 
 This comprehensive guide provides practical usage instructions for NyxsOwl, a production-ready financial analysis library for Rust. NyxsOwl offers institutional-grade tools for quantitative finance, technical analysis, and algorithmic trading with enhanced OxiDiviner 1.2.0 integration.
 
+**New: Hybrid Strategy Framework**
+
+NyxsOwl now includes a powerful Hybrid Strategy Framework as an independent module (`nyxs_owl::hybrid`). This framework integrates technical indicators and forecasting models, enabling robust, adaptive, and production-ready trading strategies. The hybrid module is designed to avoid confusion and cluttering in the main API, and is fully extensible for advanced research and institutional use.
+
+---
+
+# Hybrid Strategy Framework
+
+## Overview
+
+The NyxsOwl Hybrid Strategy Framework represents a significant advancement in quantitative trading by seamlessly integrating technical analysis with forecasting models. This framework addresses the limitations of both approaches individually while leveraging their complementary strengths.
+
+### Key Features
+
+- **Multi-layer Signal Confirmation**: Reduces false signals through technical, forecasting, volume, and pattern confirmation
+- **Regime-aware Model Selection**: Adapts to market conditions automatically
+- **Advanced Feature Engineering**: Creates predictive features from both technical indicators and forecasting models
+- **Ensemble Methods**: Reduces overfitting through model combination
+- **Outlier Detection**: Improves data quality and signal reliability
+- **Comprehensive Technical Indicators**: 125+ indicators including momentum, trend, volatility, and volume-based indicators
+
+## Architecture
+
+```
+Technical Indicators → Feature Engineering → Signal Confirmation
+        ↓                       ↓                    ↓
+Forecasting Models → Feature Engineering → Signal Confirmation
+        ↓                       ↓                    ↓
+    Integration Engine → Final Hybrid Signal
+```
+
+## Technical Indicators Integration
+
+### Comprehensive Indicator Suite
+
+The hybrid framework includes 125+ technical indicators across multiple categories:
+
+#### Momentum Indicators
+- **RSI (Relative Strength Index)**: Measures speed and magnitude of price changes
+- **CCI (Commodity Channel Index)**: Identifies cyclical trends and overbought/oversold conditions
+- **MFI (Money Flow Index)**: Volume-weighted RSI that considers price and volume
+- **ROC (Rate of Change)**: Measures the percentage change in price over time
+- **Stochastic Oscillator**: Identifies overbought/oversold conditions
+- **Williams %R**: Momentum oscillator measuring overbought/oversold levels
+
+#### Trend Indicators
+- **Moving Averages**: SMA, EMA, WMA with crossover signals
+- **MACD**: Moving Average Convergence Divergence
+- **ADX (Average Directional Index)**: Measures trend strength
+- **Parabolic SAR**: Trend-following indicator with stop-loss levels
+- **Ichimoku Cloud**: Comprehensive trend analysis system
+
+#### Volatility Indicators
+- **ATR (Average True Range)**: Measures market volatility
+- **Bollinger Bands**: Volatility-based support and resistance
+- **Keltner Channels**: Volatility-based envelope indicator
+- **Donchian Channels**: Range-based volatility indicator
+
+#### Volume Indicators
+- **VWAP (Volume Weighted Average Price)**: Volume-weighted price average
+- **OBV (On-Balance Volume)**: Volume-based trend indicator
+- **Volume Rate of Change**: Measures volume momentum
+- **Money Flow Index**: Volume-weighted momentum indicator
+
+### Feature Engineering Pipeline
+
+The framework automatically generates feature matrices for forecasting models:
+
+```rust
+use nyxs_owl::hybrid::*;
+
+let mut strategy = HybridStrategy::new(config)?;
+
+// Generate feature matrix for forecasting
+let feature_matrix = strategy.technical_engine.generate_feature_matrix(&market_data)?;
+
+// Calculate all technical indicators
+let indicators = strategy.technical_engine.calculate_all_indicators(&market_data)?;
+```
+
+### Caching and Performance
+
+The technical indicators module includes intelligent caching for optimal performance:
+
+```rust
+// Get cached indicator values
+if let Some(rsi_values) = strategy.technical_engine.get_cached_indicator("rsi_14") {
+    // Use cached RSI values
+}
+
+// Clear cache when needed
+strategy.technical_engine.clear_indicator_cache();
+```
+
+## Forecasting Model Integration
+
+### OxiDiviner 1.2.0 Integration
+
+The framework integrates OxiDiviner 1.2.0 for advanced forecasting capabilities:
+
+#### Enhanced ARIMA Strategy
+```rust
+let arima_config = ForecastingModelConfig::ARIMA {
+    auto_order: true,
+    ensemble_forecasting: true,
+    regime_detection: true,
+    outlier_detection: true,
+};
+```
+
+#### Ensemble Forecasting
+- Multiple ARIMA orders (1,1,1), (2,1,2), (1,1,2), (2,1,1)
+- Dynamic model selection based on AIC/BIC
+- Weighted ensemble predictions
+
+#### Advanced Outlier Detection
+- IQR (Interquartile Range) method
+- Z-score method
+- Moving median method
+- Adaptive threshold adjustment
+
+#### Regime Detection
+- Market condition identification
+- Model parameter adaptation
+- Performance monitoring
+
+## Signal Confirmation Framework
+
+### Multi-layer Confirmation
+
+The framework implements a sophisticated signal confirmation system:
+
+1. **Technical Confirmation**: Multiple technical indicators agree
+2. **Forecasting Confirmation**: Forecast models support the signal
+3. **Volume Confirmation**: Volume patterns support the signal
+4. **Pattern Confirmation**: Chart patterns support the signal
+
+### Confirmation Scoring
+
+```rust
+let confirmation_config = SignalConfirmationConfig {
+    technical_confirmation: true,
+    forecasting_confirmation: true,
+    volume_confirmation: true,
+    pattern_confirmation: true,
+    min_confirmation_score: 0.7,
+};
+```
+
+## Integration Methods
+
+### Weighted Consensus Integration
+
+```rust
+let integration_config = IntegrationConfig::WeightedConsensus {
+    technical_weight: 0.6,
+    forecast_weight: 0.4,
+    min_confidence: 0.7,
+    confirmation_window: 5,
+};
+```
+
+### Adaptive Integration
+
+```rust
+let integration_config = IntegrationConfig::Adaptive {
+    base_weights: HashMap::from([
+        ("technical".to_string(), 0.5),
+        ("forecast".to_string(), 0.3),
+        ("volume".to_string(), 0.2),
+    ]),
+    adaptation_rate: 0.1,
+    min_confidence: 0.7,
+};
+```
+
+## Usage Examples
+
+### Basic Hybrid Strategy
+
+```rust
+use nyxs_owl::hybrid::*;
+use nyxs_owl::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create hybrid strategy configuration
+    let config = HybridStrategyConfig {
+        technical_indicators: vec![
+            TechnicalIndicatorConfig::RSI { 
+                period: 14, 
+                oversold: 30.0, 
+                overbought: 70.0 
+            },
+            TechnicalIndicatorConfig::MACD { 
+                fast_period: 12, 
+                slow_period: 26, 
+                signal_period: 9 
+            },
+            TechnicalIndicatorConfig::CCI { 
+                period: 20, 
+                threshold: 100.0 
+            },
+            TechnicalIndicatorConfig::MFI { 
+                period: 14, 
+                oversold: 20.0, 
+                overbought: 80.0 
+            },
+        ],
+        forecasting_models: vec![
+            ForecastingModelConfig::ARIMA {
+                auto_order: true,
+                ensemble_forecasting: true,
+                regime_detection: true,
+                outlier_detection: true,
+            },
+        ],
+        feature_engineering: FeatureEngineeringConfig {
+            technical_features: true,
+            forecasting_features: true,
+            derived_features: true,
+            feature_selection: true,
+            feature_scaling: true,
+        },
+        signal_confirmation: SignalConfirmationConfig {
+            technical_confirmation: true,
+            forecasting_confirmation: true,
+            volume_confirmation: true,
+            pattern_confirmation: true,
+            min_confirmation_score: 0.7,
+        },
+        integration: IntegrationConfig::WeightedConsensus {
+            technical_weight: 0.6,
+            forecast_weight: 0.4,
+            min_confidence: 0.7,
+            confirmation_window: 5,
+        },
+    };
+
+    let mut hybrid_strategy = HybridStrategy::new(config);
+    let integrated_signals = hybrid_strategy.generate_signals(&data)?;
+    Ok(())
+}
+```
+
+---
+
 ## Table of Contents
 
 1. [Installation & Setup](#installation--setup)
@@ -17,7 +264,8 @@ This comprehensive guide provides practical usage instructions for NyxsOwl, a pr
 9. [Backtesting](#backtesting)
 10. [Production Deployment](#production-deployment)
 11. [Advanced Features](#advanced-features)
-12. [Troubleshooting](#troubleshooting)
+12. [Hybrid Strategy Framework (nyxs_owl::hybrid)](#hybrid-strategy-framework-nyxs_owlhybrid)
+13. [Troubleshooting](#troubleshooting)
 
 ## Installation & Setup
 
@@ -1169,101 +1417,39 @@ let time_series = CacheOptimizedTimeSeries::new(prices, timestamps);
 let circular_buffer = CacheOptimizedCircularBuffer::new(1000);
 ```
 
-## Enhanced Integration: Technical Indicators + Forecasting
+## Hybrid Strategy Framework (`nyxs_owl::hybrid`)
 
-### Hybrid Strategy Framework
+### Overview
 
-```rust
-use nyxs_owl::integration::*;
+The Hybrid Strategy Framework is a next-generation module that combines technical indicators and forecasting models in a unified, extensible architecture. It is designed for:
+- Robust signal generation with multi-layer confirmation
+- Regime-aware model selection and adaptive weighting
+- Advanced feature engineering and signal validation
+- Seamless integration with the rest of NyxsOwl, but as a clearly independent module
 
-// Create integrated strategy with enhanced features
-let config = IntegratedStrategyConfig::new()
-    .with_technical_indicators(vec![
-        TechnicalConfig::RSI { period: 14, thresholds: (30.0, 70.0) },
-        TechnicalConfig::MACD { fast: 12, slow: 26, signal: 9 },
-        TechnicalConfig::BollingerBands { period: 20, std_dev: 2.0 },
-        TechnicalConfig::CCI { period: 20, threshold: 100.0 },
-        TechnicalConfig::MFI { period: 14, thresholds: (20.0, 80.0) },
-    ])
-    .with_forecasting_models(vec![
-        ForecastingConfig::ARIMA { 
-            auto_order: true, 
-            regime_detection: true,
-            ensemble_forecasting: true,
-            outlier_detection: true,
-        },
-        ForecastingConfig::Ensemble { 
-            models: vec!["arima", "es", "kalman", "garch"],
-            adaptive_weighting: true,
-        },
-    ])
-    .with_integration(IntegrationConfig::WeightedConsensus {
-        technical_weight: 0.6,
-        forecast_weight: 0.4,
-        min_confidence: 0.7,
-        confirmation_window: 5,
-    });
+### Architecture Flow
 
-let mut strategy = IntegratedStrategy::new(config);
-
-// Generate integrated signals with enhanced analysis
-let signals = strategy.generate_signals(&market_data)?;
-
-// Get detailed analysis
-let analysis = strategy.get_analysis()?;
-println!("Technical confidence: {:.2}", analysis.technical_confidence);
-println!("Forecast confidence: {:.2}", analysis.forecast_confidence);
-println!("Integrated confidence: {:.2}", analysis.integrated_confidence);
-println!("Regime detected: {:?}", analysis.market_regime);
-println!("Outliers detected: {}", analysis.outliers.len());
+```
+Technical Indicators → Feature Engineering → Signal Confirmation
+        ↓                       ↓                    ↓
+Forecasting Models → Feature Engineering → Signal Confirmation
+        ↓                       ↓                    ↓
+    Integration Engine → Final Hybrid Signal
 ```
 
-### Feature Engineering Pipeline
+### Key Benefits
+- Multi-layer confirmation reduces false signals
+- Regime-aware model selection improves adaptability
+- Feature engineering creates more predictive inputs
+- Ensemble methods reduce overfitting
+- Outlier detection improves data quality
+- Multi-timeframe analysis provides broader context
+- SIMD acceleration and memory optimization for large datasets
+- Comprehensive testing and risk management integration
 
-```rust
-// Enhanced feature engineering using technical indicators
-pub struct TechnicalFeatureEngine {
-    indicators: Vec<Box<dyn TechnicalIndicator>>,
-    feature_window: usize,
-    outlier_detector: OutlierDetector,
-}
+### Usage and Configuration
 
-impl TechnicalFeatureEngine {
-    pub fn create_forecasting_features(&self, data: &DataFrame) -> Result<DataFrame> {
-        let mut features = Vec::new();
-        
-        // Add technical indicator values as features
-        for indicator in &self.indicators {
-            let values = indicator.calculate(data)?;
-            features.push(values);
-        }
-        
-        // Add derived features with outlier detection
-        features.push(self.calculate_momentum_features(data)?);
-        features.push(self.calculate_volatility_features(data)?);
-        features.push(self.calculate_trend_features(data)?);
-        features.push(self.calculate_volume_features(data)?);
-        
-        // Detect and handle outliers
-        let outlier_mask = self.outlier_detector.detect(data)?;
-        let cleaned_features = self.remove_outliers(features, &outlier_mask)?;
-        
-        // Combine into feature DataFrame
-        self.combine_features(cleaned_features)
-    }
-    
-    fn calculate_momentum_features(&self, data: &DataFrame) -> Result<Series> {
-        // Enhanced momentum features including CCI, MFI, ROC
-        let cci_values = self.calculate_cci(data)?;
-        let mfi_values = self.calculate_mfi(data)?;
-        let roc_values = self.calculate_roc(data)?;
-        
-        // Combine into momentum score
-        let momentum_score = (cci_values + mfi_values + roc_values) / 3.0;
-        Ok(Series::new("momentum_score", momentum_score))
-    }
-}
-```
+See the [Implementation Guide](#implementation-guide) below for advanced usage, configuration, and code examples. The hybrid module is fully documented and designed for both research and production.
 
 ## Troubleshooting
 

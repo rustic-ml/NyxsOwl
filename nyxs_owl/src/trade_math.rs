@@ -28,6 +28,10 @@ pub use momentum::{
 };
 /// Re-exported moving average functions
 pub use moving_averages::{calculate_ema, calculate_sma, calculate_vwap, calculate_wma};
+/// Re-exported pattern recognition functions
+pub use patterns::{
+    calculate_fibonacci_extensions, calculate_fibonacci_retracements, detect_fibonacci_retracements,
+};
 /// Re-exported trend indicator functions
 pub use trend::{
     calculate_adx_di, calculate_adxr, calculate_aroon, calculate_aroon_oscillator,
@@ -35,17 +39,12 @@ pub use trend::{
 };
 /// Re-exported volatility indicator functions
 pub use volatility::{
-    atr::calculate_atr,
-    chandelier_exit::calculate_chandelier_exit,
+    atr::calculate_atr, chandelier_exit::calculate_chandelier_exit,
     supertrend::calculate_supertrend,
 };
 /// Re-exported volume indicator functions
 pub use volume::{
-    calculate_obv, calculate_vroc, calculate_vwap_with_bands, calculate_adl, calculate_cmf,
-};
-/// Re-exported pattern recognition functions
-pub use patterns::{
-    calculate_fibonacci_retracements, calculate_fibonacci_extensions, detect_fibonacci_retracements,
+    calculate_adl, calculate_cmf, calculate_obv, calculate_vroc, calculate_vwap_with_bands,
 };
 
 // TODO: Add other categories of math/indicator functions as modules

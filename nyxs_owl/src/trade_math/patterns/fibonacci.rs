@@ -176,7 +176,8 @@ mod tests {
         let swing_low = 80.0;
         let extension_levels = vec![1.272, 1.618, 2.0];
 
-        let extensions = calculate_fibonacci_extensions(swing_high, swing_low, &extension_levels).unwrap();
+        let extensions =
+            calculate_fibonacci_extensions(swing_high, swing_low, &extension_levels).unwrap();
 
         // Test extension levels
         assert!((extensions["ext_1272"] - 125.44).abs() < 0.01);
@@ -204,4 +205,4 @@ mod tests {
         // Test invalid window
         assert!(detect_fibonacci_retracements(&high, &low, 0).is_err());
     }
-} 
+}

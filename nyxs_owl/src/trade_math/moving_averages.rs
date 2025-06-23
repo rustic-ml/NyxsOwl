@@ -122,7 +122,7 @@ pub fn calculate_ema(series: &Series, period: usize, smoothing: f64) -> PolarsRe
 ///
 /// WMA assigns more weight to recent data points.
 /// For a period `n`, the weights are `n, n-1, ..., 1` for the most recent to oldest data point.
-/// WMA = sum(Price[i] * Weight[i]) / sum(Weights)
+/// WMA = sum(Price\[i\] * Weight\[i\]) / sum(Weights)
 ///
 /// # Arguments
 /// * `series` - The input Series of data (expected to be Float64).

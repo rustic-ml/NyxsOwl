@@ -66,11 +66,11 @@ impl ATRStrategy {
         let high = data.column("high")?.cast(&DataType::Float64)?;
         let low = data.column("low")?.cast(&DataType::Float64)?;
         let close = data.column("close")?.cast(&DataType::Float64)?;
-        
+
         let high_series = high.as_series().expect("Failed to get high series");
         let low_series = low.as_series().expect("Failed to get low series");
         let close_series = close.as_series().expect("Failed to get close series");
-        
+
         let atr_series = calculate_atr(high_series, low_series, close_series, self.config.period)?;
         let atr_values = atr_series.f64()?;
 

@@ -4,6 +4,8 @@
 
 This document outlines the strategic roadmap for NyxsOwl's evolution from version 0.7.4 to advanced quantitative finance platform. Our development follows a structured approach focused on performance, reliability, and cutting-edge features while maintaining production-ready stability.
 
+**Note:** All hybrid strategy framework features will be developed and maintained as an independent module (`nyxs_owl::hybrid`) to avoid confusion and cluttering in the main API. This ensures modularity, clarity, and extensibility for advanced research and institutional use.
+
 ## Table of Contents
 
 1. [Current Status](#current-status)
@@ -53,11 +55,12 @@ This document outlines the strategic roadmap for NyxsOwl's evolution from versio
 ### Version 0.8.0 - "Hybrid Strategy Integration" (Q1 2025)
 
 #### 🚀 **Core Enhancements**
-- **Hybrid Strategy Framework**
+- **Hybrid Strategy Framework** (`nyxs_owl::hybrid`)
   - Integration of technical indicators with forecasting models
-  - Feature engineering pipeline using technical indicators
-  - Signal confirmation framework
-  - Multi-timeframe analysis integration
+  - Feature engineering pipeline using technical indicators and forecasts
+  - Signal confirmation framework (multi-layer, multi-timeframe)
+  - Regime-aware model selection and adaptive weighting
+  - All hybrid features will be implemented in the independent `nyxs_owl::hybrid` module
 
 - **Advanced Technical Indicators**
   - Ichimoku Cloud with full signal analysis
@@ -73,25 +76,50 @@ This document outlines the strategic roadmap for NyxsOwl's evolution from versio
 
 #### 📊 **Hybrid Strategy Implementation**
 ```rust
-// Planned hybrid strategy framework
-use nyxs_owl::integration::*;
+// Planned hybrid strategy framework (nyxs_owl::hybrid)
+use nyxs_owl::hybrid::*;
 
-// Integrated technical + forecasting strategy
 let config = HybridStrategyConfig {
     technical_indicators: vec![
-        TechnicalIndicator::RSI(14),
-        TechnicalIndicator::MACD(12, 26, 9),
-        TechnicalIndicator::BollingerBands(20, 2.0),
-        TechnicalIndicator::CCI(20),
-        TechnicalIndicator::MFI(14),
+        TechnicalIndicatorConfig::RSI { period: 14, oversold: 30.0, overbought: 70.0 },
+        TechnicalIndicatorConfig::MACD { fast_period: 12, slow_period: 26, signal_period: 9 },
+        TechnicalIndicatorConfig::BollingerBands { period: 20, std_dev: 2.0 },
+        TechnicalIndicatorConfig::CCI { period: 20, threshold: 100.0 },
+        TechnicalIndicatorConfig::MFI { period: 14, oversold: 20.0, overbought: 80.0 },
     ],
     forecasting_models: vec![
-        ForecastingModel::ARIMA { ensemble: true, regime_detection: true },
-        ForecastingModel::Ensemble { models: vec!["arima", "es", "kalman"] },
+        ForecastingModelConfig::ARIMA {
+            auto_order: true,
+            ensemble_forecasting: true,
+            regime_detection: true,
+            outlier_detection: true,
+        },
+        ForecastingModelConfig::Ensemble {
+            models: vec!["arima", "exponential_smoothing", "kalman"],
+            adaptive_weighting: true,
+        },
     ],
-    integration_method: IntegrationMethod::WeightedConsensus,
-    confidence_threshold: 0.7,
-    confirmation_window: 5,
+    feature_engineering: FeatureEngineeringConfig {
+        technical_features: true,
+        forecasting_features: true,
+        derived_features: true,
+        feature_selection: true,
+        feature_scaling: true,
+    },
+    signal_confirmation: SignalConfirmationConfig {
+        technical_confirmation: true,
+        forecasting_confirmation: true,
+        volume_confirmation: true,
+        pattern_confirmation: true,
+        multi_timeframe: true,
+        min_confirmation_score: 0.7,
+    },
+    integration: IntegrationConfig::WeightedConsensus {
+        technical_weight: 0.6,
+        forecast_weight: 0.4,
+        min_confidence: 0.7,
+        confirmation_window: 5,
+    },
 };
 
 let mut hybrid_strategy = HybridStrategy::new(config);

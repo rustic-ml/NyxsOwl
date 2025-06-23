@@ -1,5 +1,5 @@
-use polars::prelude::*;
 use crate::trade_math::volatility::calculate_atr;
+use polars::prelude::*;
 
 /// Calculate SuperTrend indicator
 ///
@@ -55,9 +55,12 @@ pub fn calculate_supertrend(
 
     // Calculate SuperTrend for each period
     for i in (period - 1)..high_values.len() {
-        if let (Some(high_val), Some(low_val), Some(close_val), Some(atr_val)) = 
-            (high_values[i], low_values[i], close_values[i], atr_values[i]) {
-            
+        if let (Some(high_val), Some(low_val), Some(close_val), Some(atr_val)) = (
+            high_values[i],
+            low_values[i],
+            close_values[i],
+            atr_values[i],
+        ) {
             let basic_upper = (high_val + low_val) / 2.0 + multiplier * atr_val;
             let basic_lower = (high_val + low_val) / 2.0 - multiplier * atr_val;
 
@@ -120,7 +123,8 @@ mod tests {
         let period = 3;
         let multiplier = 2.0;
 
-        let (supertrend, trend_direction) = calculate_supertrend(&high, &low, &close, period, multiplier).unwrap();
+        let (supertrend, trend_direction) =
+            calculate_supertrend(&high, &low, &close, period, multiplier).unwrap();
 
         // Test that SuperTrend values are finite
         for i in period..supertrend.len() {
@@ -141,4 +145,4 @@ mod tests {
         assert!(calculate_supertrend(&high, &low, &close, period, 0.0).is_err());
         assert!(calculate_supertrend(&high, &low, &close, period, -1.0).is_err());
     }
-} 
+}

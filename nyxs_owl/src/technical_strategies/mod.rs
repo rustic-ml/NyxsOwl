@@ -56,12 +56,14 @@ use std::collections::HashMap;
 // Import common types from forecasting module for consistency
 // Use appropriate types based on available features
 #[cfg(feature = "forecasting")]
-pub use crate::forecasting::{ConfigValue, Strategy, StrategyConfig};
+pub use crate::forecasting::{ConfigValue, StrategyConfig};
 
 #[cfg(not(feature = "forecasting"))]
 pub use crate::common::{ConfigValue, StrategyConfig};
-#[cfg(not(feature = "forecasting"))]
-use crate::simple_types::NyxsOwlError;
+
+// Re-exports for easier access
+#[cfg(feature = "forecasting")]
+pub use crate::forecasting::strategies::*;
 
 // Unified trait for StrategyConfig that works with both common and forecasting modules
 /// Trait for extracting configuration values safely from strategy configurations
@@ -146,7 +148,7 @@ impl ConfigExtractor for StrategyConfig {
 }
 
 /// The Strategy trait defines the interface for all technical analysis strategies.
-/// 
+///
 /// Each strategy must implement this trait to provide a consistent interface for:
 /// - Creating new strategy instances with configuration
 /// - Generating trading signals from market data
@@ -159,10 +161,10 @@ pub trait Strategy {
         Self: Sized;
 
     /// Generates trading signals based on the provided market data.
-    /// 
+    ///
     /// # Arguments
     /// * `data` - DataFrame containing market data with required columns
-    /// 
+    ///
     /// # Returns
     /// * `NyxsOwlResult<Series>` - Series of trading signals
     fn generate_signals(&self, data: &DataFrame) -> NyxsOwlResult<Series>;
@@ -207,10 +209,32 @@ pub trait Strategy {
     }
 }
 
-// Re-export from forecasting when available (already imported above)
-// #[cfg(feature = "forecasting")]
-// pub use crate::forecasting::Strategy;
-use crate::simple_types::{Result as NyxsOwlResult, Signal};
+/// The TechnicalStrategy trait defines the interface for all technical analysis strategies.
+///
+/// Each strategy must implement this trait to provide a consistent interface for:
+/// - Creating new strategy instances with configuration
+/// - Generating trading signals from market data
+/// - Providing metadata about the strategy
+/// - Specifying data requirements
+pub trait TechnicalStrategy: Strategy {
+    /// Generate enhanced signals with metadata
+    fn generate_enhanced_signals(&self, data: &DataFrame) -> NyxsOwlResult<Vec<TechnicalSignal>>;
+
+    /// Get indicator values used for signal generation
+    fn get_indicator_values(&self, data: &DataFrame) -> NyxsOwlResult<HashMap<String, Series>>;
+
+    /// Get strategy performance metrics
+    fn get_performance_metrics(
+        &self,
+        data: &DataFrame,
+        signals: &[TechnicalSignal],
+    ) -> NyxsOwlResult<PerformanceMetrics>;
+
+    /// Validate strategy parameters
+    fn validate_parameters(&self) -> NyxsOwlResult<()>;
+}
+
+use crate::simple_types::{Result as NyxsOwlResult, Signal, NyxsOwlError};
 
 // Declare strategy category modules
 pub mod momentum;
@@ -266,25 +290,6 @@ impl TechnicalSignal {
         self.metadata.insert(key.to_string(), value);
         self
     }
-}
-
-/// Enhanced technical strategy trait with additional capabilities
-pub trait TechnicalStrategy: Strategy {
-    /// Generate enhanced signals with metadata
-    fn generate_enhanced_signals(&self, data: &DataFrame) -> NyxsOwlResult<Vec<TechnicalSignal>>;
-
-    /// Get indicator values used for signal generation
-    fn get_indicator_values(&self, data: &DataFrame) -> NyxsOwlResult<HashMap<String, Series>>;
-
-    /// Get strategy performance metrics
-    fn get_performance_metrics(
-        &self,
-        data: &DataFrame,
-        signals: &[TechnicalSignal],
-    ) -> NyxsOwlResult<PerformanceMetrics>;
-
-    /// Validate strategy parameters
-    fn validate_parameters(&self) -> NyxsOwlResult<()>;
 }
 
 /// Performance metrics for a trading strategy
@@ -473,9 +478,9 @@ pub enum CombinationMethod {
 pub mod prelude {
     pub use super::{
         CombinationMethod, ConfigValue, PerformanceMetrics, SignalFilter, Strategy, StrategyConfig,
-        TechnicalSignal, TechnicalStrategy,
+        TechnicalSignal, TechnicalStrategy, ConfigExtractor,
     };
-    pub use crate::simple_types::{Result as NyxsOwlResult, Signal};
+    pub use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 
     // Re-export available strategies
     pub use super::multi_factor::MultiFactorStrategy;

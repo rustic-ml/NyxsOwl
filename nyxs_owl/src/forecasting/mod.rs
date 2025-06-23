@@ -272,6 +272,45 @@ pub trait Strategy: Send + Sync {
     }
 }
 
+/// Configuration for forecasting strategies
+#[derive(Debug, Clone)]
+pub struct ForecastingConfig {
+    /// Model type (ARIMA, Neural Network, etc.)
+    pub model_type: String,
+    /// Model parameters
+    pub parameters: StrategyConfig,
+    /// Whether to use ensemble methods
+    pub use_ensemble: bool,
+    /// Whether to enable regime detection
+    pub regime_detection: bool,
+    /// Whether to enable outlier detection
+    pub outlier_detection: bool,
+}
+
+impl Default for ForecastingConfig {
+    fn default() -> Self {
+        Self {
+            model_type: "ARIMA".to_string(),
+            parameters: StrategyConfig::new(),
+            use_ensemble: false,
+            regime_detection: false,
+            outlier_detection: false,
+        }
+    }
+}
+
+/// Trait for forecasting strategies
+pub trait ForecastingStrategy: Strategy {
+    /// Generate forecasting signals
+    fn generate_forecast_signals(&self, data: &DataFrame) -> NyxsOwlResult<Vec<crate::simple_types::Signal>>;
+    
+    /// Get forecast confidence
+    fn get_forecast_confidence(&self) -> f64;
+    
+    /// Get forecast horizon
+    fn get_forecast_horizon(&self) -> usize;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

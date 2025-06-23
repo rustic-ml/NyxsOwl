@@ -1,5 +1,5 @@
-use polars::prelude::*;
 use crate::trade_math::volatility::calculate_atr;
+use polars::prelude::*;
 
 /// Calculate Chandelier Exit
 ///
@@ -56,7 +56,12 @@ pub fn calculate_chandelier_exit(
     let mut short_exit = vec![None; high_values.len()];
 
     // Calculate Chandelier Exit values
-    for (i, (long_val, short_val)) in long_exit.iter_mut().zip(short_exit.iter_mut()).enumerate().skip(period - 1) {
+    for (i, (long_val, short_val)) in long_exit
+        .iter_mut()
+        .zip(short_exit.iter_mut())
+        .enumerate()
+        .skip(period - 1)
+    {
         let mut highest_high = f64::NEG_INFINITY;
         let mut lowest_low = f64::INFINITY;
 
@@ -89,35 +94,55 @@ mod tests {
 
     #[test]
     fn test_chandelier_exit() {
-        let high = Series::new("high".into(), vec![
-            110.0, 112.0, 115.0, 113.0, 116.0, 118.0, 117.0, 119.0, 121.0, 120.0,
-            122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0,
-            132.0, 133.0, 134.0, 135.0, 136.0
-        ]);
-        let low = Series::new("low".into(), vec![
-            108.0, 109.0, 111.0, 110.0, 112.0, 114.0, 115.0, 116.0, 118.0, 119.0,
-            120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
-            130.0, 131.0, 132.0, 133.0, 134.0
-        ]);
-        let close = Series::new("close".into(), vec![
-            109.0, 111.0, 113.0, 112.0, 115.0, 116.0, 116.5, 118.0, 120.0, 119.5,
-            121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0,
-            131.0, 132.0, 133.0, 134.0, 135.0
-        ]);
+        let high = Series::new(
+            "high".into(),
+            vec![
+                110.0, 112.0, 115.0, 113.0, 116.0, 118.0, 117.0, 119.0, 121.0, 120.0, 122.0, 123.0,
+                124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0, 134.0, 135.0,
+                136.0,
+            ],
+        );
+        let low = Series::new(
+            "low".into(),
+            vec![
+                108.0, 109.0, 111.0, 110.0, 112.0, 114.0, 115.0, 116.0, 118.0, 119.0, 120.0, 121.0,
+                122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0,
+                134.0,
+            ],
+        );
+        let close = Series::new(
+            "close".into(),
+            vec![
+                109.0, 111.0, 113.0, 112.0, 115.0, 116.0, 116.5, 118.0, 120.0, 119.5, 121.0, 122.0,
+                123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0, 134.0,
+                135.0,
+            ],
+        );
 
-        let (long_exit, short_exit) = calculate_chandelier_exit(&high, &low, &close, 22, 22, 3.0).unwrap();
+        let (long_exit, short_exit) =
+            calculate_chandelier_exit(&high, &low, &close, 22, 22, 3.0).unwrap();
 
         // Test warmup period
         for i in 0..21 {
-            assert!(long_exit.get(i).unwrap().try_extract::<f64>().unwrap_or(f64::NAN).is_nan());
-            assert!(short_exit.get(i).unwrap().try_extract::<f64>().unwrap_or(f64::NAN).is_nan());
+            assert!(long_exit
+                .get(i)
+                .unwrap()
+                .try_extract::<f64>()
+                .unwrap_or(f64::NAN)
+                .is_nan());
+            assert!(short_exit
+                .get(i)
+                .unwrap()
+                .try_extract::<f64>()
+                .unwrap_or(f64::NAN)
+                .is_nan());
         }
 
         // Test valid values
         for i in 21..long_exit.len() {
             if let (Ok(long_val), Ok(short_val)) = (
                 long_exit.get(i).unwrap().try_extract::<f64>(),
-                short_exit.get(i).unwrap().try_extract::<f64>()
+                short_exit.get(i).unwrap().try_extract::<f64>(),
             ) {
                 // In an uptrend, long exit should be below current price but above short exit
                 assert!(long_val.is_finite() && short_val.is_finite());
@@ -136,18 +161,18 @@ mod tests {
         let constant_low = Series::new("low".into(), vec![100.0; 25]);
         let constant_close = Series::new("close".into(), vec![100.0; 25]);
 
-        let (constant_long, constant_short) = calculate_chandelier_exit(
-            &constant_high, &constant_low, &constant_close, 22, 22, 3.0
-        ).unwrap();
+        let (constant_long, constant_short) =
+            calculate_chandelier_exit(&constant_high, &constant_low, &constant_close, 22, 22, 3.0)
+                .unwrap();
 
         for i in 21..constant_long.len() {
             if let (Ok(long_val), Ok(short_val)) = (
                 constant_long.get(i).unwrap().try_extract::<f64>(),
-                constant_short.get(i).unwrap().try_extract::<f64>()
+                constant_short.get(i).unwrap().try_extract::<f64>(),
             ) {
                 assert_eq!(long_val, 100.0);
                 assert_eq!(short_val, 100.0);
             }
         }
     }
-} 
+}

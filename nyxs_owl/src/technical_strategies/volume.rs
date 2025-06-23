@@ -9,7 +9,7 @@ use crate::technical_strategies::{PerformanceMetrics, TechnicalSignal, Technical
 use crate::technical_strategies::{Strategy, StrategyConfig};
 use crate::trade_math::moving_averages::calculate_vwap;
 use crate::trade_math::volume::calculate_obv;
-use polars::prelude::{DataFrame, NamedFrom, Series, DataType};
+use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
 use std::collections::HashMap;
 
 /// Volume Weighted Average Price (VWAP) Strategy
@@ -123,7 +123,7 @@ impl TechnicalStrategy for VWAPStrategy {
         let vwap = calculate_vwap(data)?;
         let close = data.column("close")?.cast(&DataType::Float64)?;
         let volume = data.column("volume")?.cast(&DataType::Float64)?;
-        
+
         let close_series = close.as_series().expect("Failed to get close series");
         let volume_series = volume.as_series().expect("Failed to get volume series");
         let obv = calculate_obv(close_series, volume_series)?;

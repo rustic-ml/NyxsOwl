@@ -7,8 +7,6 @@
 pub mod fibonacci;
 
 pub use fibonacci::{
-    calculate_fibonacci_retracements,
-    calculate_fibonacci_extensions,
-    detect_fibonacci_retracements,
-    FIBONACCI_LEVELS,
-}; 
+    calculate_fibonacci_extensions, calculate_fibonacci_retracements,
+    detect_fibonacci_retracements, FIBONACCI_LEVELS,
+};

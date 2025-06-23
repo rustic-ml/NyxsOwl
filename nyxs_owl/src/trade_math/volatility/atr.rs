@@ -41,15 +41,17 @@ pub fn calculate_atr(
 
     // Calculate True Range and ATR
     for (i, atr_value) in atr_values.iter_mut().enumerate() {
-        if let (Some(high_val), Some(low_val), Some(close_val)) = 
-            (high_values[i], low_values[i], close_values[i]) {
-            
+        if let (Some(high_val), Some(low_val), Some(close_val)) =
+            (high_values[i], low_values[i], close_values[i])
+        {
             // Calculate True Range
             let tr = if let Some(prev) = prev_close {
                 let high_low = high_val - low_val;
                 let high_prev_close: f64 = high_val - prev;
                 let low_prev_close: f64 = low_val - prev;
-                high_low.max(high_prev_close.abs()).max(low_prev_close.abs())
+                high_low
+                    .max(high_prev_close.abs())
+                    .max(low_prev_close.abs())
             } else {
                 high_val - low_val
             };
@@ -79,10 +81,7 @@ mod tests {
             "high".into(),
             vec![10.0, 12.0, 11.0, 13.0, 14.0, 13.5, 15.0],
         );
-        let low = Series::new(
-            "low".into(),
-            vec![9.0, 10.0, 9.5, 11.0, 12.0, 11.5, 13.0],
-        );
+        let low = Series::new("low".into(), vec![9.0, 10.0, 9.5, 11.0, 12.0, 11.5, 13.0]);
         let close = Series::new(
             "close".into(),
             vec![9.5, 11.0, 10.0, 12.0, 13.0, 12.5, 14.0],
@@ -104,4 +103,4 @@ mod tests {
         let short_high = Series::new("high".into(), vec![10.0, 12.0]);
         assert!(calculate_atr(&short_high, &low, &close, period).is_err());
     }
-} 
+}

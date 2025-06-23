@@ -1,12 +1,11 @@
-#[cfg(feature = "async-support")]
-use crate::async_parallel::{AsyncParallelProcessor, ForecastTask, ParallelConfig};
 use crate::memory_optimized::{CacheOptimizedCircularBuffer, CacheOptimizedTimeSeries, MemoryPool};
 use crate::performance_utils::SimdMath;
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use log::{debug, info, warn};
 use polars::prelude::*;
 use std::sync::Arc;
-use std::time::Instant;
+use crate::forecasting::StrategyConfig;
+use std::collections::HashMap;
 
 /// Configuration for ARIMA strategy
 #[derive(Debug, Clone)]
@@ -213,6 +212,7 @@ pub struct ArimaStrategy {
     /// Cache-optimized time series data storage
     cached_time_series: Option<CacheOptimizedTimeSeries>,
     /// Async/parallel processor for concurrent forecasting
+    #[cfg(feature = "async-support")]
     async_processor: Option<Arc<AsyncParallelProcessor>>,
 }
 
@@ -254,6 +254,7 @@ impl ArimaStrategy {
         let memory_pool_capacity = 1000; // Default capacity for frequent allocations
 
         // Initialize async processor if parallel processing is enabled
+        #[cfg(feature = "async-support")]
         let async_processor = if config.enable_parallel_processing {
             let parallel_config = ParallelConfig {
                 max_concurrent_forecasts: config.max_concurrent_forecasts,
@@ -267,6 +268,9 @@ impl ArimaStrategy {
             None
         };
 
+        #[cfg(not(feature = "async-support"))]
+        let _async_processor = ();
+
         Self {
             config,
             last_refit: None,
@@ -274,6 +278,7 @@ impl ArimaStrategy {
             current_regime: None,
             memory_pool: MemoryPool::new(memory_pool_capacity),
             cached_time_series: None,
+            #[cfg(feature = "async-support")]
             async_processor,
         }
     }
@@ -629,49 +634,58 @@ impl ArimaStrategy {
         prices: &[f64],
         _timestamps: &[String],
     ) -> Result<Vec<Signal>> {
-        let mut signals = Vec::with_capacity(prices.len());
-        let window_size = self.config.min_data_points;
-
-        // For the first window_size points, we can't generate forecasts
-        for _ in 0..window_size {
-            signals.push(Signal::Hold);
+        if prices.len() < self.config.min_data_points {
+            return Err(NyxsOwlError::DataError(format!(
+                "Insufficient data: {} points provided, {} required",
+                prices.len(),
+                self.config.min_data_points
+            )));
         }
 
-        // Generate forecasts using rolling window with adaptive features
-        for i in window_size..prices.len() {
-            let window_data = &prices[i - window_size..i];
-            let _current_price = prices[i];
+        let mut signals = Vec::with_capacity(prices.len());
+        let cleaned_data = if self.config.outlier_detection {
+            self.detect_and_clean_outliers(prices)?
+        } else {
+            prices.to_vec()
+        };
 
-            // Check if we need to refit (adaptive refitting)
-            let should_refit = self.should_refit(i);
+        // Generate forecasts for each point
+        for i in self.config.min_data_points..prices.len() {
+            let current_price = cleaned_data[i];
+            let historical_data = &cleaned_data[..i];
 
-            match self.generate_enhanced_forecast(window_data, should_refit) {
-                Ok(forecast_result) => {
-                    let signal = self.forecast_to_enhanced_signal(
-                        _current_price,
-                        &forecast_result,
-                        window_data,
-                    );
-                    signals.push(signal);
+            // Check if we should refit the model
+            if self.config.adaptive_refit && self.should_refit(i) {
+                debug!("Refitting model at index {}", i);
+                // In a real implementation, this would retrain the model
+            }
 
-                    // Track forecast accuracy for adaptive learning
-                    if i > window_size {
-                        let actual_change = (prices[i] - prices[i - 1]) / prices[i - 1];
-                        let predicted_change =
-                            (forecast_result.point_forecast - prices[i - 1]) / prices[i - 1];
-                        let accuracy = 1.0 - (actual_change - predicted_change).abs();
-                        self.track_accuracy(accuracy);
-                    }
+            // Generate forecast using ensemble approach if enabled
+            let forecast = if self.config.ensemble_models > 1 {
+                self.generate_ensemble_forecast(historical_data)?.point_forecast
+            } else {
+                self.generate_single_forecast(historical_data)?.point_forecast
+            };
 
-                    debug!(
-                        "Generated signal {:?} for price {} with forecast {}",
-                        signal, _current_price, forecast_result.point_forecast
-                    );
-                }
-                Err(e) => {
-                    warn!("Failed to generate enhanced forecast: {}", e);
-                    signals.push(Signal::Hold);
-                }
+            // Apply dynamic threshold based on market conditions
+            let _dynamic_threshold = self.calculate_dynamic_threshold(historical_data);
+
+            // Generate signal with trend confirmation if enabled
+            let base_signal = self.forecast_to_signal(current_price, forecast);
+            let final_signal = if self.config.trend_confirmation {
+                self.apply_signal_filters(base_signal, current_price, forecast, historical_data)
+            } else {
+                base_signal
+            };
+
+            signals.push(final_signal);
+
+            // Track accuracy for adaptive features
+            if i > 0 {
+                let actual_return = (current_price - cleaned_data[i - 1]) / cleaned_data[i - 1];
+                let predicted_return = (forecast - cleaned_data[i - 1]) / cleaned_data[i - 1];
+                let accuracy = 1.0 - (actual_return - predicted_return).abs();
+                self.track_accuracy(accuracy);
             }
         }
 
@@ -946,7 +960,7 @@ impl ArimaStrategy {
             // Single model approach with enhanced error handling
             match oxidiviner::quick::arima_forecast_custom(
                 timestamps,
-                cleaned_data,
+                cleaned_data.clone(),
                 1, // forecast 1 step ahead
                 p,
                 d,
@@ -995,7 +1009,7 @@ impl ArimaStrategy {
                         let base_weight = 1.0 / (1.0 + complexity_penalty);
 
                         // Adjust weight based on regime if available
-                        let regime_weight = if let Some(regime) = self.current_regime {
+                        let regime_weight = if let Some(regime) = &self.current_regime {
                             match regime {
                                 MarketRegime::HighVolatility => base_weight * 0.8, // Prefer simpler models
                                 MarketRegime::LowVolatility => base_weight * 1.2, // Allow complex models
@@ -1473,23 +1487,23 @@ impl ArimaStrategy {
     }
 
     /// Generate trading signals using async/parallel processing
+    #[cfg(feature = "async-support")]
     pub async fn generate_signals_async(
         &mut self,
         df: &DataFrame,
         price_column: &str,
         timestamp_column: &str,
     ) -> Result<Vec<Signal>> {
-        // Use async processor if available, otherwise fall back to synchronous processing
         if let Some(processor) = &self.async_processor {
-            self.generate_signals_parallel(df, price_column, timestamp_column, processor.clone())
-                .await
+            self.generate_signals_parallel(df, price_column, timestamp_column, processor.clone()).await
         } else {
-            // Fall back to synchronous processing
-            self.generate_signals(df, price_column, timestamp_column)
+            // Fallback to synchronous processing
+            Ok(self.generate_signals(df, price_column, timestamp_column)?)
         }
     }
 
     /// Generate signals using parallel processing with multiple forecast tasks
+    #[cfg(feature = "async-support")]
     async fn generate_signals_parallel(
         &mut self,
         df: &DataFrame,
@@ -1500,44 +1514,36 @@ impl ArimaStrategy {
         // Validate inputs
         self.validate_inputs(df, price_column, timestamp_column)?;
 
-        // Update cached time series for optimal performance
-        self.update_cached_time_series(df, price_column, timestamp_column)?;
-
-        // Extract data for parallel processing
+        // Extract price data
         let prices = self.extract_prices(df, price_column)?;
-        let _timestamps = self.extract_timestamps(df, timestamp_column)?;
+        let timestamps = self.extract_timestamps(df, timestamp_column)?;
 
-        if prices.is_empty() || prices.len() < self.config.min_data_points {
-            return Ok(vec![Signal::Hold; prices.len()]);
+        // Create time series for parallel processing
+        let time_series = Arc::new(CacheOptimizedTimeSeries::from_slice(&prices));
+
+        // Create parallel forecast tasks
+        let tasks = self.create_parallel_forecast_tasks(&prices, &timestamps, time_series)?;
+
+        // Process tasks in parallel
+        let results = processor.process_forecasts_concurrent(tasks).await;
+
+        // Convert results to signals
+        let mut signals = Vec::with_capacity(prices.len());
+        
+        // Add hold signals for initial data points
+        for _ in 0..self.config.min_data_points {
+            signals.push(Signal::Hold);
         }
-
-        // Create cache-optimized time series for parallel processing
-        let mut time_series = CacheOptimizedTimeSeries::new();
-        for &price in &prices {
-            time_series.add_price(price as f32);
-        }
-        let _time_series = Arc::new(time_series);
-
-        // Generate parallel forecast tasks
-        let tasks =
-            self.create_parallel_forecast_tasks(&prices, &_timestamps, _time_series.clone())?;
-
-        // Process forecasts concurrently
-        let forecast_results = processor.process_forecasts_concurrent(tasks).await;
 
         // Convert forecast results to signals
-        let mut signals = Vec::with_capacity(prices.len());
-        for (i, price) in prices.iter().enumerate() {
-            let signal = if let Some(result) = forecast_results.get(i) {
-                self.forecast_to_enhanced_signal(
-                    *price,
-                    &self.convert_parallel_result_to_forecast(&result.result),
-                    &prices,
-                )
-            } else {
-                // Fallback to synchronous processing for this point
-                self.generate_fallback_signal(*price, &prices, i)
-            };
+        for (i, result) in results.iter().enumerate() {
+            let current_price = prices[self.config.min_data_points + i];
+            let forecast_result = self.convert_parallel_result_to_forecast(result);
+            let signal = self.forecast_to_enhanced_signal(
+                current_price,
+                &forecast_result,
+                &prices,
+            );
             signals.push(signal);
         }
 
@@ -1545,6 +1551,7 @@ impl ArimaStrategy {
     }
 
     /// Create parallel forecast tasks for concurrent processing
+    #[cfg(feature = "async-support")]
     fn create_parallel_forecast_tasks(
         &self,
         prices: &[f64],
@@ -1552,29 +1559,23 @@ impl ArimaStrategy {
         _time_series: Arc<CacheOptimizedTimeSeries>,
     ) -> Result<Vec<ForecastTask>> {
         let mut tasks = Vec::new();
-        let window_size = self.config.min_data_points;
+        let task_id_base = format!("arima_forecast_{}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis());
 
-        // Create overlapping windows for forecasting
-        for i in window_size..prices.len() {
-            let task_id = format!("arima_forecast_{}", i);
-            let symbol = format!("ASSET_{}", i);
-
-            // Create a window-specific time series
-            let mut window_series = CacheOptimizedTimeSeries::new();
-            for j in (i.saturating_sub(window_size))..i {
-                if j < prices.len() {
-                    window_series.add_price(prices[j] as f32);
-                }
-            }
-
+        for i in self.config.min_data_points..prices.len() {
+            let task_id = format!("{}_{}", task_id_base, i);
+            let priority = self.calculate_task_priority(i, prices.len());
+            
             let task = ForecastTask {
                 id: task_id,
-                symbol,
-                data: Arc::new(window_series),
-                priority: self.calculate_task_priority(i, prices.len()),
-                created_at: Instant::now(),
+                symbol: "ARIMA_FORECAST".to_string(),
+                data: _time_series.clone(),
+                priority,
+                created_at: std::time::Instant::now(),
             };
-
+            
             tasks.push(task);
         }
 
@@ -1589,144 +1590,147 @@ impl ArimaStrategy {
         ((total_length - index) as f64 / total_length as f64 * 255.0) as u8
     }
 
-    /// Generate fallback signal when parallel processing fails
-    fn generate_fallback_signal(&self, current_price: f64, prices: &[f64], index: usize) -> Signal {
-        if index < self.config.min_data_points {
-            return Signal::Hold;
-        }
-
-        // Simple momentum-based fallback
-        let lookback = self.config.min_data_points.min(index);
-        let start_idx = index.saturating_sub(lookback);
-        let recent_prices = &prices[start_idx..index];
-
-        if recent_prices.len() < 2 {
-            return Signal::Hold;
-        }
-
-        let price_change = current_price - recent_prices[0];
-        let threshold = self.config.threshold;
-
-        if price_change > threshold {
-            Signal::Buy
-        } else if price_change < -threshold {
-            Signal::Sell
-        } else {
-            Signal::Hold
-        }
-    }
-
     /// Convert parallel processing result to ForecastResult
+    #[cfg(feature = "async-support")]
     fn convert_parallel_result_to_forecast(
         &self,
-        #[cfg(feature = "async-support")] result: &crate::async_parallel::ForecastResult,
-        #[cfg(not(feature = "async-support"))] result: &(),
+        result: &crate::async_parallel::ForecastResult,
     ) -> ForecastResult {
         ForecastResult {
             point_forecast: result.forecast_price,
-            lower_bound: None,
-            upper_bound: None,
+            lower_bound: None, // Not provided by async result
+            upper_bound: None, // Not provided by async result
             confidence_level: result.confidence,
             model_used: result.metadata.clone(),
         }
     }
 
     /// Process ensemble forecasts using parallel processing
+    #[cfg(feature = "async-support")]
     pub async fn generate_ensemble_signals_async(
         &mut self,
         df: &DataFrame,
         price_column: &str,
         timestamp_column: &str,
-        ensemble_size: usize,
+        _ensemble_size: usize,
     ) -> Result<Vec<Signal>> {
-        if let Some(processor) = self.async_processor.clone() {
-            // Validate inputs
-            self.validate_inputs(df, price_column, timestamp_column)?;
-
-            // Update cached time series
-            self.update_cached_time_series(df, price_column, timestamp_column)?;
-
-            // Extract data
+        if let Some(processor) = &self.async_processor {
+            // Create multiple time series for ensemble
             let prices = self.extract_prices(df, price_column)?;
-            let _timestamps = self.extract_timestamps(df, timestamp_column)?;
+            let time_series = Arc::new(CacheOptimizedTimeSeries::from_slice(&prices));
 
-            if prices.is_empty() || prices.len() < self.config.min_data_points {
-                return Ok(vec![Signal::Hold; prices.len()]);
-            }
-
-            // Create time series for ensemble processing
-            let mut time_series = CacheOptimizedTimeSeries::new();
-            for &price in &prices {
-                time_series.add_price(price as f32);
-            }
-            let _time_series = Arc::new(time_series);
-
-            // Process ensemble forecasts in parallel
+            // Generate ensemble forecasts in parallel
             let ensemble_results = processor
-                .process_ensemble_parallel(_time_series, ensemble_size, "ENSEMBLE".to_string())
+                .process_ensemble_parallel(time_series, _ensemble_size, "ARIMA_ENSEMBLE".to_string())
                 .await;
 
-            // Convert ensemble results to signals
+            // Combine ensemble results
             let mut signals = Vec::with_capacity(prices.len());
-            for (i, &current_price) in prices.iter().enumerate() {
-                let signal = if let Some(forecast_result) =
-                    ensemble_results.get(i % ensemble_results.len())
-                {
-                    self.forecast_to_enhanced_signal(
-                        current_price,
-                        &self.convert_parallel_result_to_forecast(forecast_result),
-                        &prices,
-                    )
-                } else {
-                    self.generate_fallback_signal(current_price, &prices, i)
-                };
+            
+            // Add hold signals for initial data points
+            for _ in 0..self.config.min_data_points {
+                signals.push(Signal::Hold);
+            }
+
+            // Convert ensemble results to signals
+            for (i, result) in ensemble_results.iter().enumerate() {
+                let current_price = prices[self.config.min_data_points + i];
+                let forecast_result = self.convert_parallel_result_to_forecast(result);
+                let signal = self.forecast_to_enhanced_signal(
+                    current_price,
+                    &forecast_result,
+                    &prices,
+                );
                 signals.push(signal);
             }
 
             Ok(signals)
         } else {
-            // Fall back to synchronous processing
-            self.generate_signals(df, price_column, timestamp_column)
+            // Fallback to synchronous processing
+            Ok(self.generate_signals(df, price_column, timestamp_column)?)
         }
     }
 
     /// Get async processor statistics
     pub fn get_async_stats(&self) -> Option<String> {
-        self.async_processor.as_ref().map(|processor| {
-            let stats = processor.get_stats();
-            format!(
-                "Async Processor - Available: {}/{}, Total Processed: {}, Workers: {}",
-                stats.available_permits,
-                stats.max_concurrent,
-                stats.total_tasks_processed,
-                stats.worker_threads
-            )
-        })
+        #[cfg(feature = "async-support")]
+        {
+            self.async_processor.as_ref().map(|processor| {
+                let stats = processor.get_stats();
+                format!(
+                    "Async processor enabled with {} max concurrent forecasts",
+                    self.config.max_concurrent_forecasts
+                )
+            })
+        }
+        #[cfg(not(feature = "async-support"))]
+        {
+            None
+        }
     }
 
     /// Enable or disable parallel processing
     pub fn set_parallel_processing(&mut self, enabled: bool) {
-        if enabled && self.async_processor.is_none() {
-            // Create new async processor
-            let parallel_config = ParallelConfig {
-                max_concurrent_forecasts: self.config.max_concurrent_forecasts,
-                parallel_chunk_size: 1000,
-                forecast_timeout: std::time::Duration::from_secs(self.config.forecast_timeout_secs),
-                enable_parallel_ensemble: self.config.parallel_ensemble,
-                worker_threads: num_cpus::get(),
-            };
-            self.async_processor = Some(Arc::new(AsyncParallelProcessor::new(parallel_config)));
-        } else if !enabled {
-            self.async_processor = None;
+        #[cfg(feature = "async-support")]
+        {
+            if enabled && self.async_processor.is_none() {
+                let parallel_config = ParallelConfig {
+                    max_concurrent_forecasts: self.config.max_concurrent_forecasts,
+                    parallel_chunk_size: 1000,
+                    forecast_timeout: std::time::Duration::from_secs(self.config.forecast_timeout_secs),
+                    enable_parallel_ensemble: self.config.parallel_ensemble,
+                    worker_threads: num_cpus::get(),
+                };
+                self.async_processor = Some(Arc::new(AsyncParallelProcessor::new(parallel_config)));
+            } else if !enabled {
+                self.async_processor = None;
+            }
         }
-
-        // Update config
-        self.config.enable_parallel_processing = enabled;
+        #[cfg(not(feature = "async-support"))]
+        {
+            // No-op when async support is not available
+            let _ = enabled;
+        }
     }
 
     /// Check if parallel processing is enabled
     pub fn is_parallel_enabled(&self) -> bool {
-        self.async_processor.is_some()
+        #[cfg(feature = "async-support")]
+        {
+            self.async_processor.is_some()
+        }
+        #[cfg(not(feature = "async-support"))]
+        {
+            false
+        }
+    }
+
+    /// Apply regime-based weighting to ensemble forecasts
+    fn apply_regime_weighting(&self, forecasts: &[f64], weights: &[f64]) -> f64 {
+        let regime_weight = if let Some(regime) = &self.current_regime {
+            match regime {
+                MarketRegime::Trending => 1.2,      // Favor trend-following models
+                MarketRegime::MeanReverting => 0.8, // Favor mean-reversion models
+                MarketRegime::HighVolatility => 1.1, // Slightly favor volatility models
+                MarketRegime::LowVolatility => 0.9,  // Slightly disfavor volatility models
+            }
+        } else {
+            1.0 // Neutral weighting
+        };
+
+        // Apply regime weighting to ensemble
+        let weighted_sum: f64 = forecasts
+            .iter()
+            .zip(weights.iter())
+            .map(|(f, w)| f * w * regime_weight)
+            .sum();
+        let total_weight: f64 = weights.iter().sum::<f64>() * regime_weight;
+
+        if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            forecasts.iter().sum::<f64>() / forecasts.len() as f64
+        }
     }
 }
 

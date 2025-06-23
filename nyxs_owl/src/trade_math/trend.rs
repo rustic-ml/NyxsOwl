@@ -994,48 +994,6 @@ mod adx_tests {
     }
 }
 
-// Helper for Ichimoku: (Highest High + Lowest Low) / 2 over a period
-fn calculate_hl_avg(
-    high_series: &Series,
-    low_series: &Series,
-    period: usize,
-) -> PolarsResult<Series> {
-    if period == 0 {
-        return Err(PolarsError::ComputeError(
-            "Period for HL_avg must be > 0.".into(),
-        ));
-    }
-    if high_series.len() != low_series.len() {
-        return Err(PolarsError::ComputeError(
-            "High and Low series must have the same length.".into(),
-        ));
-    }
-    if high_series.dtype() != &DataType::Float64 || low_series.dtype() != &DataType::Float64 {
-        return Err(PolarsError::ComputeError(
-            "High/Low series for HL_avg must be Float64.".into(),
-        ));
-    }
-
-    let _high_ca = high_series.f64()?;
-    let _low_ca = low_series.f64()?;
-
-    let rolling_high = high_series.rolling_max(RollingOptionsFixedWindow {
-        window_size: period,
-        min_periods: period,
-        ..Default::default()
-    })?;
-
-    let rolling_low = low_series.rolling_min(RollingOptionsFixedWindow {
-        window_size: period,
-        min_periods: period,
-        ..Default::default()
-    })?;
-
-    let sum = (&rolling_high + &rolling_low)?;
-    let result = &sum / 2.0f64;
-    Ok(result)
-}
-
 /// Calculates Ichimoku Cloud indicator components
 ///
 /// The Ichimoku Cloud is a comprehensive trend-following indicator that provides

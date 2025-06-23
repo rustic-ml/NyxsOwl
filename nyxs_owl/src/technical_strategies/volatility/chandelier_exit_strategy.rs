@@ -1,9 +1,9 @@
-use polars::prelude::*;
-use crate::simple_types::{Signal, NyxsOwlError};
+use crate::simple_types::{NyxsOwlError, Signal};
 use crate::trade_math::volatility::calculate_chandelier_exit;
+use polars::prelude::*;
 
 /// ChandelierExitStrategy implements a trading strategy based on the Chandelier Exit indicator.
-/// 
+///
 /// The strategy generates trading signals based on price movements relative to the Chandelier Exit levels:
 /// - Buy when price closes above the Short Exit level (bullish)
 /// - Sell when price closes below the Long Exit level (bearish)
@@ -64,17 +64,23 @@ impl ChandelierExitStrategy {
             self.period,
             self.atr_period,
             self.multiplier,
-        ).map_err(|e| NyxsOwlError::ValidationError(format!("Failed to calculate Chandelier Exit: {}", e)))?;
+        )
+        .map_err(|e| {
+            NyxsOwlError::ValidationError(format!("Failed to calculate Chandelier Exit: {}", e))
+        })?;
 
-        let close_values: Vec<Option<f64>> = close.f64()
+        let close_values: Vec<Option<f64>> = close
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .into_iter()
             .collect();
-        let long_values: Vec<Option<f64>> = long_exit.f64()
+        let long_values: Vec<Option<f64>> = long_exit
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .into_iter()
             .collect();
-        let short_values: Vec<Option<f64>> = short_exit.f64()
+        let short_values: Vec<Option<f64>> = short_exit
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .into_iter()
             .collect();
@@ -83,9 +89,9 @@ impl ChandelierExitStrategy {
 
         // Generate signals starting from the warmup period
         for i in (self.period - 1)..close_values.len() {
-            if let (Some(close_val), Some(long_val), Some(short_val)) = 
-                (close_values[i], long_values[i], short_values[i]) {
-                
+            if let (Some(close_val), Some(long_val), Some(short_val)) =
+                (close_values[i], long_values[i], short_values[i])
+            {
                 signals[i] = if close_val > short_val {
                     Signal::Buy
                 } else if close_val < long_val {
@@ -127,17 +133,23 @@ impl ChandelierExitStrategy {
             self.period,
             self.atr_period,
             self.multiplier,
-        ).map_err(|e| NyxsOwlError::ValidationError(format!("Failed to calculate Chandelier Exit: {}", e)))?;
+        )
+        .map_err(|e| {
+            NyxsOwlError::ValidationError(format!("Failed to calculate Chandelier Exit: {}", e))
+        })?;
 
-        let close_val = close.f64()
+        let close_val = close
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .get(index)
             .ok_or_else(|| NyxsOwlError::DataError("Invalid index".into()))?;
-        let long_val = long_exit.f64()
+        let long_val = long_exit
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .get(index)
             .ok_or_else(|| NyxsOwlError::DataError("Invalid index".into()))?;
-        let short_val = short_exit.f64()
+        let short_val = short_exit
+            .f64()
             .map_err(|e| NyxsOwlError::DataError(e.to_string()))?
             .get(index)
             .ok_or_else(|| NyxsOwlError::DataError("Invalid index".into()))?;
@@ -174,21 +186,30 @@ mod tests {
 
     #[test]
     fn test_chandelier_exit_strategy() {
-        let high = Series::new("high".into(), vec![
-            110.0, 112.0, 115.0, 113.0, 116.0, 118.0, 117.0, 119.0, 121.0, 120.0,
-            122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0,
-            132.0, 133.0, 134.0, 135.0, 136.0
-        ]);
-        let low = Series::new("low".into(), vec![
-            108.0, 109.0, 111.0, 110.0, 112.0, 114.0, 115.0, 116.0, 118.0, 119.0,
-            120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
-            130.0, 131.0, 132.0, 133.0, 134.0
-        ]);
-        let close = Series::new("close".into(), vec![
-            109.0, 111.0, 113.0, 112.0, 115.0, 116.0, 116.5, 118.0, 120.0, 119.5,
-            121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0,
-            131.0, 132.0, 133.0, 134.0, 135.0
-        ]);
+        let high = Series::new(
+            "high".into(),
+            vec![
+                110.0, 112.0, 115.0, 113.0, 116.0, 118.0, 117.0, 119.0, 121.0, 120.0, 122.0, 123.0,
+                124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0, 134.0, 135.0,
+                136.0,
+            ],
+        );
+        let low = Series::new(
+            "low".into(),
+            vec![
+                108.0, 109.0, 111.0, 110.0, 112.0, 114.0, 115.0, 116.0, 118.0, 119.0, 120.0, 121.0,
+                122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0,
+                134.0,
+            ],
+        );
+        let close = Series::new(
+            "close".into(),
+            vec![
+                109.0, 111.0, 113.0, 112.0, 115.0, 116.0, 116.5, 118.0, 120.0, 119.5, 121.0, 122.0,
+                123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0, 130.0, 131.0, 132.0, 133.0, 134.0,
+                135.0,
+            ],
+        );
 
         let strategy = ChandelierExitStrategy::default();
         let signals = strategy.generate_signals(&high, &low, &close).unwrap();
@@ -202,12 +223,16 @@ mod tests {
         }
 
         // Test confidence calculation
-        let confidence = strategy.calculate_confidence(&high, &low, &close, 22).unwrap();
+        let confidence = strategy
+            .calculate_confidence(&high, &low, &close, 22)
+            .unwrap();
         assert!(confidence >= 0.0 && confidence <= 1.0);
 
         // Test invalid parameters
         let invalid_strategy = ChandelierExitStrategy::new(0, 22, 3.0);
-        assert!(invalid_strategy.generate_signals(&high, &low, &close).is_err());
+        assert!(invalid_strategy
+            .generate_signals(&high, &low, &close)
+            .is_err());
     }
 
     #[test]
@@ -217,7 +242,9 @@ mod tests {
         let constant_close = Series::new("close".into(), vec![100.0; 25]);
 
         let strategy = ChandelierExitStrategy::default();
-        let signals = strategy.generate_signals(&constant_high, &constant_low, &constant_close).unwrap();
+        let signals = strategy
+            .generate_signals(&constant_high, &constant_low, &constant_close)
+            .unwrap();
 
         // With constant prices, all signals after warmup should be Hold
         for signal in signals.iter().skip(21) {
@@ -225,7 +252,9 @@ mod tests {
         }
 
         // Confidence should be around 0.5 for constant prices
-        let confidence = strategy.calculate_confidence(&constant_high, &constant_low, &constant_close, 22).unwrap();
+        let confidence = strategy
+            .calculate_confidence(&constant_high, &constant_low, &constant_close, 22)
+            .unwrap();
         assert!((confidence - 0.5).abs() < 0.1);
     }
-} 
+}

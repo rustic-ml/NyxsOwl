@@ -41,7 +41,7 @@ pub fn calculate_bollinger_bands(
 
     let middle = series.rolling_mean(options.clone())?;
     let std = series.rolling_std(options)?;
-    
+
     let upper = (&middle + &(&std * std_dev))?;
     let lower = (&middle - &(&std * std_dev))?;
 
@@ -61,8 +61,8 @@ mod tests {
         let prices = Series::new(
             "prices".into(),
             vec![
-                10.0, 12.0, 11.0, 13.0, 14.0, 13.5, 15.0, 14.0, 13.0, 12.5,
-                11.5, 12.0, 13.0, 14.0, 15.0, 14.5, 13.5, 12.5, 11.5, 12.0,
+                10.0, 12.0, 11.0, 13.0, 14.0, 13.5, 15.0, 14.0, 13.0, 12.5, 11.5, 12.0, 13.0, 14.0,
+                15.0, 14.5, 13.5, 12.5, 11.5, 12.0,
             ],
         );
 
@@ -86,4 +86,4 @@ mod tests {
         assert!(calculate_bollinger_bands(&prices, period, 0.0).is_err());
         assert!(calculate_bollinger_bands(&prices, period, -1.0).is_err());
     }
-} 
+}

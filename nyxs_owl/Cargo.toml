@@ -276,3 +276,8 @@ path = "../examples/async_parallel_demo.rs"
 required-features = ["forecasting", "async-support"]
 
 # Removed debug_timeseries example
+
+[[example]]
+name = "hybrid_strategy_example"
+path = "../examples/hybrid_strategy_example.rs"
+required-features = ["forecasting", "trading-math"]

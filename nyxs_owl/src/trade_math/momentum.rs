@@ -251,11 +251,19 @@ pub fn calculate_stochastic(
 
     // Calculate %D values (SMA of %K)
     if k_values.len() >= d_period {
-        for (i, d_value) in d_values.iter_mut().enumerate().skip(d_period - 1).take(k_values.len() - d_period + 1) {
+        for (i, d_value) in d_values
+            .iter_mut()
+            .enumerate()
+            .skip(d_period - 1)
+            .take(k_values.len() - d_period + 1)
+        {
             let mut sum = 0.0;
             let mut count = 0;
 
-            for k_val in k_values[i.saturating_sub(d_period - 1)..=i].iter().flatten() {
+            for k_val in k_values[i.saturating_sub(d_period - 1)..=i]
+                .iter()
+                .flatten()
+            {
                 sum += k_val;
                 count += 1;
             }
@@ -385,9 +393,10 @@ pub fn calculate_mfi(
     let close_values: Vec<Option<f64>> = close.f64()?.into_iter().collect();
     let volume_values: Vec<Option<f64>> = volume.f64()?.into_iter().collect();
 
-    if high_values.len() != low_values.len() 
+    if high_values.len() != low_values.len()
         || high_values.len() != close_values.len()
-        || high_values.len() != volume_values.len() {
+        || high_values.len() != volume_values.len()
+    {
         return Err(PolarsError::InvalidOperation(
             "All input series must have the same length".into(),
         ));
@@ -396,7 +405,7 @@ pub fn calculate_mfi(
     let mut mfi_values = vec![None; high_values.len()];
 
     // Calculate MFI for each period
-    for i in (period - 1)..high_values.len() {
+    for (i, mfi_value) in mfi_values.iter_mut().enumerate().skip(period - 1) {
         let mut positive_money_flow = 0.0;
         let mut negative_money_flow = 0.0;
 
@@ -406,13 +415,18 @@ pub fn calculate_mfi(
                 continue; // Skip first element as we need previous close
             }
 
-            if let (Some(h), Some(l), Some(c), Some(v), Some(_prev_c)) = 
-                (high_values[j], low_values[j], close_values[j], volume_values[j], close_values[j-1]) {
-                
+            if let (Some(h), Some(l), Some(c), Some(v), Some(_prev_c)) = (
+                high_values[j],
+                low_values[j],
+                close_values[j],
+                volume_values[j],
+                close_values[j - 1],
+            ) {
                 let typical_price = (h + l + c) / 3.0;
                 let prev_typical_price = if j > 0 {
-                    if let (Some(prev_h), Some(prev_l), Some(prev_close)) = 
-                        (high_values[j-1], low_values[j-1], close_values[j-1]) {
+                    if let (Some(prev_h), Some(prev_l), Some(prev_close)) =
+                        (high_values[j - 1], low_values[j - 1], close_values[j - 1])
+                    {
                         (prev_h + prev_l + prev_close) / 3.0
                     } else {
                         continue;
@@ -435,9 +449,9 @@ pub fn calculate_mfi(
         let total_money_flow = positive_money_flow + negative_money_flow;
         if total_money_flow > 0.0 {
             let money_ratio = positive_money_flow / negative_money_flow;
-            mfi_values[i] = Some(100.0 - (100.0 / (1.0 + money_ratio)));
+            *mfi_value = Some(100.0 - (100.0 / (1.0 + money_ratio)));
         } else {
-            mfi_values[i] = Some(50.0); // Neutral when no money flow
+            *mfi_value = Some(50.0); // Neutral when no money flow
         }
     }
 
@@ -469,7 +483,8 @@ pub fn calculate_roc(series: &Series, period: usize) -> PolarsResult<Series> {
     for i in period..values.len() {
         if let (Some(current_price), Some(period_ago_price)) = (values[i], values[i - period]) {
             if period_ago_price != 0.0 {
-                roc_values[i] = Some(((current_price - period_ago_price) / period_ago_price) * 100.0);
+                roc_values[i] =
+                    Some(((current_price - period_ago_price) / period_ago_price) * 100.0);
             } else {
                 roc_values[i] = Some(0.0);
             }
@@ -567,7 +582,12 @@ pub fn calculate_ultimate_oscillator(
     }
 
     // Calculate averages for each period
-    for (i, uo_value) in uo_values.iter_mut().enumerate().skip(long_period - 1).take(buying_pressure.len() - long_period + 1) {
+    for (i, uo_value) in uo_values
+        .iter_mut()
+        .enumerate()
+        .skip(long_period - 1)
+        .take(buying_pressure.len() - long_period + 1)
+    {
         let mut short_bp_sum = 0.0;
         let mut short_tr_sum = 0.0;
         let mut medium_bp_sum = 0.0;
@@ -628,41 +648,6 @@ pub fn calculate_ultimate_oscillator(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn create_test_series() -> Series {
-        Series::new(
-            "test".into(),
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
-        )
-    }
-
-    fn create_test_ohlcv_data() -> (Series, Series, Series, Series) {
-        let high = Series::new(
-            "high".into(),
-            vec![
-                110.0, 112.0, 115.0, 113.0, 116.0, 118.0, 117.0, 119.0, 121.0, 120.0,
-            ],
-        );
-        let low = Series::new(
-            "low".into(),
-            vec![
-                108.0, 109.0, 111.0, 110.0, 112.0, 114.0, 115.0, 116.0, 118.0, 119.0,
-            ],
-        );
-        let close = Series::new(
-            "close".into(),
-            vec![
-                109.0, 111.0, 113.0, 112.0, 115.0, 116.0, 116.5, 118.0, 120.0, 119.5,
-            ],
-        );
-        let volume = Series::new(
-            "volume".into(),
-            vec![
-                1000.0, 1200.0, 1100.0, 1300.0, 1400.0, 1250.0, 1350.0, 1450.0, 1500.0, 1400.0,
-            ],
-        );
-        (high, low, close, volume)
-    }
 
     #[test]
     fn test_rsi() {
