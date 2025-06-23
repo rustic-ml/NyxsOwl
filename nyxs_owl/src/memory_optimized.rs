@@ -65,6 +65,30 @@ impl CacheOptimizedTimeSeries {
         }
     }
 
+    /// Create a time series from a slice of prices
+    /// This is useful for creating time series from price data without full OHLCV information
+    pub fn from_slice(prices: &[f64]) -> Self {
+        let mut time_series = Self::with_capacity(prices.len());
+        
+        for (i, &price) in prices.iter().enumerate() {
+            // Use the price as both open, high, low, and close for simplicity
+            // Use current timestamp + offset for timestamps
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() + i as u64;
+            
+            time_series.push(timestamp, price, price, price, price, 1000);
+        }
+        
+        time_series
+    }
+
+    /// Create a time series from a vector of prices
+    pub fn from_prices(prices: Vec<f64>) -> Self {
+        Self::from_slice(&prices)
+    }
+
     /// Add a new data point with automatic derived field calculation
     pub fn push(
         &mut self,

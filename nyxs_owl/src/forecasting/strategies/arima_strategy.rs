@@ -7,6 +7,9 @@ use std::sync::Arc;
 use crate::forecasting::StrategyConfig;
 use std::collections::HashMap;
 
+#[cfg(feature = "async-support")]
+use crate::async_parallel::{AsyncParallelProcessor, ForecastTask, ParallelConfig};
+
 /// Configuration for ARIMA strategy
 #[derive(Debug, Clone)]
 pub struct ArimaStrategyConfig {

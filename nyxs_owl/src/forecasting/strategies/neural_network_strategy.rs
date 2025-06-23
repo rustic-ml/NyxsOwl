@@ -3,6 +3,7 @@ use crate::simple_types::{NyxsOwlError, Result, Signal};
 use polars::prelude::*;
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use rand::Rng;
 
 /// Configuration for Neural Network forecasting strategy
 #[derive(Debug, Clone)]
