@@ -302,11 +302,14 @@ impl Default for ForecastingConfig {
 /// Trait for forecasting strategies
 pub trait ForecastingStrategy: Strategy {
     /// Generate forecasting signals
-    fn generate_forecast_signals(&self, data: &DataFrame) -> NyxsOwlResult<Vec<crate::simple_types::Signal>>;
-    
+    fn generate_forecast_signals(
+        &self,
+        data: &DataFrame,
+    ) -> NyxsOwlResult<Vec<crate::simple_types::Signal>>;
+
     /// Get forecast confidence
     fn get_forecast_confidence(&self) -> f64;
-    
+
     /// Get forecast horizon
     fn get_forecast_horizon(&self) -> usize;
 }

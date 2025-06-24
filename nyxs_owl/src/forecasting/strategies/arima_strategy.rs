@@ -1,11 +1,11 @@
+use crate::forecasting::StrategyConfig;
 use crate::memory_optimized::{CacheOptimizedCircularBuffer, CacheOptimizedTimeSeries, MemoryPool};
 use crate::performance_utils::SimdMath;
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use log::{debug, info, warn};
 use polars::prelude::*;
-use std::sync::Arc;
-use crate::forecasting::StrategyConfig;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[cfg(feature = "async-support")]
 use crate::async_parallel::{AsyncParallelProcessor, ForecastTask, ParallelConfig};
@@ -665,9 +665,11 @@ impl ArimaStrategy {
 
             // Generate forecast using ensemble approach if enabled
             let forecast = if self.config.ensemble_models > 1 {
-                self.generate_ensemble_forecast(historical_data)?.point_forecast
+                self.generate_ensemble_forecast(historical_data)?
+                    .point_forecast
             } else {
-                self.generate_single_forecast(historical_data)?.point_forecast
+                self.generate_single_forecast(historical_data)?
+                    .point_forecast
             };
 
             // Apply dynamic threshold based on market conditions
@@ -1498,7 +1500,8 @@ impl ArimaStrategy {
         timestamp_column: &str,
     ) -> Result<Vec<Signal>> {
         if let Some(processor) = &self.async_processor {
-            self.generate_signals_parallel(df, price_column, timestamp_column, processor.clone()).await
+            self.generate_signals_parallel(df, price_column, timestamp_column, processor.clone())
+                .await
         } else {
             // Fallback to synchronous processing
             Ok(self.generate_signals(df, price_column, timestamp_column)?)
@@ -1532,7 +1535,7 @@ impl ArimaStrategy {
 
         // Convert results to signals
         let mut signals = Vec::with_capacity(prices.len());
-        
+
         // Add hold signals for initial data points
         for _ in 0..self.config.min_data_points {
             signals.push(Signal::Hold);
@@ -1548,11 +1551,7 @@ impl ArimaStrategy {
                 confidence_level: result.result.confidence,
                 model_used: result.result.metadata.clone(),
             };
-            let signal = self.forecast_to_enhanced_signal(
-                current_price,
-                &forecast_result,
-                &prices,
-            );
+            let signal = self.forecast_to_enhanced_signal(current_price, &forecast_result, &prices);
             signals.push(signal);
         }
 
@@ -1568,15 +1567,18 @@ impl ArimaStrategy {
         _time_series: Arc<CacheOptimizedTimeSeries>,
     ) -> Result<Vec<ForecastTask>> {
         let mut tasks = Vec::new();
-        let task_id_base = format!("arima_forecast_{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis());
+        let task_id_base = format!(
+            "arima_forecast_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
 
         for i in self.config.min_data_points..prices.len() {
             let task_id = format!("{}_{}", task_id_base, i);
             let priority = self.calculate_task_priority(i, prices.len());
-            
+
             let task = ForecastTask {
                 id: task_id,
                 symbol: "ARIMA_FORECAST".to_string(),
@@ -1584,7 +1586,7 @@ impl ArimaStrategy {
                 priority,
                 created_at: std::time::Instant::now(),
             };
-            
+
             tasks.push(task);
         }
 
@@ -1615,12 +1617,16 @@ impl ArimaStrategy {
 
             // Generate ensemble forecasts in parallel
             let ensemble_results = processor
-                .process_ensemble_parallel(time_series, _ensemble_size, "ARIMA_ENSEMBLE".to_string())
+                .process_ensemble_parallel(
+                    time_series,
+                    _ensemble_size,
+                    "ARIMA_ENSEMBLE".to_string(),
+                )
                 .await;
 
             // Combine ensemble results
             let mut signals = Vec::with_capacity(prices.len());
-            
+
             // Add hold signals for initial data points
             for _ in 0..self.config.min_data_points {
                 signals.push(Signal::Hold);
@@ -1636,11 +1642,8 @@ impl ArimaStrategy {
                     confidence_level: result.confidence,
                     model_used: result.metadata.clone(),
                 };
-                let signal = self.forecast_to_enhanced_signal(
-                    current_price,
-                    &forecast_result,
-                    &prices,
-                );
+                let signal =
+                    self.forecast_to_enhanced_signal(current_price, &forecast_result, &prices);
                 signals.push(signal);
             }
 
@@ -1677,7 +1680,9 @@ impl ArimaStrategy {
                 let parallel_config = ParallelConfig {
                     max_concurrent_forecasts: self.config.max_concurrent_forecasts,
                     parallel_chunk_size: 1000,
-                    forecast_timeout: std::time::Duration::from_secs(self.config.forecast_timeout_secs),
+                    forecast_timeout: std::time::Duration::from_secs(
+                        self.config.forecast_timeout_secs,
+                    ),
                     enable_parallel_ensemble: self.config.parallel_ensemble,
                     worker_threads: num_cpus::get(),
                 };
@@ -1709,8 +1714,8 @@ impl ArimaStrategy {
     fn apply_regime_weighting(&self, forecasts: &[f64], weights: &[f64]) -> f64 {
         let regime_weight = if let Some(regime) = &self.current_regime {
             match regime {
-                MarketRegime::Trending => 1.2,      // Favor trend-following models
-                MarketRegime::MeanReverting => 0.8, // Favor mean-reversion models
+                MarketRegime::Trending => 1.2,       // Favor trend-following models
+                MarketRegime::MeanReverting => 0.8,  // Favor mean-reversion models
                 MarketRegime::HighVolatility => 1.1, // Slightly favor volatility models
                 MarketRegime::LowVolatility => 0.9,  // Slightly disfavor volatility models
             }

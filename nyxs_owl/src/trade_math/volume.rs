@@ -73,8 +73,7 @@ pub fn calculate_vroc(volume: &Series, period: usize) -> PolarsResult<Series> {
         let period_ago_volume = volume_values.get(i - period).unwrap_or(0.0);
 
         if period_ago_volume != 0.0 {
-            *vroc_value =
-                Some(((current_volume - period_ago_volume) / period_ago_volume) * 100.0);
+            *vroc_value = Some(((current_volume - period_ago_volume) / period_ago_volume) * 100.0);
         } else {
             *vroc_value = Some(0.0);
         }

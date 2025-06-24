@@ -1,9 +1,9 @@
 use crate::forecasting::{ForecastingStrategy, Strategy, StrategyConfig};
 use crate::simple_types::{NyxsOwlError, Result, Signal};
 use polars::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use rand::Rng;
 
 /// Configuration for Neural Network forecasting strategy
 #[derive(Debug, Clone)]
@@ -97,11 +97,14 @@ impl Strategy for NeuralNetworkStrategy {
 
     fn generate_signals(&self, data: &DataFrame) -> Result<Series> {
         let signals = self.generate_forecast_signals(data)?;
-        let signal_values: Vec<i32> = signals.iter().map(|s| match s {
-            Signal::Buy => 1,
-            Signal::Sell => -1,
-            Signal::Hold => 0,
-        }).collect();
+        let signal_values: Vec<i32> = signals
+            .iter()
+            .map(|s| match s {
+                Signal::Buy => 1,
+                Signal::Sell => -1,
+                Signal::Hold => 0,
+            })
+            .collect();
         Ok(Series::new("signals".into(), signal_values))
     }
 
@@ -176,7 +179,7 @@ mod tests {
         let mut config = NeuralNetworkConfig::default();
         config.epochs = 10; // Shorter for testing
         let mut strategy = NeuralNetworkStrategy::new(config);
-        
+
         // Create test data
         let df = DataFrame::new(vec![
             Series::new("open".into(), vec![100.0, 101.0, 102.0]).into(),
@@ -184,7 +187,8 @@ mod tests {
             Series::new("low".into(), vec![95.0, 96.0, 97.0]).into(),
             Series::new("close".into(), vec![101.0, 102.0, 103.0]).into(),
             Series::new("volume".into(), vec![1000.0, 1100.0, 1200.0]).into(),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         let result = strategy.train(&df);
         assert!(result.is_ok());
@@ -195,7 +199,7 @@ mod tests {
     fn test_neural_network_prediction() {
         let config = NeuralNetworkConfig::default();
         let mut strategy = NeuralNetworkStrategy::new(config);
-        
+
         // Train first
         let df = DataFrame::new(vec![
             Series::new("open".into(), vec![100.0, 101.0, 102.0]).into(),
@@ -203,10 +207,11 @@ mod tests {
             Series::new("low".into(), vec![95.0, 96.0, 97.0]).into(),
             Series::new("close".into(), vec![101.0, 102.0, 103.0]).into(),
             Series::new("volume".into(), vec![1000.0, 1100.0, 1200.0]).into(),
-        ]).unwrap();
-        
+        ])
+        .unwrap();
+
         strategy.train(&df).unwrap();
-        
+
         // Test prediction
         let prediction = strategy.predict(&df);
         assert!(prediction.is_ok());
@@ -218,17 +223,18 @@ mod tests {
     fn test_neural_network_signal_generation() {
         let config = NeuralNetworkConfig::default();
         let mut strategy = NeuralNetworkStrategy::new(config);
-        
+
         let df = DataFrame::new(vec![
             Series::new("open".into(), vec![100.0, 101.0, 102.0]).into(),
             Series::new("high".into(), vec![105.0, 106.0, 107.0]).into(),
             Series::new("low".into(), vec![95.0, 96.0, 97.0]).into(),
             Series::new("close".into(), vec![101.0, 102.0, 103.0]).into(),
             Series::new("volume".into(), vec![1000.0, 1100.0, 1200.0]).into(),
-        ]).unwrap();
-        
+        ])
+        .unwrap();
+
         strategy.train(&df).unwrap();
-        
+
         let signals = strategy.generate_forecast_signals(&df);
         assert!(signals.is_ok());
         let signal_vec = signals.unwrap();

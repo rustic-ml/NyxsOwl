@@ -2,7 +2,7 @@ use nyxs_owl::prelude::*;
 use polars::prelude::*;
 
 /// Simple example demonstrating the hybrid strategy framework
-/// 
+///
 /// This example shows how to:
 /// 1. Load and prepare market data
 /// 2. Calculate simple technical indicators
@@ -49,22 +49,22 @@ fn load_sample_data() -> Result<DataFrame> {
     let n_points = 1000;
     let mut prices = Vec::with_capacity(n_points);
     let mut volumes = Vec::with_capacity(n_points);
-    
+
     // Generate trending price data with some volatility
     let mut price = 100.0;
     for i in 0..n_points {
         // Add trend component
         let trend = 0.001 * (i as f64);
-        
+
         // Add volatility component
         let volatility = 0.02 * (i as f64 / 100.0).sin();
-        
+
         // Add random component
         let random = (rand::random::<f64>() - 0.5) * 0.01;
-        
+
         price += trend + volatility + random;
         prices.push(price);
-        
+
         // Generate correlated volume
         let base_volume = 1000000.0;
         let volume_variation = 1.0 + 0.5 * (i as f64 / 50.0).sin();
@@ -82,7 +82,7 @@ fn load_sample_data() -> Result<DataFrame> {
         let open = if i == 0 { close } else { closes[i - 1] };
         let high = open.max(close) * (1.0 + rand::random::<f64>() * 0.01);
         let low = open.min(close) * (1.0 - rand::random::<f64>() * 0.01);
-        
+
         opens.push(open);
         highs.push(high);
         lows.push(low);
@@ -104,7 +104,10 @@ fn load_sample_data() -> Result<DataFrame> {
 /// Calculate simple technical indicators
 fn calculate_simple_indicators(df: &DataFrame) -> Result<Vec<SimpleIndicator>> {
     let mut indicators = Vec::new();
-    let close_series = df.column("close")?.as_series().expect("close column missing");
+    let close_series = df
+        .column("close")?
+        .as_series()
+        .expect("close column missing");
 
     // Calculate Simple Moving Average
     let sma_values = calculate_sma(&close_series, 20)?;
@@ -161,7 +164,7 @@ fn calculate_ema(prices: &Series, period: usize) -> Result<Vec<f64>> {
     let mut ema_values = Vec::new();
     let price_values: Vec<f64> = prices.f64()?.into_iter().filter_map(|x| x).collect();
     let multiplier = 2.0 / (period as f64 + 1.0);
-    
+
     for i in 0..price_values.len() {
         if i == 0 {
             ema_values.push(price_values[i]);
@@ -170,7 +173,7 @@ fn calculate_ema(prices: &Series, period: usize) -> Result<Vec<f64>> {
             ema_values.push(ema);
         }
     }
-    
+
     Ok(ema_values)
 }
 
@@ -178,7 +181,7 @@ fn calculate_ema(prices: &Series, period: usize) -> Result<Vec<f64>> {
 fn calculate_momentum(prices: &Series, period: usize) -> Result<Vec<f64>> {
     let mut momentum_values = Vec::new();
     let price_values: Vec<f64> = prices.f64()?.into_iter().filter_map(|x| x).collect();
-    
+
     for i in 0..price_values.len() {
         if i < period {
             momentum_values.push(0.0);
@@ -193,7 +196,7 @@ fn calculate_momentum(prices: &Series, period: usize) -> Result<Vec<f64>> {
             momentum_values.push(momentum);
         }
     }
-    
+
     Ok(momentum_values)
 }
 
@@ -215,9 +218,15 @@ fn calculate_volatility(prices: &Series, period: usize) -> Result<Vec<f64>> {
 }
 
 /// Generate basic signals based on indicators
-fn generate_basic_signals(df: &DataFrame, indicators: &[SimpleIndicator]) -> Result<Vec<BasicSignal>> {
+fn generate_basic_signals(
+    df: &DataFrame,
+    indicators: &[SimpleIndicator],
+) -> Result<Vec<BasicSignal>> {
     let mut signals = Vec::new();
-    let close_series = df.column("close")?.as_series().expect("close column missing");
+    let close_series = df
+        .column("close")?
+        .as_series()
+        .expect("close column missing");
     let price_values: Vec<f64> = close_series.f64()?.into_iter().filter_map(|x| x).collect();
 
     for i in 0..price_values.len() {
@@ -229,7 +238,8 @@ fn generate_basic_signals(df: &DataFrame, indicators: &[SimpleIndicator]) -> Res
         for indicator in indicators {
             if i < indicator.values.len() {
                 let value = indicator.values[i];
-                let (signal, confidence) = generate_indicator_signal(indicator, value, i, &price_values);
+                let (signal, confidence) =
+                    generate_indicator_signal(indicator, value, i, &price_values);
                 match signal {
                     Signal::Buy => buy_signals += 1,
                     Signal::Sell => sell_signals += 1,
@@ -338,9 +348,21 @@ fn analyze_signal_distribution(signals: &[BasicSignal]) {
 
     let total = signals.len() as f64;
     println!("   Signal Distribution:");
-    println!("     Buy:  {} ({:.1}%)", buy_count, (buy_count as f64 / total) * 100.0);
-    println!("     Sell: {} ({:.1}%)", sell_count, (sell_count as f64 / total) * 100.0);
-    println!("     Hold: {} ({:.1}%)", hold_count, (hold_count as f64 / total) * 100.0);
+    println!(
+        "     Buy:  {} ({:.1}%)",
+        buy_count,
+        (buy_count as f64 / total) * 100.0
+    );
+    println!(
+        "     Sell: {} ({:.1}%)",
+        sell_count,
+        (sell_count as f64 / total) * 100.0
+    );
+    println!(
+        "     Hold: {} ({:.1}%)",
+        hold_count,
+        (hold_count as f64 / total) * 100.0
+    );
     println!("   Average Confidence: {:.3}", total_confidence / total);
 }
 
@@ -349,7 +371,10 @@ fn calculate_performance_metrics(
     df: &DataFrame,
     signals: &[BasicSignal],
 ) -> Result<PerformanceMetrics> {
-    let close_series = df.column("close")?.as_series().expect("close column missing");
+    let close_series = df
+        .column("close")?
+        .as_series()
+        .expect("close column missing");
     let price_values: Vec<f64> = close_series.f64()?.into_iter().filter_map(|x| x).collect();
     let mut returns = Vec::new();
     let mut signal_returns = Vec::new();
@@ -386,9 +411,11 @@ fn calculate_performance_metrics(
 
     let volatility = if signal_returns.len() > 1 {
         let mean = avg_return;
-        let variance: f64 = signal_returns.iter()
+        let variance: f64 = signal_returns
+            .iter()
             .map(|r| (r - mean).powi(2))
-            .sum::<f64>() / (signal_returns.len() - 1) as f64;
+            .sum::<f64>()
+            / (signal_returns.len() - 1) as f64;
         variance.sqrt()
     } else {
         0.0
@@ -446,11 +473,27 @@ fn calculate_win_rate(returns: &[f64]) -> f64 {
 /// Print performance metrics
 fn print_performance_metrics(metrics: &PerformanceMetrics) {
     println!("   Performance Metrics:");
-    println!("     Total Return: {:.4} ({:.2}%)", metrics.total_return, metrics.total_return * 100.0);
-    println!("     Average Return: {:.4} ({:.2}%)", metrics.avg_return, metrics.avg_return * 100.0);
-    println!("     Volatility: {:.4} ({:.2}%)", metrics.volatility, metrics.volatility * 100.0);
+    println!(
+        "     Total Return: {:.4} ({:.2}%)",
+        metrics.total_return,
+        metrics.total_return * 100.0
+    );
+    println!(
+        "     Average Return: {:.4} ({:.2}%)",
+        metrics.avg_return,
+        metrics.avg_return * 100.0
+    );
+    println!(
+        "     Volatility: {:.4} ({:.2}%)",
+        metrics.volatility,
+        metrics.volatility * 100.0
+    );
     println!("     Sharpe Ratio: {:.4}", metrics.sharpe_ratio);
-    println!("     Max Drawdown: {:.4} ({:.2}%)", metrics.max_drawdown, metrics.max_drawdown * 100.0);
+    println!(
+        "     Max Drawdown: {:.4} ({:.2}%)",
+        metrics.max_drawdown,
+        metrics.max_drawdown * 100.0
+    );
     println!("     Win Rate: {:.2}%", metrics.win_rate * 100.0);
     println!("     Total Signals: {}", metrics.total_signals);
 }
@@ -458,21 +501,40 @@ fn print_performance_metrics(metrics: &PerformanceMetrics) {
 /// Demonstrate simple indicators
 fn demonstrate_simple_indicators(df: &DataFrame) -> Result<()> {
     println!("   Simple Indicators Demo:");
-    let close_series = df.column("close")?.as_series().expect("close column missing");
+    let close_series = df
+        .column("close")?
+        .as_series()
+        .expect("close column missing");
     let price_values: Vec<f64> = close_series.f64()?.into_iter().filter_map(|x| x).collect();
     let sma_values = calculate_sma(&close_series, 20)?;
     let current_price = price_values[price_values.len() - 1];
     let current_sma = sma_values[sma_values.len() - 1];
-    println!("     SMA (20): current={:.2}, price_vs_sma={:.2}%", current_sma, ((current_price - current_sma) / current_sma) * 100.0);
+    println!(
+        "     SMA (20): current={:.2}, price_vs_sma={:.2}%",
+        current_sma,
+        ((current_price - current_sma) / current_sma) * 100.0
+    );
     let ema_values = calculate_ema(&close_series, 20)?;
     let current_ema = ema_values[ema_values.len() - 1];
-    println!("     EMA (20): current={:.2}, price_vs_ema={:.2}%", current_ema, ((current_price - current_ema) / current_ema) * 100.0);
+    println!(
+        "     EMA (20): current={:.2}, price_vs_ema={:.2}%",
+        current_ema,
+        ((current_price - current_ema) / current_ema) * 100.0
+    );
     let momentum_values = calculate_momentum(&close_series, 10)?;
     let current_momentum = momentum_values[momentum_values.len() - 1];
-    println!("     Momentum (10): current={:.4} ({:.2}%)", current_momentum, current_momentum * 100.0);
+    println!(
+        "     Momentum (10): current={:.4} ({:.2}%)",
+        current_momentum,
+        current_momentum * 100.0
+    );
     let volatility_values = calculate_volatility(&close_series, 20)?;
     let current_volatility = volatility_values[volatility_values.len() - 1];
-    println!("     Volatility (20): current={:.4} ({:.2}%)", current_volatility, current_volatility * 100.0);
+    println!(
+        "     Volatility (20): current={:.4} ({:.2}%)",
+        current_volatility,
+        current_volatility * 100.0
+    );
     Ok(())
 }
 
@@ -525,7 +587,7 @@ mod tests {
             sell_count: 1,
             timestamp: None,
         };
-        
+
         assert_eq!(signal.signal, Signal::Buy);
         assert_eq!(signal.confidence, 0.8);
         assert_eq!(signal.buy_count, 2);
@@ -537,7 +599,7 @@ mod tests {
         let returns = vec![0.01, -0.005, 0.02, -0.01, 0.015];
         let max_dd = calculate_max_drawdown(&returns);
         let win_rate = calculate_win_rate(&returns);
-        
+
         assert!(max_dd >= 0.0);
         assert!(win_rate >= 0.0 && win_rate <= 1.0);
     }
@@ -549,4 +611,4 @@ mod tests {
         assert_eq!(sma.len(), 5);
         assert_eq!(sma[4], 4.0); // (3+4+5)/3 = 4.0
     }
-} 
+}

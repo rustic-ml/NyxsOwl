@@ -20,7 +20,6 @@ use std::hash::{Hash, Hasher};
 #[derive(Debug)]
 pub struct CacheOptimizedTimeSeries {
     len: usize,
-    capacity: usize,
 
     // Separate arrays for each field (Structure-of-Arrays)
     timestamps: Vec<u64>, // Unix timestamps for compact storage
@@ -52,7 +51,6 @@ impl CacheOptimizedTimeSeries {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             len: 0,
-            capacity,
             timestamps: Vec::with_capacity(capacity),
             opens: Vec::with_capacity(capacity),
             highs: Vec::with_capacity(capacity),
@@ -69,18 +67,19 @@ impl CacheOptimizedTimeSeries {
     /// This is useful for creating time series from price data without full OHLCV information
     pub fn from_slice(prices: &[f64]) -> Self {
         let mut time_series = Self::with_capacity(prices.len());
-        
+
         for (i, &price) in prices.iter().enumerate() {
             // Use the price as both open, high, low, and close for simplicity
             // Use current timestamp + offset for timestamps
             let timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_secs() + i as u64;
-            
+                .as_secs()
+                + i as u64;
+
             time_series.push(timestamp, price, price, price, price, 1000);
         }
-        
+
         time_series
     }
 

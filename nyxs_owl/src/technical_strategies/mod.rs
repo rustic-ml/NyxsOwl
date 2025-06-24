@@ -234,7 +234,7 @@ pub trait TechnicalStrategy: Strategy {
     fn validate_parameters(&self) -> NyxsOwlResult<()>;
 }
 
-use crate::simple_types::{Result as NyxsOwlResult, Signal, NyxsOwlError};
+use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 
 // Declare strategy category modules
 pub mod momentum;
@@ -477,8 +477,8 @@ pub enum CombinationMethod {
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use super::{
-        CombinationMethod, ConfigValue, PerformanceMetrics, SignalFilter, Strategy, StrategyConfig,
-        TechnicalSignal, TechnicalStrategy, ConfigExtractor,
+        CombinationMethod, ConfigExtractor, ConfigValue, PerformanceMetrics, SignalFilter,
+        Strategy, StrategyConfig, TechnicalSignal, TechnicalStrategy,
     };
     pub use crate::simple_types::{NyxsOwlError, Result as NyxsOwlResult, Signal};
 

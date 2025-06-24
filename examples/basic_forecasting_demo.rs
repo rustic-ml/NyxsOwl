@@ -67,6 +67,30 @@ fn demo_backtest(df: &DataFrame) -> std::result::Result<(), Box<dyn std::error::
     // Extract prices for backtesting
     let prices: Vec<f64> = df.column("close")?.f64()?.into_no_null_iter().collect();
 
+    // The ARIMA strategy only generates signals from min_data_points onwards
+    // We need to pad the beginning with Hold signals to match the price length
+    let mut padded_signals = Vec::with_capacity(prices.len());
+
+    // Add Hold signals for the initial period where no forecasts are generated
+    for _ in 0..50 {
+        padded_signals.push(Signal::Hold);
+    }
+
+    // Add the actual generated signals
+    padded_signals.extend_from_slice(&signals);
+
+    // Ensure we have the same number of signals as prices
+    if padded_signals.len() != prices.len() {
+        // If we still have a mismatch, pad with Hold signals to match
+        while padded_signals.len() < prices.len() {
+            padded_signals.push(Signal::Hold);
+        }
+        // If we have too many signals, truncate
+        if padded_signals.len() > prices.len() {
+            padded_signals.truncate(prices.len());
+        }
+    }
+
     // Create backtester
     let backtest_config = BacktestConfig {
         initial_capital: 10000.0,
@@ -77,7 +101,7 @@ fn demo_backtest(df: &DataFrame) -> std::result::Result<(), Box<dyn std::error::
     };
 
     let backtester = ForecastBacktester::new(backtest_config);
-    let performance = backtester.backtest(&prices, &signals, None)?;
+    let performance = backtester.backtest(&prices, &padded_signals, None)?;
 
     println!("  📊 Results:");
     println!(
