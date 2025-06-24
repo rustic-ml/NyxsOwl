@@ -1541,7 +1541,13 @@ impl ArimaStrategy {
         // Convert forecast results to signals
         for (i, result) in results.iter().enumerate() {
             let current_price = prices[self.config.min_data_points + i];
-            let forecast_result = self.convert_parallel_result_to_forecast(result);
+            let forecast_result = ForecastResult {
+                point_forecast: result.result.forecast_price,
+                lower_bound: None, // Not provided by async result
+                upper_bound: None, // Not provided by async result
+                confidence_level: result.result.confidence,
+                model_used: result.result.metadata.clone(),
+            };
             let signal = self.forecast_to_enhanced_signal(
                 current_price,
                 &forecast_result,
@@ -1593,21 +1599,6 @@ impl ArimaStrategy {
         ((total_length - index) as f64 / total_length as f64 * 255.0) as u8
     }
 
-    /// Convert parallel processing result to ForecastResult
-    #[cfg(feature = "async-support")]
-    fn convert_parallel_result_to_forecast(
-        &self,
-        result: &crate::async_parallel::ForecastResult,
-    ) -> ForecastResult {
-        ForecastResult {
-            point_forecast: result.forecast_price,
-            lower_bound: None, // Not provided by async result
-            upper_bound: None, // Not provided by async result
-            confidence_level: result.confidence,
-            model_used: result.metadata.clone(),
-        }
-    }
-
     /// Process ensemble forecasts using parallel processing
     #[cfg(feature = "async-support")]
     pub async fn generate_ensemble_signals_async(
@@ -1638,7 +1629,13 @@ impl ArimaStrategy {
             // Convert ensemble results to signals
             for (i, result) in ensemble_results.iter().enumerate() {
                 let current_price = prices[self.config.min_data_points + i];
-                let forecast_result = self.convert_parallel_result_to_forecast(result);
+                let forecast_result = ForecastResult {
+                    point_forecast: result.forecast_price,
+                    lower_bound: None, // Not provided by async result
+                    upper_bound: None, // Not provided by async result
+                    confidence_level: result.confidence,
+                    model_used: result.metadata.clone(),
+                };
                 let signal = self.forecast_to_enhanced_signal(
                     current_price,
                     &forecast_result,
