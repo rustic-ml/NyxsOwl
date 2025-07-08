@@ -9,4 +9,6 @@ pub mod williams_r_strategy;
 pub use williams_r_strategy::{WilliamsRConfig, WilliamsRStrategy};
 
 /// RSI strategy functions
-pub use rsi_strategy::{rsi_signals, rsi_bullish_failure_swing, rsi_bearish_failure_swing, rsi_combined_signals};
+pub use rsi_strategy::{
+    rsi_bearish_failure_swing, rsi_bullish_failure_swing, rsi_combined_signals, rsi_signals,
+};
