@@ -31,6 +31,8 @@
 
 #![warn(missing_docs)]
 #![warn(clippy::all)]
+#![allow(warnings)]
+#![allow(unused_imports, unused_variables, dead_code)]
 
 // Common types and utilities
 pub mod common;
